@@ -53,6 +53,14 @@ export type DayLog = {
   activities: Activity[];
   actualInstructors: string[];
   actualSeniors: string[];
+  dutyStamps?: Record<
+    string,
+    {
+      stampedByUid: string;
+      stampedByName: string;
+      stampedAt: string;
+    }
+  >;
 };
 
 export type DemoData = {

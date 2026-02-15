@@ -543,6 +543,11 @@ const toFamilyName = (fullName: string): string => {
   return normalized;
 };
 
+const DEMO_STAMP_USER = {
+  uid: "demo_writer",
+  name: "渋谷",
+};
+
 export function LogPage({
   data,
   updateDayLog,
@@ -562,6 +567,7 @@ export function LogPage({
     activities: [],
     actualInstructors: [],
     actualSeniors: [],
+    dutyStamps: {},
   };
 
   const plannedInstructors = useMemo(
@@ -594,6 +600,14 @@ export function LogPage({
   const activityTypeSuggestRef = useRef<HTMLDivElement>(null);
   const activityTypeInputRef = useRef<HTMLInputElement>(null);
   const [activityTypeError, setActivityTypeError] = useState("");
+  const [stampMessage, setStampMessage] = useState("");
+  const [animatingStampOrder, setAnimatingStampOrder] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!stampMessage) return;
+    const timer = window.setTimeout(() => setStampMessage(""), 1800);
+    return () => window.clearTimeout(timer);
+  }, [stampMessage]);
 
   const onSaveDemo = () => {
     const nextInstructors = log.actualInstructors.map((name) => name.trim()).filter(Boolean);
@@ -854,6 +868,44 @@ export function LogPage({
     closeRsvpModal();
   };
 
+  const onStampDuty = (sessionOrder: number, plannedName: string) => {
+    if (!plannedName) return;
+    const key = String(sessionOrder);
+    const current = log.dutyStamps?.[key];
+
+    if (current?.stampedByUid === DEMO_STAMP_USER.uid) {
+      setStampMessage("捺印済みです");
+      return;
+    }
+
+    const needsConfirm = Boolean(current) || plannedName !== DEMO_STAMP_USER.name;
+    if (needsConfirm) {
+      const fromName = current?.stampedByName ?? plannedName;
+      const ok = window.confirm(
+        `当番者を「${fromName}」から「${DEMO_STAMP_USER.name}」に変更して捺印します。よろしいですか？`,
+      );
+      if (!ok) return;
+    }
+
+    updateDayLog(date, (prev) => ({
+      ...prev,
+      dutyStamps: {
+        ...(prev.dutyStamps ?? {}),
+        [key]: {
+          stampedByUid: DEMO_STAMP_USER.uid,
+          stampedByName: DEMO_STAMP_USER.name,
+          stampedAt: new Date().toISOString(),
+        },
+      },
+    }));
+
+    setStampMessage("捺印しました");
+    setAnimatingStampOrder(sessionOrder);
+    window.setTimeout(() => {
+      setAnimatingStampOrder((prev) => (prev === sessionOrder ? null : prev));
+    }, 260);
+  };
+
   return (
     <section className="card log-page">
       <div className="log-toolbar">
@@ -1102,20 +1154,40 @@ export function LogPage({
         <div className="duty-section">
           <div className="duty-connected-scroll">
             <div className="duty-connected-wrap">
-              {dutySlots.map((slot, index) => (
-                <div key={`${slot.name}-${index}`} className="duty-connected-cell">
-                  {slot.name ? (
-                    <span
-                      className="duty-stamp-circle"
-                      style={{ transform: `rotate(${slot.rotate}deg)` }}
-                    >
-                      <span className="duty-stamp-text">{slot.familyName}</span>
-                    </span>
-                  ) : null}
-                </div>
-              ))}
+              {dutySlots.map((slot, index) => {
+                const order = sessions[index]?.order ?? index + 1;
+                const stamp = log.dutyStamps?.[String(order)];
+                const isStamped = Boolean(stamp);
+                const stampDisplayName = isStamped
+                  ? toFamilyName(stamp?.stampedByName ?? "")
+                  : slot.familyName;
+                return (
+                  <div key={`${slot.name}-${index}`} className="duty-connected-cell">
+                    {slot.name ? (
+                      <button
+                        type="button"
+                        className={`duty-stamp-circle duty-stamp-button ${
+                          isStamped ? "stamped" : "unstamped"
+                        }`}
+                        style={{ transform: `rotate(${slot.rotate}deg)` }}
+                        onClick={() => onStampDuty(order, slot.name)}
+                        title={
+                          stamp
+                            ? `捺印者: ${stamp.stampedByName} / ${new Date(stamp.stampedAt).toLocaleString("ja-JP")}`
+                            : "未捺印"
+                        }
+                        >
+                        <span className={`duty-stamp-text ${animatingStampOrder === order ? "stamp-pop" : ""}`}>
+                          {stampDisplayName}
+                        </span>
+                      </button>
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
           </div>
+          {stampMessage && <p className="duty-stamp-note">{stampMessage}</p>}
         </div>
       </div>
 
