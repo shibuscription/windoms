@@ -20,6 +20,7 @@ export function App() {
             activities: [],
             actualInstructors: [],
             actualSeniors: [],
+            mainInstructorAttendance: {},
             dutyStamps: {},
           };
           return {

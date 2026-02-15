@@ -699,6 +699,13 @@ body {
   gap: 12px;
 }
 
+.log-three-cols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
 .log-person-column {
   display: grid;
   gap: 8px;
@@ -784,6 +791,39 @@ body {
 
 .panel-body {
   padding: 10px 12px;
+}
+
+.main-instructor-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.main-instructor-row {
+  display: grid;
+  grid-template-columns: minmax(9ch, max-content) 1fr;
+  align-items: center;
+  column-gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.main-instructor-row:last-child {
+  border-bottom: 0;
+}
+
+.main-instructor-time {
+  white-space: nowrap;
+}
+
+.main-instructor-check {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.main-instructor-check input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
 }
 
 .name-list {
@@ -1331,7 +1371,8 @@ textarea {
   .field-grid,
   .split,
   .activity-form,
-  .log-two-cols {
+  .log-two-cols,
+  .log-three-cols {
     grid-template-columns: 1fr;
   }
 

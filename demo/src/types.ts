@@ -53,6 +53,7 @@ export type DayLog = {
   activities: Activity[];
   actualInstructors: string[];
   actualSeniors: string[];
+  mainInstructorAttendance?: Record<string, boolean>;
   dutyStamps?: Record<
     string,
     {

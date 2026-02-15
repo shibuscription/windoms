@@ -42,7 +42,7 @@ export const mockData: DemoData = {
           location: "音楽室",
           assignees: ["uid_001"],
           assigneeNameSnapshot: "林 太郎",
-          plannedInstructors: ["講師A"],
+          plannedInstructors: ["井野先生", "講師A"],
           plannedSeniors: ["先輩B"],
           demoRsvps: [
             { uid: "m01", displayName: "田中", status: "yes" },
@@ -121,6 +121,7 @@ export const mockData: DemoData = {
       ],
       actualInstructors: ["講師A"],
       actualSeniors: [],
+      mainInstructorAttendance: {},
     },
   },
 };

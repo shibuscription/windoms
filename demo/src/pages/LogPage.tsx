@@ -547,6 +547,7 @@ const DEMO_STAMP_USER = {
   uid: "demo_writer",
   name: "渋谷",
 };
+const MAIN_INSTRUCTOR_NAME = "井野先生";
 
 export function LogPage({
   data,
@@ -567,6 +568,7 @@ export function LogPage({
     activities: [],
     actualInstructors: [],
     actualSeniors: [],
+    mainInstructorAttendance: {},
     dutyStamps: {},
   };
 
@@ -589,7 +591,7 @@ export function LogPage({
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
   const [editingActivityIndex, setEditingActivityIndex] = useState<number | null>(null);
   const [activityDraft, setActivityDraft] = useState<Activity>(emptyActivity);
-  const [refModal, setRefModal] = useState<"instructors" | "seniors" | null>(null);
+  const [refModal, setRefModal] = useState<"mainInstructor" | "instructors" | "seniors" | null>(null);
   const [selectedRsvpSession, setSelectedRsvpSession] = useState<SessionDoc | null>(null);
   const [rsvpDraft, setRsvpDraft] = useState<Record<string, RsvpStatus | "">>({});
   const [rsvpError, setRsvpError] = useState("");
@@ -633,8 +635,28 @@ export function LogPage({
   const locationRows = sessions.filter((session) => Boolean(session.location));
   const weatherValue = normalizeWeather(log.weather);
   const selectedWeatherTone = weatherToneClass(weatherValue);
-  const refModalItems = refModal === "instructors" ? plannedInstructors : plannedSeniors;
-  const refModalTitle = refModal === "instructors" ? "講師予定" : "先輩予定";
+  const mainInstructorPlanByOrder = useMemo(() => {
+    const entries = sessions.map((session) => [
+      session.order,
+      Boolean((session.plannedInstructors ?? []).includes(MAIN_INSTRUCTOR_NAME)),
+    ]);
+    return Object.fromEntries(entries) as Record<number, boolean>;
+  }, [sessions]);
+  const refModalItems =
+    refModal === "mainInstructor"
+      ? sessions.map((session) => {
+          const planned = mainInstructorPlanByOrder[session.order] ? "◯" : "×";
+          return `${formatTimeNoLeadingZero(session.startTime)}〜${formatTimeNoLeadingZero(session.endTime)}　${planned}`;
+        })
+      : refModal === "instructors"
+        ? plannedInstructors
+        : plannedSeniors;
+  const refModalTitle =
+    refModal === "mainInstructor"
+      ? "講師予定（井野先生）"
+      : refModal === "instructors"
+        ? "外部講師予定"
+        : "先輩予定";
 
   const activityEntries = useMemo(() => sortedActivityEntries(log.activities), [log.activities]);
   const instructorHistoryCandidates = useMemo(
@@ -830,6 +852,17 @@ export function LogPage({
     }));
   };
 
+  const toggleMainInstructorAttendance = (sessionOrder: number) => {
+    const key = String(sessionOrder);
+    updateDayLog(date, (prev) => ({
+      ...prev,
+      mainInstructorAttendance: {
+        ...(prev.mainInstructorAttendance ?? {}),
+        [key]: !(prev.mainInstructorAttendance?.[key] ?? false),
+      },
+    }));
+  };
+
   const openRsvpModal = (session: SessionDoc) => {
     setSelectedRsvpSession(session);
     const nextDraft: Record<string, RsvpStatus | ""> = {};
@@ -1020,7 +1053,45 @@ export function LogPage({
         </div>
       </div>
 
-      <div className="log-two-cols">
+      <div className="log-three-cols">
+        <div className="log-panel">
+          <div className="ref-panel">
+            <div className="section-header">
+              <h2>講師（井野先生）</h2>
+              <button
+                type="button"
+                className="button button-small ghost-button section-action"
+                onClick={() => setRefModal("mainInstructor")}
+              >
+                予定を見る
+              </button>
+            </div>
+          </div>
+          <div className="panel-body">
+            <ul className="main-instructor-list">
+              {sessions.map((session) => {
+                const key = String(session.order);
+                const checked = Boolean(log.mainInstructorAttendance?.[key]);
+                return (
+                  <li key={session.order} className="main-instructor-row">
+                    <span className="main-instructor-time">
+                      {formatTimeNoLeadingZero(session.startTime)}〜
+                      {formatTimeNoLeadingZero(session.endTime)}
+                    </span>
+                    <span className="main-instructor-check">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleMainInstructorAttendance(session.order)}
+                        aria-label={`講師在席実績 ${formatTimeNoLeadingZero(session.startTime)}〜${formatTimeNoLeadingZero(session.endTime)}`}
+                      />
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
         <div className="log-panel">
           <div className="ref-panel">
             <div className="section-header">
