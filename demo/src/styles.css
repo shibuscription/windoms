@@ -22,6 +22,9 @@ body {
 }
 
 .app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 12px 20px;
   background: #0f172a;
 }
@@ -30,6 +33,124 @@ body {
   color: #fff;
   text-decoration: none;
   font-weight: 700;
+}
+
+.menu-trigger {
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-radius: 8px;
+  min-width: 40px;
+  height: 36px;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  background: rgba(2, 6, 23, 0.78);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 16px 16px;
+}
+
+.menu-panel {
+  width: min(1080px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 12px 6px 6px;
+  position: relative;
+}
+
+.menu-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  border: 0;
+  background: transparent;
+  color: #f8fafc;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.menu-today-header {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: center;
+  color: #fff;
+  cursor: pointer;
+  padding: 8px 28px 16px;
+  margin: 0;
+}
+
+.menu-today-date {
+  display: inline-block;
+  font-size: clamp(1.6rem, 3.4vw, 2.2rem);
+  font-weight: 800;
+  color: #fff;
+}
+
+.menu-today-weekday {
+  margin-left: 4px;
+  font-size: clamp(1rem, 2.2vw, 1.2rem);
+  font-weight: 700;
+}
+
+.menu-today-weekday.weekday {
+  color: #e5e7eb;
+}
+
+.menu-today-weekday.sat {
+  color: #60a5fa;
+}
+
+.menu-today-weekday.sun {
+  color: #f87171;
+}
+
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 12px;
+}
+
+.menu-item {
+  border: 1px solid #d4dbe5;
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px 10px;
+  min-height: 94px;
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: #1f2937;
+}
+
+.menu-item.active {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.menu-item-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.menu-item-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .page-wrap {
@@ -1357,8 +1478,8 @@ textarea {
 
 .demo-badge {
   position: fixed;
-  top: 10px;
-  right: 10px;
+  top: 56px;
+  right: 12px;
   background: #b91c1c;
   color: #fff;
   border-radius: 999px;
@@ -1394,5 +1515,14 @@ textarea {
 
   .log-weather {
     margin-left: 0;
+  }
+
+  .menu-overlay {
+    padding: 14px 10px 10px;
+  }
+
+  .menu-panel {
+    border-radius: 0;
+    padding: 12px 2px 2px;
   }
 }
