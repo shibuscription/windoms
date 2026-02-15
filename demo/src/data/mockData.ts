@@ -1,19 +1,10 @@
 import type { DemoData } from "../types";
-import { todayDateKey } from "../utils/date";
+import { shiftDateKey, todayDateKey } from "../utils/date";
 
 const today = todayDateKey();
-const offsetDateKey = (base: string, days: number): string => {
-  const [year, month, day] = base.split("-").map(Number);
-  const date = new Date(year, month - 1, day);
-  date.setDate(date.getDate() + days);
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-};
-const dayMinus1 = offsetDateKey(today, -1);
-const dayMinus2 = offsetDateKey(today, -2);
-const dayMinus3 = offsetDateKey(today, -3);
+const dayMinus1 = shiftDateKey(today, -1);
+const dayMinus2 = shiftDateKey(today, -2);
+const dayMinus3 = shiftDateKey(today, -3);
 
 export const mockData: DemoData = {
   demoDictionaries: {
@@ -37,7 +28,7 @@ export const mockData: DemoData = {
     [today]: {
       defaultLocation: "第1音楽室",
       notice:
-        "本日16:30に片付け開始です。\n打楽器は搬出前にチェックリストを確認してください。",
+        "1行目: 本日16:30に片付け開始です。\n2行目: 打楽器は搬出前にチェックリストを確認してください。\n3行目: 譜面台は最後に倉庫へ戻してください。\n4行目: 合奏後は全員で床の確認を行います。\n5行目: 水分補給は休憩時にまとめて実施してください。\n6行目: 体育館利用時は上履きを忘れないでください。\n7行目: チューナーとメトロノームは当番が回収します。\n8行目: 終了後に忘れ物チェックを必ず行ってください。\n9行目: 連絡事項は日誌備考にも記録してください。\n10行目: お疲れさまでした。",
       plannedInstructors: ["講師A", "講師B"],
       plannedSeniors: ["先輩B", "先輩C", "先輩D"],
       sessions: [

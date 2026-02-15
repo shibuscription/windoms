@@ -76,7 +76,10 @@ export function App() {
       <main className="page-wrap">
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/today" element={<TodayPage data={context.data} />} />
+          <Route
+            path="/today"
+            element={<TodayPage data={context.data} updateDayLog={context.updateDayLog} />}
+          />
           <Route
             path="/logs/:date"
             element={
