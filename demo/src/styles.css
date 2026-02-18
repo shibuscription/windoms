@@ -2,6 +2,7 @@
   font-family: "Segoe UI", "Yu Gothic UI", sans-serif;
   color: #1f2937;
   background: #f7f8fa;
+  --header-h: 60px;
   --section-header-bg: #eef2f7;
   --section-header-fg: #374151;
   --section-header-border: #d6dde8;
@@ -22,11 +23,16 @@ body {
 }
 
 .app-header {
+  position: sticky;
+  top: 0;
+  z-index: 250;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  min-height: var(--header-h);
   padding: 12px 20px;
   background: #0f172a;
+  gap: 10px;
 }
 
 .brand {
@@ -47,6 +53,58 @@ body {
   cursor: pointer;
 }
 
+.header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.status-icon-button {
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border-radius: 999px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.status-icon-button.active {
+  background: rgba(37, 99, 235, 0.32);
+  border-color: rgba(147, 197, 253, 0.8);
+}
+
+.status-icon-button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.status-icon-emoji {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.status-icon-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.68rem;
+  line-height: 16px;
+  font-weight: 700;
+  text-align: center;
+  border: 1px solid rgba(15, 23, 42, 0.65);
+}
+
 .menu-overlay {
   position: fixed;
   inset: 0;
@@ -56,6 +114,76 @@ body {
   align-items: flex-start;
   justify-content: center;
   padding: 24px 16px 16px;
+}
+
+.status-panel-overlay {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: var(--header-h);
+  bottom: 0;
+  background: rgba(2, 6, 23, 0.42);
+  z-index: 230;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 8px 10px 10px;
+}
+
+.status-panel {
+  width: min(640px, calc(100vw - 20px));
+  max-height: calc(100vh - var(--header-h) - 16px);
+  overflow: auto;
+  background: #0f172a;
+  color: #e5e7eb;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 12px;
+  padding: 14px 16px 18px;
+  position: relative;
+  box-shadow: 0 10px 26px rgba(2, 6, 23, 0.42);
+  animation: drop-down 160ms ease-out;
+}
+
+.status-panel-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  border: 0;
+  background: transparent;
+  color: #f8fafc;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.status-panel-subtitle {
+  margin: 0 24px 4px 0;
+  color: #93c5fd;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.status-panel-title {
+  margin: 0 24px 8px 0;
+  font-size: 1.05rem;
+}
+
+.status-panel-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+@keyframes drop-down {
+  from {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .menu-panel {
@@ -203,7 +331,7 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .date-nav-button {
@@ -214,10 +342,25 @@ body {
   padding: 8px 12px;
   cursor: pointer;
   min-height: 38px;
+  flex-shrink: 0;
 }
 
 .today-date-center {
   position: relative;
+  z-index: 5;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+  overflow: visible;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 2px 4px;
+}
+
+.today-date-center:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
 }
 
 .today-date-picker-trigger {
@@ -231,9 +374,15 @@ body {
   font-size: 1.65rem;
   font-weight: 700;
   line-height: 1.1;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .today-date-picker-trigger:hover {
+  background: #f8fafc;
+}
+
+.today-date-center:hover .today-date-picker-trigger {
   background: #f8fafc;
 }
 
@@ -408,6 +557,10 @@ body {
 
 .date-main {
   color: #111827;
+}
+
+.date-short {
+  display: none;
 }
 
 .date-weekday {
@@ -1489,6 +1642,10 @@ textarea {
 }
 
 @media (max-width: 760px) {
+  :root {
+    --header-h: 54px;
+  }
+
   .field-grid,
   .split,
   .activity-form,
@@ -1507,6 +1664,12 @@ textarea {
   .today-date-nav {
     width: 100%;
     justify-content: space-between;
+    gap: 6px;
+  }
+
+  .date-nav-button {
+    padding: 7px 10px;
+    font-size: 0.9rem;
   }
 
   .log-time-range-inline {
@@ -1524,5 +1687,75 @@ textarea {
   .menu-panel {
     border-radius: 0;
     padding: 12px 2px 2px;
+  }
+
+  .app-header {
+    padding: 10px 12px;
+  }
+
+  .header-actions {
+    gap: 6px;
+  }
+
+  .status-icon-button,
+  .menu-trigger {
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+  }
+
+  .status-panel-overlay {
+    padding: 6px 8px 8px;
+  }
+
+  .status-panel {
+    width: calc(100vw - 16px);
+  }
+}
+
+@media (max-width: 480px) {
+  .today-date-nav {
+    gap: 4px;
+  }
+
+  .date-nav-button {
+    padding: 6px 8px;
+    font-size: 0.84rem;
+  }
+
+  .today-date-picker-trigger {
+    width: 100%;
+    justify-content: center;
+    font-size: 1.36rem;
+    padding: 8px 6px;
+    gap: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .date-weekday {
+    margin-left: 2px;
+    font-size: 0.74em;
+  }
+
+  .calendar-icon {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .date-full {
+    display: none;
+  }
+
+  .date-short {
+    display: inline;
+  }
+}
+
+@media (min-width: 601px) {
+  .date-short {
+    display: none;
   }
 }

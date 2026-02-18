@@ -627,5 +627,50 @@ Windomsは「吹奏楽クラブ運営者の心理的・物理的負担を軽減�
 - メニュー項目に「楽器」を追加し、「メンバー／ロール」を「メンバー」に更新
 - DEMOバッジとメニュー操作が干渉しない配置方針を明確化
 
+---
+
+## 21. 設計思想の追記（Session / Event / Task / Today / Action Bar）
+
+### 21.1 データモデル設計思想（Session / Event / Task）
+
+- Session：日時を持つ活動単位（Today/日誌の起点）
+- Event：意味のまとまり（コンサート/コンクール/合宿等）。時間はSession側に持たせる考え方（Event自体は日時必須ではない）
+- Task：実行単位（TODO）
+
+### 21.2 EventとSessionの関係
+
+- Eventは0個以上のSessionを持てる
+- SessionはEventを0 or 1持つ
+- N対Nは不要（当面やらない）
+- 例：合宿はEvent1つに対して複数Session（各日の練習枠）
+- 例：本番に向けた事前練習3回も同じEventに紐付けて見られる
+
+### 21.3 Taskの紐付け（XORルール）
+
+- Taskは紐付け先を最大1つ（none / sessionId / eventId）
+- 同時にsessionIdとeventIdの両方は持たない
+- Eventに紐付いたTaskは、関連Session側でも「表示」は可能（データ重複はしない）
+
+### 21.4 Today画面の役割（Notice含む）
+
+- Todayは運営の現在地（起点画面）
+- Noticeは「手動作成型」と「自動生成型」を想定
+- 通知ログではなく「今、知るべきこと」を表示する層
+
+### 21.5 Action Bar（ステータスバー）
+
+- Todayヘッダー右側にステータスアイコン（🔔/✅/📅）を置く
+- Action Bar（ステータスバー）はWindoms共通ヘッダーとして全画面に表示する
+- バッジで件数を示し、タップで各パネルを開く
+- ハンバーガーは最右固定（メニューは既存のオーバーレイ方式を維持）
+
+### 21.6 表示ルール（Taskの見せ方）
+
+- Sessionに紐付くTaskは、そのSession詳細画面に表示される。
+- Eventに紐付くTaskは、Event詳細画面に表示される。
+- Event配下のSession画面では、Event由来のTaskも参照表示できる（ただしデータは重複保存しない）。
+- Session由来のTaskとEvent由来のTaskは、表示上区別できるようにする（例：バッジ表示など）。
+- Taskの保存先は常に一意であり、表示のためにコピーを作らない。
+
 
 

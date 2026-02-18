@@ -182,6 +182,11 @@ export function TodayPage({ data, updateDayLog }: TodayPageProps) {
     setNoticeExpanded((prev) => !prev);
   };
 
+  const toggleMiniCalendar = () => {
+    setCalendarMonth(toMonthKey(date));
+    setIsCalendarOpen((prev) => !prev);
+  };
+
   return (
     <section className="card">
       <div className="today-header today-date-view">
@@ -189,31 +194,31 @@ export function TodayPage({ data, updateDayLog }: TodayPageProps) {
           <button type="button" className="date-nav-button" onClick={() => moveDate(-1)}>
             ← 前日
           </button>
-          <div className="today-date-center" ref={calendarWrapRef}>
+          <div
+            className="today-date-center"
+            ref={calendarWrapRef}
+            role="button"
+            tabIndex={0}
+            onClick={toggleMiniCalendar}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                toggleMiniCalendar();
+              }
+            }}
+          >
             <div
               className="today-date-picker-trigger"
-              role="button"
-              tabIndex={0}
-              onClick={() => {
-                setCalendarMonth(toMonthKey(date));
-                setIsCalendarOpen((prev) => !prev);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  setCalendarMonth(toMonthKey(date));
-                  setIsCalendarOpen((prev) => !prev);
-                }
-              }}
             >
-              <span className="date-main">{formatDateYmd(date)}</span>
+              <span className="date-main date-full">{formatDateYmd(date)}</span>
+              <span className="date-main date-short">{formatDateYmd(date).slice(5)}</span>
               <span className={`date-weekday ${weekdayTone(date)}`}>（{formatWeekdayJa(date)}）</span>
               <span className="calendar-icon" aria-hidden="true">
                 📅
               </span>
             </div>
             {isCalendarOpen && (
-              <div className="today-calendar-popover">
+              <div className="today-calendar-popover" onClick={(event) => event.stopPropagation()}>
                 <div className="mini-calendar-header">
                   <button
                     type="button"

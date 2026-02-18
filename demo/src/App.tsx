@@ -32,23 +32,72 @@ const menuItems = (today: string): MenuItem[] => [
 export function App() {
   const [data, setData] = useState<DemoData>(mockData);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [activeStatusPanel, setActiveStatusPanel] = useState<"notice" | "todo" | "duty" | null>(
+    null,
+  );
   const location = useLocation();
   const navigate = useNavigate();
   const today = todayDateKey();
 
   useEffect(() => {
-    if (!isMenuOpen) return;
+    if (!isMenuOpen && !activeStatusPanel) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setIsMenuOpen(false);
+      if (event.key === "Escape") setActiveStatusPanel(null);
     };
     document.addEventListener("keydown", onKeyDown);
     const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    if (isMenuOpen || activeStatusPanel) {
+      document.body.style.overflow = "hidden";
+    }
     return () => {
       document.removeEventListener("keydown", onKeyDown);
       document.body.style.overflow = originalOverflow;
     };
-  }, [isMenuOpen]);
+  }, [isMenuOpen, activeStatusPanel]);
+
+  useEffect(() => {
+    if (!activeStatusPanel) return;
+    setActiveStatusPanel(null);
+  }, [location.key]);
+
+  const statusButtons: Array<{ id: "notice" | "todo" | "duty"; icon: string; label: string; badge: number }> = [
+    { id: "notice", icon: "🔔", label: "Notices", badge: 2 },
+    { id: "todo", icon: "✅", label: "My TODO", badge: 3 },
+    { id: "duty", icon: "📅", label: "次の当番", badge: 1 },
+  ];
+  const statusPanelMeta: Record<
+    "notice" | "todo" | "duty",
+    { title: string; subtitle: string; items: string[] }
+  > = {
+    notice: {
+      title: "Notices",
+      subtitle: "お知らせ（DEMO）",
+      items: [
+        "本日 16:30 片付け開始です。",
+        "週末本番の集合は 8:40 正門前です。",
+        "譜面台の不足分を職員室で受け取りください。",
+      ],
+    },
+    todo: {
+      title: "My TODO",
+      subtitle: "担当TODO（DEMO）",
+      items: [
+        "打楽器チェックリストを更新する",
+        "本番用チラシを配布する",
+        "見守り当番の最終確認を行う",
+      ],
+    },
+    duty: {
+      title: "次の当番",
+      subtitle: "当番予定（DEMO）",
+      items: [
+        "日時: 2026-02-21 09:00-12:00",
+        "場所: 第1音楽室",
+        "備考: 入室前に出欠確認をお願いします。",
+      ],
+    },
+  };
 
   const context = useMemo(
     () => ({
@@ -115,14 +164,38 @@ export function App() {
         <Link to="/" className="brand">
           Windoms demo
         </Link>
-        <button
-          type="button"
-          className="menu-trigger"
-          aria-label="メニューを開く"
-          onClick={() => setIsMenuOpen(true)}
-        >
-          ☰
-        </button>
+        <div className="header-actions">
+          {statusButtons.map((item) => {
+            const isActive = activeStatusPanel === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                className={`status-icon-button ${isActive ? "active" : ""}`}
+                aria-label={item.label}
+                onClick={() => setActiveStatusPanel((prev) => (prev === item.id ? null : item.id))}
+              >
+                <span className="status-icon-emoji" aria-hidden="true">
+                  {item.icon}
+                </span>
+                <span className="status-icon-badge" aria-hidden="true">
+                  {item.badge}
+                </span>
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            className="menu-trigger"
+            aria-label="メニューを開く"
+            onClick={() => {
+              setActiveStatusPanel(null);
+              setIsMenuOpen(true);
+            }}
+          >
+            ☰
+          </button>
+        </div>
       </header>
       <main className="page-wrap">
         <Routes>
@@ -186,6 +259,27 @@ export function App() {
               ))}
             </div>
           </div>
+        </div>
+      )}
+      {activeStatusPanel && (
+        <div className="status-panel-overlay" onClick={() => setActiveStatusPanel(null)}>
+          <section className="status-panel" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="status-panel-close"
+              aria-label="パネルを閉じる"
+              onClick={() => setActiveStatusPanel(null)}
+            >
+              ×
+            </button>
+            <p className="status-panel-subtitle">{statusPanelMeta[activeStatusPanel].subtitle}</p>
+            <h2 className="status-panel-title">{statusPanelMeta[activeStatusPanel].title}</h2>
+            <ul className="status-panel-list">
+              {statusPanelMeta[activeStatusPanel].items.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </section>
         </div>
       )}
     </div>
