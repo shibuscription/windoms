@@ -6,10 +6,18 @@ import { LogPage } from "./pages/LogPage";
 import { ActivityPlanPage } from "./pages/ActivityPlanPage";
 import { AttendancePage } from "./pages/AttendancePage";
 import { WatchPage } from "./pages/WatchPage";
+import { ShiftSurveyPage } from "./pages/ShiftSurveyPage";
 import { mockData } from "./data/mockData";
 import type { DayLog, DemoData, DemoRsvp } from "./types";
 import { formatDateYmd, formatWeekdayJa, todayDateKey, weekdayTone } from "./utils/date";
-import { getActivityPlanTargetMonthKey, readActivityPlanStatus, readDemoRole, readDemoUnansweredCount } from "./utils/activityPlan";
+import {
+  activityPlanStatusStorageKey,
+  activityPlanUnansweredStorageKey,
+  getActivityPlanTargetMonthKey,
+  readActivityPlanStatus,
+  readDemoRole,
+  readDemoUnansweredCount,
+} from "./utils/activityPlan";
 
 type MenuItem = {
   id: string;
@@ -155,6 +163,7 @@ export function App() {
   const [activeStatusPanel, setActiveStatusPanel] = useState<"notice" | "todo" | "duty" | null>(
     null,
   );
+  const [isDevPanelOpen, setIsDevPanelOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const today = todayDateKey();
@@ -166,6 +175,13 @@ export function App() {
     isAdmin && activityPlanStatus === "SURVEY_OPEN" && unansweredCount > 0
       ? `未回答 ${unansweredCount}`
       : undefined;
+  const hasShiftSurveyTodo = isAdmin && activityPlanStatus === "SURVEY_OPEN" && unansweredCount > 0;
+  const shiftSurveyPath = `/shift-survey?month=${activityPlanMonthKey}`;
+  const statusStorageKey = activityPlanStatusStorageKey(activityPlanMonthKey);
+  const unansweredStorageKey = activityPlanUnansweredStorageKey(activityPlanMonthKey);
+  const [demoStatus, setDemoStatus] = useState<string>(activityPlanStatus);
+  const [demoUnanswered, setDemoUnanswered] = useState<string>(String(unansweredCount));
+  const [demoRoleDraft, setDemoRoleDraft] = useState<"admin" | "member">(readDemoRole());
 
   useEffect(() => {
     if (!isMenuOpen && !activeStatusPanel) return;
@@ -191,38 +207,52 @@ export function App() {
 
   const statusButtons: Array<{ id: "notice" | "todo" | "duty"; icon: string; label: string; badge: number }> = [
     { id: "notice", icon: "🔔", label: "Notices", badge: 2 },
-    { id: "todo", icon: "✅", label: "My TODO", badge: 3 },
+    { id: "todo", icon: "✅", label: "My TODO", badge: 3 + (hasShiftSurveyTodo ? 1 : 0) },
     { id: "duty", icon: "📅", label: "次の当番", badge: 1 },
   ];
+  type StatusPanelItem = {
+    id: string;
+    text: string;
+    actionLabel?: string;
+    to?: string;
+  };
   const statusPanelMeta: Record<
     "notice" | "todo" | "duty",
-    { title: string; subtitle: string; items: string[] }
+    { title: string; subtitle: string; items: StatusPanelItem[] }
   > = {
     notice: {
       title: "Notices",
       subtitle: "お知らせ（DEMO）",
       items: [
-        "本日 16:30 片付け開始です。",
-        "週末本番の集合は 8:40 正門前です。",
-        "譜面台の不足分を職員室で受け取りください。",
+        { id: "notice-1", text: "本日 16:30 片付け開始です。" },
+        { id: "notice-2", text: "週末本番の集合は 8:40 正門前です。" },
+        { id: "notice-3", text: "譜面台の不足分を職員室で受け取りください。" },
       ],
     },
     todo: {
       title: "My TODO",
       subtitle: "担当TODO（DEMO）",
       items: [
-        "打楽器チェックリストを更新する",
-        "本番用チラシを配布する",
-        "見守り当番の最終確認を行う",
+        { id: "todo-1", text: "打楽器チェックリストを更新する" },
+        { id: "todo-2", text: "本番用チラシを配布する" },
+        { id: "todo-3", text: "見守り当番の最終確認を行う" },
+        ...(hasShiftSurveyTodo
+          ? [{
+              id: "todo-shift-survey",
+              text: `当番可否アンケートに回答してください（未回答 ${unansweredCount} 件）`,
+              actionLabel: "回答する",
+              to: shiftSurveyPath,
+            }]
+          : []),
       ],
     },
     duty: {
       title: "次の当番",
       subtitle: "当番予定（DEMO）",
       items: [
-        "日時: 2026-02-21 09:00-12:00",
-        "場所: 第1音楽室",
-        "備考: 入室前に出欠確認をお願いします。",
+        { id: "duty-1", text: "日時: 2026-02-21 09:00-12:00" },
+        { id: "duty-2", text: "場所: 第1音楽室" },
+        { id: "duty-3", text: "備考: 入室前に出欠確認をお願いします。" },
       ],
     },
   };
@@ -285,6 +315,23 @@ export function App() {
     [data],
   );
 
+  const applyDemoControls = () => {
+    const normalizedStatus = demoStatus === "SESSIONS_DECIDED" ? "SESSIONS_SET" : demoStatus;
+    window.localStorage.setItem(statusStorageKey, normalizedStatus);
+    const parsedUnanswered = Number(demoUnanswered);
+    const nextUnanswered = Number.isFinite(parsedUnanswered) ? Math.max(0, Math.floor(parsedUnanswered)) : 0;
+    window.localStorage.setItem(unansweredStorageKey, String(nextUnanswered));
+    window.localStorage.setItem("windoms:demo-role", demoRoleDraft);
+    window.location.reload();
+  };
+
+  const resetDemoControls = () => {
+    window.localStorage.removeItem(statusStorageKey);
+    window.localStorage.removeItem(unansweredStorageKey);
+    window.localStorage.setItem("windoms:demo-role", "admin");
+    window.location.reload();
+  };
+
   return (
     <div className="app-shell">
       <div className="demo-badge">DEMO（データは仮）</div>
@@ -338,6 +385,7 @@ export function App() {
           />
           <Route path="/attendance" element={<AttendancePage />} />
           <Route path="/watch" element={<WatchPage />} />
+          <Route path="/shift-survey" element={<ShiftSurveyPage />} />
           <Route
             path="/logs/:date"
             element={
@@ -418,11 +466,96 @@ export function App() {
             <h2 className="status-panel-title">{statusPanelMeta[activeStatusPanel].title}</h2>
             <ul className="status-panel-list">
               {statusPanelMeta[activeStatusPanel].items.map((item) => (
-                <li key={item}>{item}</li>
+                <li key={item.id}>
+                  <span>{item.text}</span>
+                  {item.to && item.actionLabel && (
+                    <button
+                      type="button"
+                      className="button button-small"
+                      onClick={() => {
+                        const target = item.to;
+                        if (!target) return;
+                        setActiveStatusPanel(null);
+                        navigate(target);
+                      }}
+                    >
+                      {item.actionLabel}
+                    </button>
+                  )}
+                </li>
               ))}
             </ul>
           </section>
         </div>
+      )}
+      {(import.meta as { env?: { DEV?: boolean } }).env?.DEV && (
+        <>
+          {!isDevPanelOpen && (
+            <button
+              type="button"
+              className="dev-panel-fab"
+              aria-label="DEMOコントロールを開く"
+              onClick={() => setIsDevPanelOpen(true)}
+            >
+              🧪
+            </button>
+          )}
+          {isDevPanelOpen && (
+            <aside className="dev-panel">
+              <div className="dev-panel-header">
+                <strong className="dev-panel-title">DEMOコントロール</strong>
+                <button
+                  type="button"
+                  className="dev-panel-minimize"
+                  aria-label="最小化"
+                  onClick={() => setIsDevPanelOpen(false)}
+                >
+                  ＿
+                </button>
+              </div>
+              <label className="dev-panel-field">
+                <span>Status ({activityPlanMonthKey})</span>
+                <select value={demoStatus} onChange={(event) => setDemoStatus(event.target.value)}>
+                  <option value="NOT_STARTED">NOT_STARTED</option>
+                  <option value="SESSIONS_SET">SESSIONS_SET</option>
+                  <option value="SESSIONS_DECIDED">SESSIONS_DECIDED</option>
+                  <option value="SURVEY_OPEN">SURVEY_OPEN</option>
+                  <option value="SURVEY_CLOSED">SURVEY_CLOSED</option>
+                  <option value="AI_DRAFTED">AI_DRAFTED</option>
+                  <option value="SHIFT_CONFIRMED">SHIFT_CONFIRMED</option>
+                  <option value="NOTIFIED">NOTIFIED</option>
+                </select>
+              </label>
+              <label className="dev-panel-field">
+                <span>未回答数</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={demoUnanswered}
+                  onChange={(event) => setDemoUnanswered(event.target.value)}
+                />
+              </label>
+              <label className="dev-panel-field">
+                <span>demo-role</span>
+                <select
+                  value={demoRoleDraft}
+                  onChange={(event) => setDemoRoleDraft(event.target.value as "admin" | "member")}
+                >
+                  <option value="admin">admin</option>
+                  <option value="member">member</option>
+                </select>
+              </label>
+              <div className="dev-panel-actions">
+                <button type="button" className="button button-small" onClick={applyDemoControls}>
+                  Apply
+                </button>
+                <button type="button" className="button button-small" onClick={resetDemoControls}>
+                  Reset DEMO
+                </button>
+              </div>
+            </aside>
+          )}
+        </>
       )}
     </div>
   );
