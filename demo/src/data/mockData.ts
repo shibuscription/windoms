@@ -24,6 +24,67 @@ export const mockData: DemoData = {
     m10: { uid: "m10", grade: 2, instrumentOrder: 5, kana: "やまもと" },
     m11: { uid: "m11", grade: 1, instrumentOrder: 3, kana: "まつもと" },
   },
+  users: {
+    g01: { uid: "g01", displayName: "渋谷父", householdId: "hh01" },
+    g02: { uid: "g02", displayName: "渋谷母", householdId: "hh01" },
+    g03: { uid: "g03", displayName: "田中母", householdId: "hh02" },
+    g04: { uid: "g04", displayName: "佐藤祖母", householdId: "hh03" },
+    g05: { uid: "g05", displayName: "高橋叔母", householdId: "hh04" },
+    g06: { uid: "g06", displayName: "伊藤父", householdId: "hh05" },
+    g07: { uid: "g07", displayName: "渡辺母", householdId: "hh06" },
+  },
+  households: {
+    hh01: {
+      householdId: "hh01",
+      label: "渋谷家",
+      members: [
+        { uid: "g01", role: "guardian", relationshipToChild: "father" },
+        { uid: "g02", role: "guardian", relationshipToChild: "mother" },
+        { uid: "m01", role: "child" },
+        { uid: "m02", role: "child" },
+      ],
+    },
+    hh02: {
+      householdId: "hh02",
+      label: "田中家",
+      members: [
+        { uid: "g03", role: "guardian", relationshipToChild: "mother" },
+        { uid: "m03", role: "child" },
+      ],
+    },
+    hh03: {
+      householdId: "hh03",
+      label: "佐藤家",
+      members: [
+        { uid: "g04", role: "guardian", relationshipToChild: "grandmother" },
+        { uid: "m04", role: "child" },
+      ],
+    },
+    hh04: {
+      householdId: "hh04",
+      label: "高橋家",
+      members: [
+        { uid: "g05", role: "guardian", relationshipToChild: "aunt" },
+        { uid: "m05", role: "child" },
+      ],
+    },
+    hh05: {
+      householdId: "hh05",
+      label: "伊藤家",
+      members: [
+        { uid: "g06", role: "guardian", relationshipToChild: "father" },
+        { uid: "m06", role: "child" },
+      ],
+    },
+    hh06: {
+      householdId: "hh06",
+      label: "渡辺家",
+      members: [
+        { uid: "g07", role: "guardian", relationshipToChild: "mother" },
+        { uid: "m07", role: "child" },
+      ],
+    },
+  },
   scheduleDays: {
     [today]: {
       defaultLocation: "第1音楽室",

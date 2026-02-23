@@ -15,6 +15,27 @@ export type DemoMember = {
   kana: string;
 };
 
+export type HouseholdRole = "guardian" | "child";
+export type RelationshipToChild = "father" | "mother" | "grandmother" | "aunt" | "other";
+
+export type HouseholdMembership = {
+  uid: string;
+  role: HouseholdRole;
+  relationshipToChild?: RelationshipToChild;
+};
+
+export type Household = {
+  householdId: string;
+  label: string;
+  members: HouseholdMembership[];
+};
+
+export type DemoUser = {
+  uid: string;
+  displayName: string;
+  householdId?: string;
+};
+
 export type SessionDoc = {
   order: number;
   startTime: string;
@@ -68,6 +89,8 @@ export type DemoData = {
   scheduleDays: Record<string, ScheduleDayDoc>;
   dayLogs: Record<string, DayLog>;
   members: Record<string, DemoMember>;
+  users: Record<string, DemoUser>;
+  households: Record<string, Household>;
   demoDictionaries: {
     instructors: string[];
     seniors: string[];

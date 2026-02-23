@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { HomePage } from "./pages/HomePage";
 import { TodayPage } from "./pages/TodayPage";
 import { LogPage } from "./pages/LogPage";
+import { ActivityPlanPage } from "./pages/ActivityPlanPage";
 import { mockData } from "./data/mockData";
 import type { DayLog, DemoData, DemoRsvp } from "./types";
 import { formatDateYmd, formatWeekdayJa, todayDateKey, weekdayTone } from "./utils/date";
@@ -12,21 +13,128 @@ type MenuItem = {
   label: string;
   icon: string;
   to: string;
-  isActive: (pathname: string) => boolean;
+  isActive: (location: { pathname: string; search: string }) => boolean;
 };
 
-const menuItems = (today: string): MenuItem[] => [
-  { id: "today", label: "Today", icon: "📅", to: "/today", isActive: (p) => p === "/today" },
-  { id: "log", label: "日誌", icon: "📝", to: `/logs/${today}`, isActive: (p) => p.startsWith("/logs/") },
-  { id: "schedule", label: "スケジュール", icon: "🗓️", to: "/today?view=schedule", isActive: () => false },
-  { id: "todo", label: "TODO", icon: "✅", to: "/today?view=todo", isActive: () => false },
-  { id: "accounting", label: "会計", icon: "💰", to: "/today?view=accounting", isActive: () => false },
-  { id: "instruments", label: "楽器", icon: "🎷", to: "/today?view=instruments", isActive: () => false },
-  { id: "scores", label: "楽譜", icon: "🎼", to: "/today?view=scores", isActive: () => false },
-  { id: "docs", label: "資料", icon: "📁", to: "/today?view=docs", isActive: () => false },
-  { id: "members", label: "メンバー", icon: "👥", to: "/today?view=members", isActive: () => false },
-  { id: "links", label: "リンク集", icon: "🔗", to: "/today?view=links", isActive: () => false },
-  { id: "settings", label: "設定", icon: "⚙️", to: "/today?view=settings", isActive: () => false },
+type MenuSection = {
+  id: string;
+  heading: string;
+  items: MenuItem[];
+};
+
+const viewIsActive = (location: { pathname: string; search: string }, view: string) =>
+  location.pathname === "/today" && new URLSearchParams(location.search).get("view") === view;
+
+const menuSections = (today: string): MenuSection[] => [
+  {
+    id: "operation",
+    heading: "運用",
+    items: [
+      {
+        id: "today",
+        label: "Today",
+        icon: "📅",
+        to: "/today",
+        isActive: (location) => location.pathname === "/today" && !location.search,
+      },
+      {
+        id: "log",
+        label: "日誌",
+        icon: "📝",
+        to: `/logs/${today}`,
+        isActive: (location) => location.pathname.startsWith("/logs/"),
+      },
+      {
+        id: "calendar",
+        label: "カレンダー",
+        icon: "🗓️",
+        to: "/today?view=calendar",
+        isActive: (location) => viewIsActive(location, "calendar"),
+      },
+      {
+        id: "todo",
+        label: "TODO",
+        icon: "✅",
+        to: "/today?view=todo",
+        isActive: (location) => viewIsActive(location, "todo"),
+      },
+    ],
+  },
+  {
+    id: "activity-planning",
+    heading: "活動予定",
+    items: [
+      {
+        id: "activity-plan",
+        label: "活動予定",
+        icon: "🧭",
+        to: "/activity-plan",
+        isActive: (location) => location.pathname === "/activity-plan",
+      },
+      {
+        id: "watch",
+        label: "見守り",
+        icon: "👀",
+        to: "/today?view=watch",
+        isActive: (location) => viewIsActive(location, "watch"),
+      },
+    ],
+  },
+  {
+    id: "management",
+    heading: "管理",
+    items: [
+      {
+        id: "accounting",
+        label: "会計",
+        icon: "💰",
+        to: "/today?view=accounting",
+        isActive: (location) => viewIsActive(location, "accounting"),
+      },
+      {
+        id: "instruments",
+        label: "楽器",
+        icon: "🎷",
+        to: "/today?view=instruments",
+        isActive: (location) => viewIsActive(location, "instruments"),
+      },
+      {
+        id: "scores",
+        label: "楽譜",
+        icon: "🎼",
+        to: "/today?view=scores",
+        isActive: (location) => viewIsActive(location, "scores"),
+      },
+      {
+        id: "docs",
+        label: "資料",
+        icon: "📁",
+        to: "/today?view=docs",
+        isActive: (location) => viewIsActive(location, "docs"),
+      },
+      {
+        id: "members",
+        label: "メンバー",
+        icon: "👥",
+        to: "/today?view=members",
+        isActive: (location) => viewIsActive(location, "members"),
+      },
+      {
+        id: "links",
+        label: "リンク集",
+        icon: "🔗",
+        to: "/today?view=links",
+        isActive: (location) => viewIsActive(location, "links"),
+      },
+      {
+        id: "settings",
+        label: "設定",
+        icon: "⚙️",
+        to: "/today?view=settings",
+        isActive: (location) => viewIsActive(location, "settings"),
+      },
+    ],
+  },
 ];
 
 export function App() {
@@ -205,6 +313,10 @@ export function App() {
             element={<TodayPage data={context.data} updateDayLog={context.updateDayLog} />}
           />
           <Route
+            path="/activity-plan"
+            element={<ActivityPlanPage />}
+          />
+          <Route
             path="/logs/:date"
             element={
               <LogPage
@@ -240,22 +352,29 @@ export function App() {
               <span className="menu-today-date">{formatDateYmd(today)}</span>
               <span className={`menu-today-weekday ${weekdayTone(today)}`}>（{formatWeekdayJa(today)}）</span>
             </button>
-            <div className="menu-grid">
-              {menuItems(today).map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`menu-item ${item.isActive(location.pathname) ? "active" : ""}`}
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    navigate(item.to);
-                  }}
-                >
-                  <span className="menu-item-icon" aria-hidden="true">
-                    {item.icon}
-                  </span>
-                  <span className="menu-item-label">{item.label}</span>
-                </button>
+            <div className="menu-sections">
+              {menuSections(today).map((section) => (
+                <section key={section.id} className="menu-section">
+                  <h2 className="menu-section-heading">{section.heading}</h2>
+                  <div className="menu-grid">
+                    {section.items.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`menu-item ${item.isActive(location) ? "active" : ""}`}
+                        onClick={() => {
+                          setIsMenuOpen(false);
+                          navigate(item.to);
+                        }}
+                      >
+                        <span className="menu-item-icon" aria-hidden="true">
+                          {item.icon}
+                        </span>
+                        <span className="menu-item-label">{item.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
               ))}
             </div>
           </div>

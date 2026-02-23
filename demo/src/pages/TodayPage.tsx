@@ -57,6 +57,18 @@ const sortRsvps = (items: DemoRsvp[], data: DemoData): DemoRsvp[] =>
   });
 
 const weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"] as const;
+const demoViewTitle: Record<string, string> = {
+  calendar: "カレンダー",
+  watch: "見守り",
+  todo: "TODO",
+  accounting: "会計",
+  instruments: "楽器",
+  scores: "楽譜",
+  docs: "資料",
+  members: "メンバー",
+  links: "リンク集",
+  settings: "設定",
+};
 
 const toMonthKey = (dateKey: string): string => dateKey.slice(0, 7);
 
@@ -87,6 +99,7 @@ const buildMonthCells = (monthKey: string): Array<string | null> => {
 export function TodayPage({ data, updateDayLog }: TodayPageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const today = todayDateKey();
+  const view = searchParams.get("view") ?? "";
   const queryDate = searchParams.get("date") ?? "";
   const date = queryDate && isValidDateKey(queryDate) ? queryDate : today;
   const [selectedSession, setSelectedSession] = useState<SessionDoc | null>(null);
@@ -186,6 +199,19 @@ export function TodayPage({ data, updateDayLog }: TodayPageProps) {
     setCalendarMonth(toMonthKey(date));
     setIsCalendarOpen((prev) => !prev);
   };
+
+  if (view) {
+    const title = demoViewTitle[view] ?? "未実装モジュール";
+    return (
+      <section className="card">
+        <h1>{title}</h1>
+        <p>この画面はDEMOの仮遷移です。実装はこれから行います。</p>
+        <Link to="/today" className="button">
+          Todayへ戻る
+        </Link>
+      </section>
+    );
+  }
 
   return (
     <section className="card">

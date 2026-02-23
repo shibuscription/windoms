@@ -245,6 +245,24 @@ body {
   color: #f87171;
 }
 
+.menu-sections {
+  display: grid;
+  gap: 16px;
+}
+
+.menu-section {
+  display: grid;
+  gap: 8px;
+}
+
+.menu-section-heading {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
 .menu-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
@@ -1627,6 +1645,245 @@ textarea {
 
 .save-button {
   margin-left: 8px;
+}
+
+.activity-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+
+.activity-step {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  border: 1px solid #cbd5e1;
+}
+
+.activity-step.done {
+  background: #e0f2fe;
+  border-color: #7dd3fc;
+  color: #0c4a6e;
+}
+
+.activity-step.current {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #fff;
+}
+
+.activity-step.todo {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #64748b;
+}
+
+.activity-plan-table-wrap {
+  margin-top: 10px;
+  overflow-x: hidden;
+}
+
+.activity-plan-table {
+  width: 100%;
+  min-width: 0;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.82rem;
+}
+
+.activity-plan-table th,
+.activity-plan-table td {
+  border: 1px solid #d6dde8;
+  padding: 5px 6px;
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activity-plan-table th:nth-child(1),
+.activity-plan-table td:nth-child(1) {
+  width: 12%;
+}
+
+.activity-plan-table th:nth-child(2),
+.activity-plan-table td:nth-child(2),
+.activity-plan-table th:nth-child(3),
+.activity-plan-table td:nth-child(3),
+.activity-plan-table th:nth-child(4),
+.activity-plan-table td:nth-child(4) {
+  width: 16%;
+}
+
+.activity-plan-table th:nth-child(5),
+.activity-plan-table td:nth-child(5),
+.activity-plan-table th:nth-child(6),
+.activity-plan-table td:nth-child(6) {
+  width: 20%;
+}
+
+.activity-cell-item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-plan-table th {
+  background: #f8fafc;
+  font-weight: 700;
+}
+
+.activity-cell-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.activity-cell-item {
+  display: block;
+}
+
+.activity-session-lines {
+  display: grid;
+  gap: 2px;
+}
+
+.activity-session-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.activity-cell-remove {
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  width: 20px;
+  height: 20px;
+  line-height: 1;
+  cursor: pointer;
+  color: #475569;
+}
+
+.activity-row-add {
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  width: 24px;
+  height: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.activity-slot-add {
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  min-width: 28px;
+  height: 24px;
+  line-height: 1;
+  cursor: pointer;
+  color: #475569;
+}
+
+.activity-note-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.activity-note-cell > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activity-note-edit {
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  color: #475569;
+  font-size: 0.72rem;
+  padding: 1px 7px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.activity-plan-not-ready {
+  margin-top: 10px;
+  color: #475569;
+}
+
+.activity-survey-panel {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.activity-survey-status {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #334155;
+}
+
+.activity-survey-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1e3a8a;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.activity-survey-list {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.activity-survey-note {
+  margin: 0 0 10px;
+  color: #475569;
+  font-size: 0.85rem;
+}
+
+.activity-duty-inline {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  font-size: 0.78rem;
+  color: #475569;
+  justify-self: start;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activity-duty-inline.editable {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
+.activity-duty-inline.readonly {
+  cursor: not-allowed;
+  color: #64748b;
 }
 
 .demo-badge {
