@@ -4,15 +4,19 @@ import { HomePage } from "./pages/HomePage";
 import { TodayPage } from "./pages/TodayPage";
 import { LogPage } from "./pages/LogPage";
 import { ActivityPlanPage } from "./pages/ActivityPlanPage";
+import { AttendancePage } from "./pages/AttendancePage";
+import { WatchPage } from "./pages/WatchPage";
 import { mockData } from "./data/mockData";
 import type { DayLog, DemoData, DemoRsvp } from "./types";
 import { formatDateYmd, formatWeekdayJa, todayDateKey, weekdayTone } from "./utils/date";
+import { getActivityPlanTargetMonthKey, readActivityPlanStatus, readDemoRole, readDemoUnansweredCount } from "./utils/activityPlan";
 
 type MenuItem = {
   id: string;
   label: string;
   icon: string;
   to: string;
+  badgeText?: string;
   isActive: (location: { pathname: string; search: string }) => boolean;
 };
 
@@ -25,7 +29,7 @@ type MenuSection = {
 const viewIsActive = (location: { pathname: string; search: string }, view: string) =>
   location.pathname === "/today" && new URLSearchParams(location.search).get("view") === view;
 
-const menuSections = (today: string): MenuSection[] => [
+const menuSections = (today: string, activityPlanBadgeText?: string): MenuSection[] => [
   {
     id: "operation",
     heading: "運用",
@@ -69,14 +73,22 @@ const menuSections = (today: string): MenuSection[] => [
         label: "活動予定",
         icon: "🧭",
         to: "/activity-plan",
+        badgeText: activityPlanBadgeText,
         isActive: (location) => location.pathname === "/activity-plan",
+      },
+      {
+        id: "attendance",
+        label: "出欠",
+        icon: "🗒️",
+        to: "/attendance",
+        isActive: (location) => location.pathname === "/attendance",
       },
       {
         id: "watch",
         label: "見守り",
         icon: "👀",
-        to: "/today?view=watch",
-        isActive: (location) => viewIsActive(location, "watch"),
+        to: "/watch",
+        isActive: (location) => location.pathname === "/watch",
       },
     ],
   },
@@ -146,6 +158,14 @@ export function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const today = todayDateKey();
+  const activityPlanMonthKey = getActivityPlanTargetMonthKey(today);
+  const isAdmin = readDemoRole() === "admin";
+  const activityPlanStatus = readActivityPlanStatus(activityPlanMonthKey);
+  const unansweredCount = readDemoUnansweredCount(activityPlanMonthKey);
+  const activityPlanBadgeText =
+    isAdmin && activityPlanStatus === "SURVEY_OPEN" && unansweredCount > 0
+      ? `未回答 ${unansweredCount}`
+      : undefined;
 
   useEffect(() => {
     if (!isMenuOpen && !activeStatusPanel) return;
@@ -316,6 +336,8 @@ export function App() {
             path="/activity-plan"
             element={<ActivityPlanPage />}
           />
+          <Route path="/attendance" element={<AttendancePage />} />
+          <Route path="/watch" element={<WatchPage />} />
           <Route
             path="/logs/:date"
             element={
@@ -353,7 +375,7 @@ export function App() {
               <span className={`menu-today-weekday ${weekdayTone(today)}`}>（{formatWeekdayJa(today)}）</span>
             </button>
             <div className="menu-sections">
-              {menuSections(today).map((section) => (
+              {menuSections(today, activityPlanBadgeText).map((section) => (
                 <section key={section.id} className="menu-section">
                   <h2 className="menu-section-heading">{section.heading}</h2>
                   <div className="menu-grid">
@@ -371,6 +393,7 @@ export function App() {
                           {item.icon}
                         </span>
                         <span className="menu-item-label">{item.label}</span>
+                        {item.badgeText && <span className="menu-item-badge">{item.badgeText}</span>}
                       </button>
                     ))}
                   </div>
