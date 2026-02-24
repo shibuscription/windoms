@@ -107,6 +107,7 @@ export function TodayPage({ data, updateDayLog }: TodayPageProps) {
   const [calendarMonth, setCalendarMonth] = useState(toMonthKey(date));
   const [noticeExpanded, setNoticeExpanded] = useState(false);
   const [noticeCanToggle, setNoticeCanToggle] = useState(false);
+  const [isFutureLogConfirmOpen, setIsFutureLogConfirmOpen] = useState(false);
   const calendarWrapRef = useRef<HTMLDivElement>(null);
   const noticeContentRef = useRef<HTMLDivElement>(null);
   const day = data.scheduleDays[date];
@@ -185,10 +186,15 @@ export function TodayPage({ data, updateDayLog }: TodayPageProps) {
 
   const createDayLog = () => {
     if (date > today) {
-      const confirmed = window.confirm("選択した日付は未来日です。日誌を作成してもよろしいですか？");
-      if (!confirmed) return;
+      setIsFutureLogConfirmOpen(true);
+      return;
     }
     updateDayLog(date, (prev) => ({ ...prev }));
+  };
+
+  const confirmCreateFutureDayLog = () => {
+    updateDayLog(date, (prev) => ({ ...prev }));
+    setIsFutureLogConfirmOpen(false);
   };
 
   const toggleNoticeExpanded = () => {
@@ -401,6 +407,29 @@ export function TodayPage({ data, updateDayLog }: TodayPageProps) {
                   <span className={`rsvp-mark ${rsvp.status}`}>{statusSymbol[rsvp.status]}</span>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+      {isFutureLogConfirmOpen && (
+        <div className="modal-backdrop" onClick={() => setIsFutureLogConfirmOpen(false)}>
+          <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close"
+              onClick={() => setIsFutureLogConfirmOpen(false)}
+              aria-label="閉じる"
+            >
+              ×
+            </button>
+            <p className="modal-context">選択した日付は未来日です。日誌を作成してもよろしいですか？</p>
+            <div className="modal-actions">
+              <button type="button" className="button button-secondary" onClick={() => setIsFutureLogConfirmOpen(false)}>
+                キャンセル
+              </button>
+              <button type="button" className="button button-small" onClick={confirmCreateFutureDayLog}>
+                作成する
+              </button>
             </div>
           </div>
         </div>

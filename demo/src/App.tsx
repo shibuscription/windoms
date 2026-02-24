@@ -34,6 +34,21 @@ type MenuSection = {
   items: MenuItem[];
 };
 
+type DemoNotification = {
+  id: string;
+  title: string;
+  type: "actionable" | "info";
+  read: boolean;
+  resolved: boolean;
+};
+
+type DemoTodo = {
+  id: string;
+  title: string;
+  scope: "shared" | "private";
+  done: boolean;
+};
+
 const viewIsActive = (location: { pathname: string; search: string }, view: string) =>
   location.pathname === "/today" && new URLSearchParams(location.search).get("view") === view;
 
@@ -160,9 +175,21 @@ const menuSections = (today: string, activityPlanBadgeText?: string): MenuSectio
 export function App() {
   const [data, setData] = useState<DemoData>(mockData);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [activeStatusPanel, setActiveStatusPanel] = useState<"notice" | "todo" | "duty" | null>(
+  const [activeStatusPanel, setActiveStatusPanel] = useState<"notice" | "todo" | null>(
     null,
   );
+  const [noticeTab, setNoticeTab] = useState<"pending" | "history">("pending");
+  const [notifications, setNotifications] = useState<DemoNotification[]>([
+    { id: "n1", title: "当番可否アンケートの回答期限が近づいています", type: "actionable", read: false, resolved: false },
+    { id: "n2", title: "3月の活動予定が通知されました", type: "info", read: false, resolved: true },
+    { id: "n3", title: "見守り当番の調整が未完了です", type: "actionable", read: true, resolved: false },
+  ]);
+  const [todos, setTodos] = useState<DemoTodo[]>([
+    { id: "t1", title: "活動予定の備考を最終確認", scope: "shared", done: false },
+    { id: "t2", title: "本番配布資料の部数確認", scope: "shared", done: false },
+    { id: "t3", title: "印刷物を職員室へ提出", scope: "private", done: false },
+  ]);
+  const [pendingTodoId, setPendingTodoId] = useState<string | null>(null);
   const [isDevPanelOpen, setIsDevPanelOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -205,57 +232,21 @@ export function App() {
     setActiveStatusPanel(null);
   }, [location.key]);
 
-  const statusButtons: Array<{ id: "notice" | "todo" | "duty"; icon: string; label: string; badge: number }> = [
-    { id: "notice", icon: "🔔", label: "Notices", badge: 2 },
-    { id: "todo", icon: "✅", label: "My TODO", badge: 3 + (hasShiftSurveyTodo ? 1 : 0) },
-    { id: "duty", icon: "📅", label: "次の当番", badge: 1 },
+  const unreadNotificationCount = notifications.filter((item) => !item.read).length;
+  const incompleteTodoCount = todos.filter((item) => !item.done).length;
+  const statusButtons: Array<{ id: "notice" | "todo"; icon: string; label: string; badge: number }> = [
+    { id: "notice", icon: "🔔", label: "Notices", badge: unreadNotificationCount },
+    { id: "todo", icon: "✅", label: "My TODO", badge: incompleteTodoCount + (hasShiftSurveyTodo ? 1 : 0) },
   ];
-  type StatusPanelItem = {
-    id: string;
-    text: string;
-    actionLabel?: string;
-    to?: string;
-  };
-  const statusPanelMeta: Record<
-    "notice" | "todo" | "duty",
-    { title: string; subtitle: string; items: StatusPanelItem[] }
-  > = {
-    notice: {
-      title: "Notices",
-      subtitle: "お知らせ（DEMO）",
-      items: [
-        { id: "notice-1", text: "本日 16:30 片付け開始です。" },
-        { id: "notice-2", text: "週末本番の集合は 8:40 正門前です。" },
-        { id: "notice-3", text: "譜面台の不足分を職員室で受け取りください。" },
-      ],
-    },
-    todo: {
-      title: "My TODO",
-      subtitle: "担当TODO（DEMO）",
-      items: [
-        { id: "todo-1", text: "打楽器チェックリストを更新する" },
-        { id: "todo-2", text: "本番用チラシを配布する" },
-        { id: "todo-3", text: "見守り当番の最終確認を行う" },
-        ...(hasShiftSurveyTodo
-          ? [{
-              id: "todo-shift-survey",
-              text: `当番可否アンケートに回答してください（未回答 ${unansweredCount} 件）`,
-              actionLabel: "回答する",
-              to: shiftSurveyPath,
-            }]
-          : []),
-      ],
-    },
-    duty: {
-      title: "次の当番",
-      subtitle: "当番予定（DEMO）",
-      items: [
-        { id: "duty-1", text: "日時: 2026-02-21 09:00-12:00" },
-        { id: "duty-2", text: "場所: 第1音楽室" },
-        { id: "duty-3", text: "備考: 入室前に出欠確認をお願いします。" },
-      ],
-    },
-  };
+  const pendingNotifications = notifications.filter(
+    (item) => item.type === "actionable" && !item.resolved,
+  );
+  const historyNotifications = notifications.filter(
+    (item) => item.read || item.type === "info",
+  );
+  const sharedTodos = todos.filter((item) => !item.done && item.scope === "shared");
+  const privateTodos = todos.filter((item) => !item.done && item.scope === "private");
+  const nextDutyText = "次の当番：2/21(土) 9:00-12:00";
 
   const context = useMemo(
     () => ({
@@ -332,6 +323,15 @@ export function App() {
     window.location.reload();
   };
 
+  const confirmTodoCompletion = (todoId: string) => {
+    setTodos((prev) =>
+      prev.map((todo) =>
+        todo.id === todoId ? { ...todo, done: true } : todo,
+      ),
+    );
+    setPendingTodoId(null);
+  };
+
   return (
     <div className="app-shell">
       <div className="demo-badge">DEMO（データは仮）</div>
@@ -348,7 +348,10 @@ export function App() {
                 type="button"
                 className={`status-icon-button ${isActive ? "active" : ""}`}
                 aria-label={item.label}
-                onClick={() => setActiveStatusPanel((prev) => (prev === item.id ? null : item.id))}
+                onClick={() => {
+                  if (item.id === "notice") setNoticeTab("pending");
+                  setActiveStatusPanel((prev) => (prev === item.id ? null : item.id));
+                }}
               >
                 <span className="status-icon-emoji" aria-hidden="true">
                   {item.icon}
@@ -359,6 +362,7 @@ export function App() {
               </button>
             );
           })}
+          {nextDutyText && <span className="next-duty-text">{nextDutyText}</span>}
           <button
             type="button"
             className="menu-trigger"
@@ -462,29 +466,159 @@ export function App() {
             >
               ×
             </button>
-            <p className="status-panel-subtitle">{statusPanelMeta[activeStatusPanel].subtitle}</p>
-            <h2 className="status-panel-title">{statusPanelMeta[activeStatusPanel].title}</h2>
-            <ul className="status-panel-list">
-              {statusPanelMeta[activeStatusPanel].items.map((item) => (
-                <li key={item.id}>
-                  <span>{item.text}</span>
-                  {item.to && item.actionLabel && (
-                    <button
-                      type="button"
-                      className="button button-small"
-                      onClick={() => {
-                        const target = item.to;
-                        if (!target) return;
-                        setActiveStatusPanel(null);
-                        navigate(target);
-                      }}
+            {activeStatusPanel === "notice" && (
+              <>
+                <p className="status-panel-subtitle">システム通知（DEMO）</p>
+                <h2 className="status-panel-title">通知センター</h2>
+                <div className="status-panel-tabs">
+                  <button
+                    type="button"
+                    className={`status-panel-tab ${noticeTab === "pending" ? "active" : ""}`}
+                    onClick={() => setNoticeTab("pending")}
+                  >
+                    未処理
+                  </button>
+                  <button
+                    type="button"
+                    className={`status-panel-tab ${noticeTab === "history" ? "active" : ""}`}
+                    onClick={() => setNoticeTab("history")}
+                  >
+                    履歴
+                  </button>
+                </div>
+                <ul className="status-panel-list">
+                  {(noticeTab === "pending" ? pendingNotifications : historyNotifications).map((item) => (
+                    <li
+                      key={item.id}
+                      className="status-notice-row"
+                      onClick={() =>
+                        setNotifications((prev) =>
+                          prev.map((notice) =>
+                            notice.id === item.id ? { ...notice, read: true } : notice,
+                          ),
+                        )
+                      }
                     >
-                      {item.actionLabel}
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
+                      <span className={item.read ? "" : "status-unread"}>
+                        {item.title}
+                        {!item.read && <span className="status-new-tag">NEW</span>}
+                      </span>
+                      {item.type === "actionable" && !item.resolved && (
+                        <button
+                          type="button"
+                          className="button button-small"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setNotifications((prev) =>
+                              prev.map((notice) =>
+                                notice.id === item.id ? { ...notice, resolved: true, read: true } : notice,
+                              ),
+                            );
+                          }}
+                        >
+                          解消
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                  {noticeTab === "pending" && pendingNotifications.length === 0 && <li>未処理通知はありません</li>}
+                  {noticeTab === "history" && historyNotifications.length === 0 && <li>履歴はありません</li>}
+                </ul>
+              </>
+            )}
+            {activeStatusPanel === "todo" && (
+              <>
+                <p className="status-panel-subtitle">担当TODO（DEMO）</p>
+                <h2 className="status-panel-title">TODO</h2>
+                <div className="status-todo-section">
+                  <h3>共有TODO</h3>
+                  <ul className="status-panel-list">
+                    {sharedTodos.map((item) => (
+                      <li key={item.id}>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={false}
+                            onChange={() => setPendingTodoId(item.id)}
+                          />
+                          <span>{item.title}</span>
+                        </label>
+                      </li>
+                    ))}
+                    {sharedTodos.length === 0 && <li>共有TODOはありません</li>}
+                  </ul>
+                </div>
+                <div className="status-todo-section">
+                  <h3>個人TODO</h3>
+                  <ul className="status-panel-list">
+                    {privateTodos.map((item) => (
+                      <li key={item.id}>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={false}
+                            onChange={() => setPendingTodoId(item.id)}
+                          />
+                          <span>{item.title}</span>
+                        </label>
+                      </li>
+                    ))}
+                    {privateTodos.length === 0 && <li>個人TODOはありません</li>}
+                  </ul>
+                </div>
+                {hasShiftSurveyTodo && (
+                  <div className="status-todo-section">
+                    <h3>アンケート</h3>
+                    <ul className="status-panel-list">
+                      <li>
+                        <span>当番可否アンケートに回答してください（未回答 {unansweredCount} 件）</span>
+                        <button
+                          type="button"
+                          className="button button-small"
+                          onClick={() => {
+                            setActiveStatusPanel(null);
+                            navigate(shiftSurveyPath);
+                          }}
+                        >
+                          回答する
+                        </button>
+                      </li>
+                    </ul>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        </div>
+      )}
+      {pendingTodoId && (
+        <div className="modal-backdrop" onClick={() => setPendingTodoId(null)}>
+          <section className="modal-panel" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close"
+              aria-label="モーダルを閉じる"
+              onClick={() => setPendingTodoId(null)}
+            >
+              ×
+            </button>
+            <p className="modal-context">完了にしますか？</p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => setPendingTodoId(null)}
+              >
+                キャンセル
+              </button>
+              <button
+                type="button"
+                className="button button-small"
+                onClick={() => confirmTodoCompletion(pendingTodoId)}
+              >
+                完了する
+              </button>
+            </div>
           </section>
         </div>
       )}

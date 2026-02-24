@@ -604,6 +604,9 @@ export function LogPage({
   const [activityTypeError, setActivityTypeError] = useState("");
   const [stampMessage, setStampMessage] = useState("");
   const [animatingStampOrder, setAnimatingStampOrder] = useState<number | null>(null);
+  const [isSaveNoticeOpen, setIsSaveNoticeOpen] = useState(false);
+  const [pendingDeleteActivityIndex, setPendingDeleteActivityIndex] = useState<number | null>(null);
+  const [pendingStampSession, setPendingStampSession] = useState<{ sessionOrder: number; fromName: string } | null>(null);
 
   useEffect(() => {
     if (!stampMessage) return;
@@ -618,7 +621,7 @@ export function LogPage({
       instructors: nextInstructors,
       seniors: nextSeniors,
     });
-    window.alert("保存しました（デモ）");
+    setIsSaveNoticeOpen(true);
   };
 
   const dayStartTime = sessions[0]?.startTime ?? "--:--";
@@ -811,13 +814,16 @@ export function LogPage({
   };
 
   const onDeleteActivity = (targetIndex: number) => {
-    const confirmed = window.confirm("この活動記録を削除しますか？");
-    if (!confirmed) return;
+    setPendingDeleteActivityIndex(targetIndex);
+  };
 
+  const confirmDeleteActivity = () => {
+    if (pendingDeleteActivityIndex === null) return;
     updateDayLog(date, (prev) => ({
       ...prev,
-      activities: prev.activities.filter((_, index) => index !== targetIndex),
+      activities: prev.activities.filter((_, index) => index !== pendingDeleteActivityIndex),
     }));
+    setPendingDeleteActivityIndex(null);
   };
 
   const removeSongAt = (index: number) => {
@@ -901,25 +907,8 @@ export function LogPage({
     closeRsvpModal();
   };
 
-  const onStampDuty = (sessionOrder: number, plannedName: string) => {
-    if (!plannedName) return;
+  const applyDutyStamp = (sessionOrder: number) => {
     const key = String(sessionOrder);
-    const current = log.dutyStamps?.[key];
-
-    if (current?.stampedByUid === DEMO_STAMP_USER.uid) {
-      setStampMessage("捺印済みです");
-      return;
-    }
-
-    const needsConfirm = Boolean(current) || plannedName !== DEMO_STAMP_USER.name;
-    if (needsConfirm) {
-      const fromName = current?.stampedByName ?? plannedName;
-      const ok = window.confirm(
-        `当番者を「${fromName}」から「${DEMO_STAMP_USER.name}」に変更して捺印します。よろしいですか？`,
-      );
-      if (!ok) return;
-    }
-
     updateDayLog(date, (prev) => ({
       ...prev,
       dutyStamps: {
@@ -937,6 +926,25 @@ export function LogPage({
     window.setTimeout(() => {
       setAnimatingStampOrder((prev) => (prev === sessionOrder ? null : prev));
     }, 260);
+  };
+
+  const onStampDuty = (sessionOrder: number, plannedName: string) => {
+    if (!plannedName) return;
+    const key = String(sessionOrder);
+    const current = log.dutyStamps?.[key];
+
+    if (current?.stampedByUid === DEMO_STAMP_USER.uid) {
+      setStampMessage("捺印済みです");
+      return;
+    }
+
+    const needsConfirm = Boolean(current) || plannedName !== DEMO_STAMP_USER.name;
+    if (needsConfirm) {
+      const fromName = current?.stampedByName ?? plannedName;
+      setPendingStampSession({ sessionOrder, fromName });
+      return;
+    }
+    applyDutyStamp(sessionOrder);
   };
 
   return (
@@ -1261,6 +1269,78 @@ export function LogPage({
           {stampMessage && <p className="duty-stamp-note">{stampMessage}</p>}
         </div>
       </div>
+
+      {isSaveNoticeOpen && (
+        <div className="modal-backdrop" onClick={() => setIsSaveNoticeOpen(false)}>
+          <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
+            <button type="button" className="modal-close" onClick={() => setIsSaveNoticeOpen(false)} aria-label="閉じる">
+              ×
+            </button>
+            <p className="modal-context">保存しました（デモ）</p>
+            <div className="modal-actions">
+              <button type="button" className="button button-small" onClick={() => setIsSaveNoticeOpen(false)}>
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDeleteActivityIndex !== null && (
+        <div className="modal-backdrop" onClick={() => setPendingDeleteActivityIndex(null)}>
+          <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close"
+              onClick={() => setPendingDeleteActivityIndex(null)}
+              aria-label="閉じる"
+            >
+              ×
+            </button>
+            <p className="modal-context">この活動記録を削除しますか？</p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => setPendingDeleteActivityIndex(null)}
+              >
+                やめる
+              </button>
+              <button type="button" className="button button-small" onClick={confirmDeleteActivity}>
+                実行する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingStampSession && (
+        <div className="modal-backdrop" onClick={() => setPendingStampSession(null)}>
+          <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
+            <button type="button" className="modal-close" onClick={() => setPendingStampSession(null)} aria-label="閉じる">
+              ×
+            </button>
+            <p className="modal-context">
+              当番者を「{pendingStampSession.fromName}」から「{DEMO_STAMP_USER.name}」に変更して捺印します。よろしいですか？
+            </p>
+            <div className="modal-actions">
+              <button type="button" className="button button-secondary" onClick={() => setPendingStampSession(null)}>
+                やめる
+              </button>
+              <button
+                type="button"
+                className="button button-small"
+                onClick={() => {
+                  applyDutyStamp(pendingStampSession.sessionOrder);
+                  setPendingStampSession(null);
+                }}
+              >
+                実行する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {refModal && (
         <div className="modal-backdrop" onClick={() => setRefModal(null)}>
