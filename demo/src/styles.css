@@ -286,7 +286,7 @@ body {
 }
 
 .menu-panel {
-  width: min(1080px, 100%);
+  width: min(1280px, 100%);
   max-height: calc(100vh - 40px);
   overflow: auto;
   background: transparent;
@@ -350,30 +350,30 @@ body {
 }
 
 .menu-section {
-  display: grid;
-  gap: 8px;
+  margin-bottom: 48px;
 }
 
-.menu-section-heading {
-  margin: 0;
+.menu-section-title {
+  margin: 0 0 16px;
   color: #94a3b8;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-size: 18px;
+  font-weight: 600;
+  opacity: 0.8;
 }
 
 .menu-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, 140px);
+  gap: 16px;
+  justify-content: start;
 }
 
 .menu-item {
   border: 1px solid #d4dbe5;
   background: #fff;
   border-radius: 12px;
-  padding: 14px 10px;
-  min-height: 94px;
+  padding: 14px;
+  aspect-ratio: 1 / 1;
   display: grid;
   place-items: center;
   gap: 8px;
@@ -387,7 +387,7 @@ body {
 }
 
 .menu-item-icon {
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   line-height: 1;
 }
 

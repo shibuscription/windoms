@@ -59,8 +59,14 @@ const sortRsvps = (items: DemoRsvp[], data: DemoData): DemoRsvp[] =>
 const weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"] as const;
 const demoViewTitle: Record<string, string> = {
   calendar: "カレンダー",
+  event: "イベント",
+  homework: "宿題",
+  "practice-log": "練習日誌",
+  "duty-log": "当番日誌",
   watch: "見守り",
   todo: "TODO",
+  "purchase-request": "購入依頼",
+  reimbursement: "立替",
   accounting: "会計",
   instruments: "楽器",
   scores: "楽譜",

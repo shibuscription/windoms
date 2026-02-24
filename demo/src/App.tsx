@@ -24,6 +24,7 @@ type MenuItem = {
   label: string;
   icon: string;
   to: string;
+  allowedRoles: DemoMenuRole[];
   badgeText?: string;
   isActive: (location: { pathname: string; search: string }) => boolean;
 };
@@ -33,6 +34,8 @@ type MenuSection = {
   heading: string;
   items: MenuItem[];
 };
+
+type DemoMenuRole = "child" | "parent" | "admin";
 
 type DemoNotification = {
   id: string;
@@ -52,125 +55,184 @@ type DemoTodo = {
 const viewIsActive = (location: { pathname: string; search: string }, view: string) =>
   location.pathname === "/today" && new URLSearchParams(location.search).get("view") === view;
 
-const menuSections = (today: string, activityPlanBadgeText?: string): MenuSection[] => [
-  {
-    id: "operation",
-    heading: "運用",
-    items: [
-      {
-        id: "today",
-        label: "Today",
-        icon: "📅",
-        to: "/today",
-        isActive: (location) => location.pathname === "/today" && !location.search,
-      },
-      {
-        id: "log",
-        label: "日誌",
-        icon: "📝",
-        to: `/logs/${today}`,
-        isActive: (location) => location.pathname.startsWith("/logs/"),
-      },
-      {
-        id: "calendar",
-        label: "カレンダー",
-        icon: "🗓️",
-        to: "/today?view=calendar",
-        isActive: (location) => viewIsActive(location, "calendar"),
-      },
-      {
-        id: "todo",
-        label: "TODO",
-        icon: "✅",
-        to: "/today?view=todo",
-        isActive: (location) => viewIsActive(location, "todo"),
-      },
-    ],
-  },
-  {
-    id: "activity-planning",
-    heading: "活動予定",
-    items: [
-      {
-        id: "activity-plan",
-        label: "活動予定",
-        icon: "🧭",
-        to: "/activity-plan",
-        badgeText: activityPlanBadgeText,
-        isActive: (location) => location.pathname === "/activity-plan",
-      },
-      {
-        id: "attendance",
-        label: "出欠",
-        icon: "🗒️",
-        to: "/attendance",
-        isActive: (location) => location.pathname === "/attendance",
-      },
-      {
-        id: "watch",
-        label: "見守り",
-        icon: "👀",
-        to: "/watch",
-        isActive: (location) => location.pathname === "/watch",
-      },
-    ],
-  },
-  {
-    id: "management",
-    heading: "管理",
-    items: [
-      {
-        id: "accounting",
-        label: "会計",
-        icon: "💰",
-        to: "/today?view=accounting",
-        isActive: (location) => viewIsActive(location, "accounting"),
-      },
-      {
-        id: "instruments",
-        label: "楽器",
-        icon: "🎷",
-        to: "/today?view=instruments",
-        isActive: (location) => viewIsActive(location, "instruments"),
-      },
-      {
-        id: "scores",
-        label: "楽譜",
-        icon: "🎼",
-        to: "/today?view=scores",
-        isActive: (location) => viewIsActive(location, "scores"),
-      },
-      {
-        id: "docs",
-        label: "資料",
-        icon: "📁",
-        to: "/today?view=docs",
-        isActive: (location) => viewIsActive(location, "docs"),
-      },
-      {
-        id: "members",
-        label: "メンバー",
-        icon: "👥",
-        to: "/today?view=members",
-        isActive: (location) => viewIsActive(location, "members"),
-      },
-      {
-        id: "links",
-        label: "リンク集",
-        icon: "🔗",
-        to: "/today?view=links",
-        isActive: (location) => viewIsActive(location, "links"),
-      },
-      {
-        id: "settings",
-        label: "設定",
-        icon: "⚙️",
-        to: "/today?view=settings",
-        isActive: (location) => viewIsActive(location, "settings"),
-      },
-    ],
-  },
-];
+const DEMO_MENU_ROLE_KEY = "windoms_demo_role";
+
+const menuSections = (
+  today: string,
+  activityPlanBadgeText: string | undefined,
+  role: DemoMenuRole,
+): MenuSection[] => {
+  const sections: MenuSection[] = [
+    {
+      id: "activity",
+      heading: "活動",
+      items: [
+        {
+          id: "today",
+          label: "Today",
+          icon: "📅",
+          to: "/today",
+          allowedRoles: ["child", "parent", "admin"],
+          isActive: (location) => location.pathname === "/today" && !location.search,
+        },
+        {
+          id: "calendar",
+          label: "カレンダー",
+          icon: "🗓️",
+          to: "/today?view=calendar",
+          allowedRoles: ["child", "parent", "admin"],
+          isActive: (location) => viewIsActive(location, "calendar"),
+        },
+        {
+          id: "duty-log",
+          label: "当番日誌",
+          icon: "📝",
+          to: `/logs/${today}`,
+          allowedRoles: ["parent", "admin"],
+          isActive: (location) => location.pathname.startsWith("/logs/"),
+        },
+        {
+          id: "practice-log",
+          label: "練習日誌",
+          icon: "✍️",
+          to: "/today?view=practice-log",
+          allowedRoles: ["child", "parent", "admin"],
+          isActive: (location) => viewIsActive(location, "practice-log"),
+        },
+        {
+          id: "homework",
+          label: "宿題",
+          icon: "📘",
+          to: "/today?view=homework",
+          allowedRoles: ["child", "parent", "admin"],
+          isActive: (location) => viewIsActive(location, "homework"),
+        },
+        {
+          id: "todo",
+          label: "TODO",
+          icon: "✅",
+          to: "/today?view=todo",
+          allowedRoles: ["parent", "admin"],
+          isActive: (location) => viewIsActive(location, "todo"),
+        },
+        {
+          id: "event",
+          label: "イベント",
+          icon: "🎪",
+          to: "/today?view=event",
+          allowedRoles: ["child", "parent", "admin"],
+          isActive: (location) => viewIsActive(location, "event"),
+        },
+        {
+          id: "shift-create",
+          label: "シフト作成",
+          icon: "🧭",
+          to: "/activity-plan",
+          allowedRoles: ["admin"],
+          badgeText: activityPlanBadgeText,
+          isActive: (location) => location.pathname === "/activity-plan",
+        },
+      ],
+    },
+    {
+      id: "accounting",
+      heading: "会計",
+      items: [
+        {
+          id: "purchase-request",
+          label: "購入依頼",
+          icon: "🛍️",
+          to: "/today?view=purchase-request",
+          allowedRoles: ["parent", "admin"],
+          isActive: (location) => viewIsActive(location, "purchase-request"),
+        },
+        {
+          id: "reimbursement",
+          label: "立替",
+          icon: "🧾",
+          to: "/today?view=reimbursement",
+          allowedRoles: ["parent", "admin"],
+          isActive: (location) => viewIsActive(location, "reimbursement"),
+        },
+        {
+          id: "accounting",
+          label: "会計",
+          icon: "💰",
+          to: "/today?view=accounting",
+          allowedRoles: ["admin"],
+          isActive: (location) => viewIsActive(location, "accounting"),
+        },
+      ],
+    },
+    {
+      id: "assets",
+      heading: "資産",
+      items: [
+        {
+          id: "instruments",
+          label: "楽器",
+          icon: "🎷",
+          to: "/today?view=instruments",
+          allowedRoles: ["child", "parent", "admin"],
+          isActive: (location) => viewIsActive(location, "instruments"),
+        },
+        {
+          id: "scores",
+          label: "楽譜",
+          icon: "🎼",
+          to: "/today?view=scores",
+          allowedRoles: ["child", "parent", "admin"],
+          isActive: (location) => viewIsActive(location, "scores"),
+        },
+        {
+          id: "docs",
+          label: "資料",
+          icon: "📁",
+          to: "/today?view=docs",
+          allowedRoles: ["child", "parent", "admin"],
+          isActive: (location) => viewIsActive(location, "docs"),
+        },
+        {
+          id: "members",
+          label: "メンバー",
+          icon: "👥",
+          to: "/today?view=members",
+          allowedRoles: ["child", "parent", "admin"],
+          isActive: (location) => viewIsActive(location, "members"),
+        },
+        {
+          id: "links",
+          label: "リンク集",
+          icon: "🔗",
+          to: "/today?view=links",
+          allowedRoles: ["child", "parent", "admin"],
+          isActive: (location) => viewIsActive(location, "links"),
+        },
+      ],
+    },
+    {
+      id: "settings",
+      heading: "設定",
+      items: [
+        {
+          id: "settings",
+          label: "設定",
+          icon: "⚙️",
+          to: "/today?view=settings",
+          allowedRoles: ["child", "parent", "admin"],
+          isActive: (location) => viewIsActive(location, "settings"),
+        },
+      ],
+    },
+  ];
+
+  return sections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => item.allowedRoles.includes(role)),
+    }))
+    .filter((section) => section.items.length > 0);
+};
 
 export function App() {
   const [data, setData] = useState<DemoData>(mockData);
@@ -191,6 +253,10 @@ export function App() {
   ]);
   const [pendingTodoId, setPendingTodoId] = useState<string | null>(null);
   const [isDevPanelOpen, setIsDevPanelOpen] = useState(false);
+  const [demoMenuRole, setDemoMenuRole] = useState<DemoMenuRole>(() => {
+    const saved = window.localStorage.getItem(DEMO_MENU_ROLE_KEY);
+    return saved === "child" || saved === "parent" || saved === "admin" ? saved : "admin";
+  });
   const location = useLocation();
   const navigate = useNavigate();
   const today = todayDateKey();
@@ -209,6 +275,10 @@ export function App() {
   const [demoStatus, setDemoStatus] = useState<string>(activityPlanStatus);
   const [demoUnanswered, setDemoUnanswered] = useState<string>(String(unansweredCount));
   const [demoRoleDraft, setDemoRoleDraft] = useState<"admin" | "member">(readDemoRole());
+  const visibleMenuSections = useMemo(
+    () => menuSections(today, activityPlanBadgeText, demoMenuRole),
+    [today, activityPlanBadgeText, demoMenuRole],
+  );
 
   useEffect(() => {
     if (!isMenuOpen && !activeStatusPanel) return;
@@ -320,7 +390,13 @@ export function App() {
     window.localStorage.removeItem(statusStorageKey);
     window.localStorage.removeItem(unansweredStorageKey);
     window.localStorage.setItem("windoms:demo-role", "admin");
+    window.localStorage.setItem(DEMO_MENU_ROLE_KEY, "admin");
     window.location.reload();
+  };
+
+  const updateDemoMenuRole = (nextRole: DemoMenuRole) => {
+    setDemoMenuRole(nextRole);
+    window.localStorage.setItem(DEMO_MENU_ROLE_KEY, nextRole);
   };
 
   const confirmTodoCompletion = (todoId: string) => {
@@ -427,9 +503,9 @@ export function App() {
               <span className={`menu-today-weekday ${weekdayTone(today)}`}>（{formatWeekdayJa(today)}）</span>
             </button>
             <div className="menu-sections">
-              {menuSections(today, activityPlanBadgeText).map((section) => (
+              {visibleMenuSections.map((section) => (
                 <section key={section.id} className="menu-section">
-                  <h2 className="menu-section-heading">{section.heading}</h2>
+                  <h2 className="menu-section-title">{section.heading}</h2>
                   <div className="menu-grid">
                     {section.items.map((item) => (
                       <button
@@ -677,6 +753,17 @@ export function App() {
                 >
                   <option value="admin">admin</option>
                   <option value="member">member</option>
+                </select>
+              </label>
+              <label className="dev-panel-field">
+                <span>表示ロール（MENU）</span>
+                <select
+                  value={demoMenuRole}
+                  onChange={(event) => updateDemoMenuRole(event.target.value as DemoMenuRole)}
+                >
+                  <option value="child">child</option>
+                  <option value="parent">parent</option>
+                  <option value="admin">admin</option>
                 </select>
               </label>
               <div className="dev-panel-actions">
