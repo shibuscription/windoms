@@ -324,7 +324,11 @@ export function App() {
   );
   const sharedTodos = todos.filter((item) => !item.done && item.scope === "shared");
   const privateTodos = todos.filter((item) => !item.done && item.scope === "private");
-  const nextDutyText = "次の当番：2/21(土) 9:00-12:00";
+  const nextDuty = {
+    label: "次の当番:",
+    date: "2/21(土)",
+    time: "9:00-12:00",
+  };
   const lunchDate = resolveLunchDate(location, today);
   const lunchPath = `/lunch?date=${lunchDate}`;
 
@@ -423,10 +427,14 @@ export function App() {
       <div className="demo-badge">DEMO（データは仮）</div>
       <header className="app-header">
         <Link to="/" className="brand">
-          Windoms demo
+          <span className="brand-text">Windoms</span>
         </Link>
         <div className="header-actions">
-          {nextDutyText && <span className="next-duty-text">{nextDutyText}</span>}
+          <div className="next-duty" aria-label={`${nextDuty.label} ${nextDuty.date} ${nextDuty.time}`}>
+            <span className="next-duty-label">{nextDuty.label}</span>
+            <span className="next-duty-date">{nextDuty.date}</span>
+            <span className="next-duty-time">{nextDuty.time}</span>
+          </div>
           <button
             type="button"
             className="status-icon-button"

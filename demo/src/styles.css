@@ -39,6 +39,13 @@ body {
   color: #fff;
   text-decoration: none;
   font-weight: 700;
+  min-width: 0;
+  flex-shrink: 1;
+}
+
+.brand-text {
+  display: inline-block;
+  white-space: nowrap;
 }
 
 .menu-trigger {
@@ -57,13 +64,25 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  flex-shrink: 0;
+  min-width: 0;
+  flex: 1;
+  justify-content: flex-end;
 }
 
-.next-duty-text {
+.next-duty {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
   color: #cbd5e1;
   font-size: 0.82rem;
   white-space: nowrap;
+}
+
+.next-duty-label,
+.next-duty-date,
+.next-duty-time {
+  line-height: 1.2;
 }
 
 .status-icon-button {
@@ -363,20 +382,20 @@ body {
 
 .menu-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, 140px);
-  gap: 16px;
-  justify-content: start;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  max-width: 440px;
 }
 
 .menu-item {
   border: 1px solid #d4dbe5;
   background: #fff;
   border-radius: 12px;
-  padding: 14px;
+  padding: 10px;
   aspect-ratio: 1 / 1;
   display: grid;
   place-items: center;
-  gap: 8px;
+  gap: 5px;
   cursor: pointer;
   color: #1f2937;
 }
@@ -387,12 +406,12 @@ body {
 }
 
 .menu-item-icon {
-  font-size: 1.6rem;
+  font-size: 1.35rem;
   line-height: 1;
 }
 
 .menu-item-label {
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   font-weight: 600;
   text-align: center;
   white-space: nowrap;
@@ -409,6 +428,14 @@ body {
   border-radius: 999px;
   background: #fee2e2;
   color: #991b1b;
+}
+
+@media (max-width: 767px) {
+  .next-duty {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+  }
 }
 
 .home-cards {
