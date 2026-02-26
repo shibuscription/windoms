@@ -10,6 +10,10 @@ import { ShiftSurveyPage } from "./pages/ShiftSurveyPage";
 import { LunchPage } from "./pages/LunchPage";
 import { LinksPage } from "./pages/LinksPage";
 import { MembersPage } from "./pages/MembersPage";
+import { AccountingHome } from "./pages/Accounting/AccountingHome";
+import { AccountingPeriods } from "./pages/Accounting/AccountingPeriods";
+import { AccountingReport } from "./pages/Accounting/AccountingReport";
+import { AccountLedger } from "./pages/Accounting/AccountLedger";
 import { mockData } from "./data/mockData";
 import type { DayLog, DemoData, DemoRsvp } from "./types";
 import { formatDateYmd, formatWeekdayJa, isValidDateKey, todayDateKey, weekdayTone } from "./utils/date";
@@ -166,9 +170,9 @@ const menuSections = (
           id: "accounting",
           label: "会計",
           icon: "💰",
-          to: "/today?view=accounting",
+          to: "/accounting",
           allowedRoles: ["admin"],
-          isActive: (location) => viewIsActive(location, "accounting"),
+          isActive: (location) => location.pathname.startsWith("/accounting"),
         },
       ],
     },
@@ -497,6 +501,10 @@ export function App() {
           <Route path="/lunch" element={<LunchPage />} />
           <Route path="/links" element={<LinksPage />} />
           <Route path="/members" element={<MembersPage />} />
+          <Route path="/accounting" element={<AccountingHome />} />
+          <Route path="/accounting/ledger" element={<AccountLedger />} />
+          <Route path="/accounting/report" element={<AccountingReport />} />
+          <Route path="/accounting/periods" element={<AccountingPeriods />} />
           <Route
             path="/logs/:date"
             element={
