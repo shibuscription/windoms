@@ -7,9 +7,12 @@ import { ActivityPlanPage } from "./pages/ActivityPlanPage";
 import { AttendancePage } from "./pages/AttendancePage";
 import { WatchPage } from "./pages/WatchPage";
 import { ShiftSurveyPage } from "./pages/ShiftSurveyPage";
+import { LunchPage } from "./pages/LunchPage";
+import { LinksPage } from "./pages/LinksPage";
+import { MembersPage } from "./pages/MembersPage";
 import { mockData } from "./data/mockData";
 import type { DayLog, DemoData, DemoRsvp } from "./types";
-import { formatDateYmd, formatWeekdayJa, todayDateKey, weekdayTone } from "./utils/date";
+import { formatDateYmd, formatWeekdayJa, isValidDateKey, todayDateKey, weekdayTone } from "./utils/date";
 import {
   activityPlanStatusStorageKey,
   activityPlanUnansweredStorageKey,
@@ -56,6 +59,11 @@ const viewIsActive = (location: { pathname: string; search: string }, view: stri
   location.pathname === "/today" && new URLSearchParams(location.search).get("view") === view;
 
 const DEMO_MENU_ROLE_KEY = "windoms_demo_role";
+const resolveLunchDate = (location: { pathname: string; search: string }, fallback: string): string => {
+  if (location.pathname !== "/today") return fallback;
+  const date = new URLSearchParams(location.search).get("date");
+  return date && isValidDateKey(date) ? date : fallback;
+};
 
 const menuSections = (
   today: string,
@@ -196,17 +204,17 @@ const menuSections = (
           id: "members",
           label: "メンバー",
           icon: "👥",
-          to: "/today?view=members",
+          to: "/members",
           allowedRoles: ["child", "parent", "admin"],
-          isActive: (location) => viewIsActive(location, "members"),
+          isActive: (location) => location.pathname === "/members",
         },
         {
           id: "links",
           label: "リンク集",
           icon: "🔗",
-          to: "/today?view=links",
+          to: "/links",
           allowedRoles: ["child", "parent", "admin"],
-          isActive: (location) => viewIsActive(location, "links"),
+          isActive: (location) => location.pathname === "/links",
         },
       ],
     },
@@ -317,6 +325,8 @@ export function App() {
   const sharedTodos = todos.filter((item) => !item.done && item.scope === "shared");
   const privateTodos = todos.filter((item) => !item.done && item.scope === "private");
   const nextDutyText = "次の当番：2/21(土) 9:00-12:00";
+  const lunchDate = resolveLunchDate(location, today);
+  const lunchPath = `/lunch?date=${lunchDate}`;
 
   const context = useMemo(
     () => ({
@@ -416,6 +426,17 @@ export function App() {
           Windoms demo
         </Link>
         <div className="header-actions">
+          {nextDutyText && <span className="next-duty-text">{nextDutyText}</span>}
+          <button
+            type="button"
+            className="status-icon-button"
+            aria-label="お弁当"
+            onClick={() => navigate(lunchPath)}
+          >
+            <span className="status-icon-emoji" aria-hidden="true">
+              🍱
+            </span>
+          </button>
           {statusButtons.map((item) => {
             const isActive = activeStatusPanel === item.id;
             return (
@@ -438,7 +459,6 @@ export function App() {
               </button>
             );
           })}
-          {nextDutyText && <span className="next-duty-text">{nextDutyText}</span>}
           <button
             type="button"
             className="menu-trigger"
@@ -466,6 +486,9 @@ export function App() {
           <Route path="/attendance" element={<AttendancePage />} />
           <Route path="/watch" element={<WatchPage />} />
           <Route path="/shift-survey" element={<ShiftSurveyPage />} />
+          <Route path="/lunch" element={<LunchPage />} />
+          <Route path="/links" element={<LinksPage />} />
+          <Route path="/members" element={<MembersPage />} />
           <Route
             path="/logs/:date"
             element={
