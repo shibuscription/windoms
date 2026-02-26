@@ -139,6 +139,8 @@ body {
   align-items: flex-start;
   justify-content: center;
   padding: 24px 16px 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .status-panel-overlay {
@@ -305,26 +307,29 @@ body {
 }
 
 .menu-panel {
-  width: min(1280px, 100%);
-  max-height: calc(100vh - 40px);
-  overflow: auto;
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
   background: transparent;
   border: 0;
   border-radius: 0;
-  padding: 12px 6px 6px;
-  position: relative;
+  padding: 12px 0 6px;
 }
 
 .menu-close {
-  position: absolute;
+  position: sticky;
   top: 10px;
   right: 10px;
+  margin-left: auto;
+  display: block;
   border: 0;
-  background: transparent;
+  background: rgba(2, 6, 23, 0.82);
   color: #f8fafc;
   font-size: 1.4rem;
   line-height: 1;
   cursor: pointer;
+  z-index: 2;
 }
 
 .menu-today-header {
@@ -366,6 +371,7 @@ body {
 .menu-sections {
   display: grid;
   gap: 16px;
+  padding: 0 6px 6px;
 }
 
 .menu-section {
@@ -382,9 +388,11 @@ body {
 
 .menu-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  max-width: 440px;
+  grid-template-columns: repeat(auto-fit, 132px);
+  gap: 12px;
+  max-width: none;
+  justify-content: start;
+  align-items: start;
 }
 
 .menu-item {
@@ -392,6 +400,7 @@ body {
   background: #fff;
   border-radius: 12px;
   padding: 10px;
+  width: 132px;
   aspect-ratio: 1 / 1;
   display: grid;
   place-items: center;
@@ -2504,7 +2513,20 @@ textarea {
 
   .menu-panel {
     border-radius: 0;
-    padding: 12px 2px 2px;
+    padding: 12px 0 2px;
+  }
+
+  .menu-sections {
+    padding: 0 2px 2px;
+  }
+
+  .menu-grid {
+    grid-template-columns: repeat(auto-fit, 100px);
+    gap: 8px;
+  }
+
+  .menu-item {
+    width: 100px;
   }
 
   .app-header {
