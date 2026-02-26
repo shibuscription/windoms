@@ -27,7 +27,7 @@ const createPeriod = (fiscalYear: number, accounts?: PeriodAccount[]): Accountin
     fiscalYear,
     startDate: `${fiscalYear}-04-01`,
     endDate: `${fiscalYear + 1}-03-31`,
-    status: "open",
+    status: "editing",
     accounts: accounts ?? buildPeriodAccounts(),
     transactions: [],
     createdAt,
@@ -57,7 +57,17 @@ export const loadAccountingStore = (): AccountingStore => {
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (!isStoreShape(parsed)) return seedStore();
-    return parsed;
+    const normalizedPeriods = parsed.periods.map((period) => {
+      const rawStatus = (period as { status?: string }).status;
+      return {
+        ...period,
+        status: rawStatus === "open" ? "editing" : period.status,
+      };
+    });
+    return {
+      ...parsed,
+      periods: normalizedPeriods,
+    };
   } catch {
     return seedStore();
   }

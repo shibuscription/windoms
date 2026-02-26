@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   font-family: "Segoe UI", "Yu Gothic UI", sans-serif;
   color: #1f2937;
   background: #f7f8fa;
@@ -771,6 +771,33 @@ body {
   gap: 8px;
 }
 
+.accounting-action-row-fixed {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.accounting-action-button {
+  min-height: 60px;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.accounting-action-icon {
+  margin-right: 6px;
+  font-size: 1.1em;
+}
+
+.accounting-action-income {
+  background: #15803d;
+}
+
+.accounting-action-expense {
+  background: #b91c1c;
+}
+
+.accounting-action-transfer {
+  background: #1d4ed8;
+}
+
 .accounting-account-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -786,6 +813,86 @@ body {
   color: #111827;
   display: grid;
   gap: 4px;
+}
+
+.accounting-section-heading {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.accounting-account-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.accounting-account-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 8px 10px;
+}
+
+.accounting-account-row-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: #111827;
+}
+
+.accounting-summary-right strong {
+  text-align: right;
+}
+
+.accounting-amount-negative {
+  color: #b91c1c;
+}
+
+.accounting-graph-list {
+  display: grid;
+  gap: 8px;
+}
+
+.accounting-graph-row {
+  display: grid;
+  grid-template-columns: 44px 1fr max-content;
+  align-items: center;
+  gap: 8px;
+}
+
+.accounting-graph-label {
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.accounting-graph-track {
+  height: 12px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.accounting-graph-bar {
+  height: 100%;
+  border-radius: 999px;
+  background: #2563eb;
+}
+
+.accounting-graph-value {
+  font-size: 0.82rem;
+  color: #334155;
+  text-align: right;
 }
 
 .accounting-summary {
@@ -2475,7 +2582,6 @@ textarea {
   .activity-form,
   .log-two-cols,
   .log-three-cols,
-  .accounting-action-row,
   .accounting-account-grid,
   .accounting-summary {
     grid-template-columns: 1fr;

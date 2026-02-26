@@ -48,6 +48,8 @@ export const useAccountingStore = () => {
   );
 
   const addTransaction = (input: TransactionInput) => {
+    const period = store.periods.find((item) => item.periodId === input.periodId);
+    if (!period || period.status !== "editing") return;
     const transaction: AccountingTransaction = {
       id: generateId(),
       createdAt: new Date().toISOString(),
@@ -64,30 +66,8 @@ export const useAccountingStore = () => {
     withPersist(store, setStore, (prev) => addTransactionToPeriod(prev, input.periodId, transaction));
   };
 
-  const updatePeriodAccount = (
-    periodId: string,
-    accountKey: string,
-    patch: { label?: string; openingBalance?: number }
-  ) => {
-    const period = store.periods.find((item) => item.periodId === periodId);
-    if (!period) return;
-    const next: AccountingPeriod = {
-      ...period,
-      accounts: period.accounts.map((account) =>
-        account.accountKey === accountKey
-          ? {
-              ...account,
-              label: patch.label ?? account.label,
-              openingBalance: patch.openingBalance ?? account.openingBalance,
-            }
-          : account
-      ),
-    };
-    withPersist(store, setStore, (prev) => replacePeriod(prev, next));
-  };
-
   const closeCurrentPeriodAndCarryOver = () => {
-    if (!currentPeriod || currentPeriod.status !== "open") return;
+    if (!currentPeriod || currentPeriod.status !== "editing") return;
     const closingMap = balancesByAccount(currentPeriod);
     const closed: AccountingPeriod = { ...currentPeriod, status: "closed" };
     const nextPeriod = buildNextPeriodFromBalances(closed.fiscalYear + 1, closingMap);
@@ -99,18 +79,6 @@ export const useAccountingStore = () => {
         periods: [...withClosed.periods, nextPeriod],
       };
     });
-  };
-
-  const reopenPeriod = (periodId: string): { ok: boolean; reason?: string } => {
-    const period = store.periods.find((item) => item.periodId === periodId);
-    if (!period || period.status !== "closed") return { ok: false, reason: "対象期が見つかりません" };
-    const next = store.periods.find((item) => item.fiscalYear === period.fiscalYear + 1);
-    if (next && next.transactions.length > 0) {
-      return { ok: false, reason: "次期に取引が存在するため、締め解除できません" };
-    }
-    const reopened: AccountingPeriod = { ...period, status: "open" };
-    withPersist(store, setStore, (prev) => replacePeriod(prev, reopened));
-    return { ok: true };
   };
 
   const setCurrentPeriod = (periodId: string) => {
@@ -125,9 +93,7 @@ export const useAccountingStore = () => {
     periodsSorted,
     subjects: FIXED_SUBJECTS,
     addTransaction,
-    updatePeriodAccount,
     closeCurrentPeriodAndCarryOver,
-    reopenPeriod,
     setCurrentPeriod,
   };
 };

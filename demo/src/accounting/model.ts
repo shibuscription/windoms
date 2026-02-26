@@ -42,7 +42,7 @@ export type AccountingTransaction = {
   toAccountKey?: string;
 };
 
-export type PeriodStatus = "open" | "closed";
+export type PeriodStatus = "editing" | "closed";
 
 export type AccountingPeriod = {
   periodId: string;
