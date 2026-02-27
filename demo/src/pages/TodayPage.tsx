@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import type { DayLog, DemoData, DemoRsvp, DutyRequirement, RsvpStatus, SessionDoc } from "../types";
 import {
   formatDateYmd,
@@ -104,6 +104,7 @@ const buildMonthCells = (monthKey: string): Array<string | null> => {
 
 export function TodayPage({ data, updateDayLog }: TodayPageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const today = todayDateKey();
   const view = searchParams.get("view") ?? "";
   const queryDate = searchParams.get("date") ?? "";
@@ -170,6 +171,7 @@ export function TodayPage({ data, updateDayLog }: TodayPageProps) {
     [selectedSession, data],
   );
   const calendarCells = useMemo(() => buildMonthCells(calendarMonth), [calendarMonth]);
+  const calendarPath = `/calendar?ym=${toMonthKey(date)}&date=${date}`;
 
   const moveDate = (days: number) => {
     const next = shiftDateKey(date, days);
@@ -235,26 +237,25 @@ export function TodayPage({ data, updateDayLog }: TodayPageProps) {
           <div
             className="today-date-center"
             ref={calendarWrapRef}
-            role="button"
-            tabIndex={0}
-            onClick={toggleMiniCalendar}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                toggleMiniCalendar();
-              }
-            }}
           >
-            <div
+            <button
+              type="button"
               className="today-date-picker-trigger"
+              onClick={toggleMiniCalendar}
+              aria-label="日付選択を開く"
             >
               <span className="date-main date-full">{formatDateYmd(date)}</span>
               <span className="date-main date-short">{formatDateYmd(date).slice(5)}</span>
               <span className={`date-weekday ${weekdayTone(date)}`}>（{formatWeekdayJa(date)}）</span>
-              <span className="calendar-icon" aria-hidden="true">
-                📅
-              </span>
-            </div>
+            </button>
+            <button
+              type="button"
+              className="today-calendar-link-trigger"
+              onClick={() => navigate(calendarPath)}
+              aria-label="カレンダーを開く"
+            >
+              🗓️
+            </button>
             {isCalendarOpen && (
               <div className="today-calendar-popover" onClick={(event) => event.stopPropagation()}>
                 <div className="mini-calendar-header">

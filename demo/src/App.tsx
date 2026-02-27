@@ -2,6 +2,7 @@ import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-r
 import { useEffect, useMemo, useState } from "react";
 import { HomePage } from "./pages/HomePage";
 import { TodayPage } from "./pages/TodayPage";
+import { CalendarPage } from "./pages/CalendarPage";
 import { LogPage } from "./pages/LogPage";
 import { ActivityPlanPage } from "./pages/ActivityPlanPage";
 import { AttendancePage } from "./pages/AttendancePage";
@@ -10,6 +11,7 @@ import { ShiftSurveyPage } from "./pages/ShiftSurveyPage";
 import { LunchPage } from "./pages/LunchPage";
 import { LinksPage } from "./pages/LinksPage";
 import { MembersPage } from "./pages/MembersPage";
+import { EventsPage } from "./pages/EventsPage";
 import { AccountingHome } from "./pages/Accounting/AccountingHome";
 import { AccountingPeriods } from "./pages/Accounting/AccountingPeriods";
 import { AccountingReport } from "./pages/Accounting/AccountingReport";
@@ -91,9 +93,9 @@ const menuSections = (
           id: "calendar",
           label: "カレンダー",
           icon: "🗓️",
-          to: "/today?view=calendar",
+          to: "/calendar",
           allowedRoles: ["child", "parent", "admin"],
-          isActive: (location) => viewIsActive(location, "calendar"),
+          isActive: (location) => location.pathname === "/calendar",
         },
         {
           id: "duty-log",
@@ -131,9 +133,9 @@ const menuSections = (
           id: "event",
           label: "イベント",
           icon: "🎪",
-          to: "/today?view=event",
+          to: "/events",
           allowedRoles: ["child", "parent", "admin"],
-          isActive: (location) => viewIsActive(location, "event"),
+          isActive: (location) => location.pathname.startsWith("/events"),
         },
         {
           id: "shift-create",
@@ -491,6 +493,7 @@ export function App() {
             path="/today"
             element={<TodayPage data={context.data} updateDayLog={context.updateDayLog} />}
           />
+          <Route path="/calendar" element={<CalendarPage data={context.data} />} />
           <Route
             path="/activity-plan"
             element={<ActivityPlanPage />}
@@ -499,6 +502,8 @@ export function App() {
           <Route path="/watch" element={<WatchPage />} />
           <Route path="/shift-survey" element={<ShiftSurveyPage />} />
           <Route path="/lunch" element={<LunchPage />} />
+          <Route path="/events" element={<EventsPage />} />
+          <Route path="/events/:eventId" element={<EventsPage />} />
           <Route path="/links" element={<LinksPage />} />
           <Route path="/members" element={<MembersPage />} />
           <Route path="/accounting" element={<AccountingHome />} />

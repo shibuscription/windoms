@@ -1,10 +1,82 @@
-import type { DemoData } from "../types";
+import type { DemoData, ScheduleDayDoc, SessionDoc } from "../types";
 import { shiftDateKey, todayDateKey } from "../utils/date";
 
 const today = todayDateKey();
 const dayMinus1 = shiftDateKey(today, -1);
 const dayMinus2 = shiftDateKey(today, -2);
 const dayMinus3 = shiftDateKey(today, -3);
+const DUTY_LAST_NAMES = ["伊藤", "佐藤", "鈴木", "高橋", "-"] as const;
+
+const dutyNameBySeed = (seed: number): string => DUTY_LAST_NAMES[seed % DUTY_LAST_NAMES.length];
+
+const makeSession = (
+  order: number,
+  startTime: string,
+  endTime: string,
+  type: SessionDoc["type"],
+  dutySeed: number,
+  eventName?: string,
+): SessionDoc => ({
+  order,
+  startTime,
+  endTime,
+  type,
+  eventName,
+  dutyRequirement: "duty",
+  requiresShift: true,
+  location: type === "event" ? "市内会場" : "第1音楽室",
+  assignees: [],
+  assigneeNameSnapshot: dutyNameBySeed(dutySeed),
+  plannedInstructors: [],
+  plannedSeniors: [],
+});
+
+const buildFeb2026ScheduleDays = (): Record<string, ScheduleDayDoc> => {
+  const result: Record<string, ScheduleDayDoc> = {};
+  let dutySeed = 0;
+  const year = 2026;
+  const month = 2;
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const dateKey = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const weekday = new Date(year, month - 1, day).getDay();
+    const sessions: SessionDoc[] = [];
+
+    if (weekday === 2 || weekday === 4) {
+      sessions.push(makeSession(1, "17:00", "18:30", "normal", dutySeed));
+      dutySeed += 1;
+    }
+    if (weekday === 6) {
+      sessions.push(makeSession(1, "09:00", "12:00", "self", dutySeed));
+      sessions.push(makeSession(2, "12:00", "15:00", "normal", dutySeed + 1));
+      dutySeed += 2;
+    }
+    if (weekday === 0) {
+      sessions.push(makeSession(1, "09:00", "12:00", "normal", dutySeed));
+      sessions.push(makeSession(2, "12:00", "15:00", "self", dutySeed + 1));
+      dutySeed += 2;
+    }
+
+    if (dateKey === "2026-02-11") {
+      sessions.length = 0;
+      sessions.push(makeSession(1, "10:00", "14:00", "event", dutySeed, "市民文化祭ステージ"));
+      dutySeed += 1;
+    }
+    if (dateKey === "2026-02-23") {
+      sessions.length = 0;
+      sessions.push(makeSession(1, "13:00", "16:00", "event", dutySeed, "陶器まつり屋外演奏"));
+      dutySeed += 1;
+    }
+
+    if (sessions.length === 0) continue;
+    result[dateKey] = {
+      defaultLocation: "第1音楽室",
+      sessions,
+    };
+  }
+  return result;
+};
 
 export const mockData: DemoData = {
   demoDictionaries: {
@@ -86,6 +158,7 @@ export const mockData: DemoData = {
     },
   },
   scheduleDays: {
+    ...buildFeb2026ScheduleDays(),
     [today]: {
       defaultLocation: "第1音楽室",
       notice:

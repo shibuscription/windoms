@@ -41,6 +41,7 @@ export type SessionDoc = {
   startTime: string;
   endTime: string;
   type: SessionType;
+  eventName?: string;
   dutyRequirement: DutyRequirement;
   // compatibility: dutyRequirement === "duty" の旧フラグ
   requiresShift?: boolean;

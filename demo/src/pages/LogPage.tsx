@@ -951,7 +951,7 @@ export function LogPage({
     <section className="card log-page">
       <div className="log-toolbar">
         <Link to="/today" className="button button-small">
-          今日へ戻る
+          Todayへ
         </Link>
         <button type="button" className="button button-small" onClick={onSaveDemo}>
           保存（デモ）
