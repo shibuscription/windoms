@@ -13,12 +13,14 @@ import { LinksPage } from "./pages/LinksPage";
 import { MembersPage } from "./pages/MembersPage";
 import { EventsPage } from "./pages/EventsPage";
 import { TodosPage } from "./pages/TodosPage";
+import { PurchasesPage } from "./pages/PurchasesPage";
+import { ReimbursementsPage } from "./pages/ReimbursementsPage";
 import { AccountingHome } from "./pages/Accounting/AccountingHome";
 import { AccountingPeriods } from "./pages/Accounting/AccountingPeriods";
 import { AccountingReport } from "./pages/Accounting/AccountingReport";
 import { AccountLedger } from "./pages/Accounting/AccountLedger";
 import { DEMO_CURRENT_UID, mockData } from "./data/mockData";
-import type { DayLog, DemoData, DemoRsvp, Todo } from "./types";
+import type { DayLog, DemoData, DemoRsvp, PurchaseRequest, Reimbursement, Todo } from "./types";
 import { formatDateYmd, formatWeekdayJa, isValidDateKey, todayDateKey, weekdayTone } from "./utils/date";
 import { resolveTodoRelatedSummary, sortTodos } from "./utils/todoUtils";
 import {
@@ -151,17 +153,17 @@ const menuSections = (
           id: "purchase-request",
           label: "購入依頼",
           icon: "🛍️",
-          to: "/today?view=purchase-request",
+          to: "/purchases",
           allowedRoles: ["parent", "admin"],
-          isActive: (location) => viewIsActive(location, "purchase-request"),
+          isActive: (location) => location.pathname === "/purchases",
         },
         {
           id: "reimbursement",
           label: "立替",
           icon: "🧾",
-          to: "/today?view=reimbursement",
+          to: "/reimbursements",
           allowedRoles: ["parent", "admin"],
-          isActive: (location) => viewIsActive(location, "reimbursement"),
+          isActive: (location) => location.pathname === "/reimbursements",
         },
         {
           id: "accounting",
@@ -421,6 +423,20 @@ export function App() {
     }));
   };
 
+  const updatePurchaseRequests = (updater: (prev: PurchaseRequest[]) => PurchaseRequest[]) => {
+    setData((prev) => ({
+      ...prev,
+      purchaseRequests: updater(prev.purchaseRequests),
+    }));
+  };
+
+  const updateReimbursements = (updater: (prev: Reimbursement[]) => Reimbursement[]) => {
+    setData((prev) => ({
+      ...prev,
+      reimbursements: updater(prev.reimbursements),
+    }));
+  };
+
   return (
     <div className="app-shell">
       <div className="demo-badge">DEMO（データは仮）</div>
@@ -513,6 +529,27 @@ export function App() {
           <Route
             path="/todos"
             element={<TodosPage data={data} currentUid={currentUid} updateTodos={updateTodos} />}
+          />
+          <Route
+            path="/purchases"
+            element={
+              <PurchasesPage
+                data={data}
+                currentUid={currentUid}
+                demoRole={readDemoRole()}
+                updatePurchaseRequests={updatePurchaseRequests}
+                updateReimbursements={updateReimbursements}
+              />
+            }
+          />
+          <Route
+            path="/reimbursements"
+            element={
+              <ReimbursementsPage
+                data={data}
+                updateReimbursements={updateReimbursements}
+              />
+            }
           />
           <Route path="/links" element={<LinksPage />} />
           <Route path="/members" element={<MembersPage />} />

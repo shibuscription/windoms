@@ -103,6 +103,55 @@ export type Todo = {
   related?: RelatedRef | null;
 };
 
+export type PurchaseRequestStatus = "OPEN" | "BOUGHT";
+
+export type PurchaseRequest = {
+  id: string;
+  title: string;
+  createdAt?: string;
+  category?: string;
+  memo?: string;
+  quantity?: string | number;
+  estimatedAmount?: number;
+  createdBy: string;
+  purchaseAssignees?: string[];
+  status: PurchaseRequestStatus;
+  boughtBy?: string;
+  boughtAt?: string;
+  purchaseResult?: {
+    itemName: string;
+    quantity?: string | number;
+    amount?: number;
+    purchasedAt: string;
+    receiptFilesMeta?: Array<{
+      name: string;
+      size: number;
+      type: string;
+    }>;
+    accountingRecordRequested?: boolean;
+    reimbursementRecordRequested?: boolean;
+  };
+};
+
+export type ReimbursementStatus =
+  | "OPEN"
+  | "PAID_BY_TREASURER"
+  | "RECEIVED_BY_BUYER"
+  | "DONE";
+
+export type Reimbursement = {
+  id: string;
+  title: string;
+  amount: number;
+  purchasedAt: string;
+  buyer: string;
+  memo?: string;
+  receipt?: string;
+  relatedPurchaseRequestId?: string;
+  paidByTreasurerAt?: string;
+  receivedByBuyerAt?: string;
+};
+
 export type DemoEventSummary = {
   id: string;
   title: string;
@@ -116,6 +165,8 @@ export type DemoData = {
   households: Record<string, Household>;
   events: DemoEventSummary[];
   todos: Todo[];
+  purchaseRequests: PurchaseRequest[];
+  reimbursements: Reimbursement[];
   demoDictionaries: {
     instructors: string[];
     seniors: string[];
