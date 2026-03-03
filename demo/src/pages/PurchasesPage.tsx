@@ -1,16 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DemoData, PurchaseRequest, Reimbursement } from "../types";
+import { ReceiptImagePicker } from "../components/ReceiptImagePicker";
+import { useReceiptPreviews } from "../hooks/useReceiptPreviews";
 
 type PurchaseTab = "open" | "bought";
 type DemoRole = "admin" | "member";
-
-type ReceiptPreview = {
-  id: string;
-  name: string;
-  size: number;
-  type: string;
-  url: string;
-};
 
 type PurchaseCreateDraft = {
   title: string;
@@ -33,6 +27,13 @@ type PurchasesPageProps = {
   updatePurchaseRequests: (updater: (prev: PurchaseRequest[]) => PurchaseRequest[]) => void;
   updateReimbursements: (updater: (prev: Reimbursement[]) => Reimbursement[]) => void;
 };
+
+type PurchaseConfirmDialogState =
+  | {
+      mode: "delete";
+      purchase: PurchaseRequest;
+    }
+  | null;
 
 const toDateTimeLabel = (iso?: string): string => {
   if (!iso) return "—";
@@ -81,22 +82,9 @@ export function PurchasesPage({
   const [modalTarget, setModalTarget] = useState<PurchaseRequest | null>(null);
   const [completeDraft, setCompleteDraft] = useState<PurchaseCompleteDraft | null>(null);
   const [itemNameError, setItemNameError] = useState<string | null>(null);
-  const [receiptPreviews, setReceiptPreviews] = useState<ReceiptPreview[]>([]);
-  const receiptPreviewsRef = useRef<ReceiptPreview[]>([]);
-
-  const releaseReceiptPreviews = (items: ReceiptPreview[]) => {
-    items.forEach((item) => URL.revokeObjectURL(item.url));
-  };
-
-  useEffect(() => {
-    receiptPreviewsRef.current = receiptPreviews;
-  }, [receiptPreviews]);
-
-  useEffect(() => {
-    return () => {
-      releaseReceiptPreviews(receiptPreviewsRef.current);
-    };
-  }, []);
+  const [confirmDialog, setConfirmDialog] = useState<PurchaseConfirmDialogState>(null);
+  const { previews: receiptPreviews, addFiles, removePreview, clearPreviews } =
+    useReceiptPreviews();
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
@@ -210,8 +198,7 @@ export function PurchasesPage({
   };
 
   const openCompleteModal = (item: PurchaseRequest) => {
-    releaseReceiptPreviews(receiptPreviewsRef.current);
-    setReceiptPreviews([]);
+    clearPreviews();
     setModalTarget(item);
     setCompleteDraft({
       itemName: item.title,
@@ -225,31 +212,16 @@ export function PurchasesPage({
   };
 
   const closeCompleteModal = () => {
-    releaseReceiptPreviews(receiptPreviewsRef.current);
-    setReceiptPreviews([]);
+    clearPreviews();
     setModalTarget(null);
     setCompleteDraft(null);
     setItemNameError(null);
   };
 
-  const addReceiptFiles = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    const nextItems: ReceiptPreview[] = Array.from(files).map((file) => ({
-      id: `${file.name}-${file.size}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      url: URL.createObjectURL(file),
-    }));
-    setReceiptPreviews((prev) => [...prev, ...nextItems]);
-  };
-
-  const removeReceiptPreview = (id: string) => {
-    setReceiptPreviews((prev) => {
-      const target = prev.find((item) => item.id === id);
-      if (target) URL.revokeObjectURL(target.url);
-      return prev.filter((item) => item.id !== id);
-    });
+  const runConfirmAction = () => {
+    if (!confirmDialog) return;
+    updatePurchaseRequests((prev) => prev.filter((item) => item.id !== confirmDialog.purchase.id));
+    setConfirmDialog(null);
   };
 
   const commitComplete = () => {
@@ -365,6 +337,18 @@ export function PurchasesPage({
                   onClick={() => openCompleteModal(item)}
                 >
                   購入済みにする
+                </button>
+              </div>
+            )}
+            {item.status === "OPEN" && item.createdBy === currentUid && (
+              <div className="reimbursement-delete-action">
+                <button
+                  type="button"
+                  className="link-icon-button"
+                  aria-label="削除"
+                  onClick={() => setConfirmDialog({ mode: "delete", purchase: item })}
+                >
+                  🗑️
                 </button>
               </div>
             )}
@@ -484,34 +468,11 @@ export function PurchasesPage({
               />
             </label>
 
-            <div className="purchase-receipts">
-              <p className="purchase-receipts-title">レシート画像（任意・複数）</p>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(event) => addReceiptFiles(event.target.files)}
-              />
-              {receiptPreviews.length > 0 && (
-                <div className="purchase-receipt-grid">
-                  {receiptPreviews.map((preview) => (
-                    <article key={preview.id} className="purchase-receipt-card">
-                      <img src={preview.url} alt={preview.name} className="purchase-receipt-image" />
-                      <p className="purchase-receipt-name" title={preview.name}>
-                        {preview.name}
-                      </p>
-                      <button
-                        type="button"
-                        className="button button-small button-secondary"
-                        onClick={() => removeReceiptPreview(preview.id)}
-                      >
-                        削除
-                      </button>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </div>
+            <ReceiptImagePicker
+              previews={receiptPreviews}
+              onAddFiles={addFiles}
+              onRemovePreview={removePreview}
+            />
 
             {demoRole === "member" && (
               <label className="purchase-option-check">
@@ -552,6 +513,30 @@ export function PurchasesPage({
               </button>
               <button type="button" className="button" onClick={commitComplete}>
                 確定
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {confirmDialog && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setConfirmDialog(null)}>
+          <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
+            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setConfirmDialog(null)}>
+              ×
+            </button>
+            <h3>この購入依頼を削除しますか？</h3>
+            <p className="modal-summary">{confirmDialog.purchase.title}</p>
+            <div className="modal-actions">
+              <button type="button" className="button button-secondary" onClick={() => setConfirmDialog(null)}>
+                キャンセル
+              </button>
+              <button
+                type="button"
+                className="button events-danger-button"
+                onClick={runConfirmAction}
+              >
+                削除
               </button>
             </div>
           </section>

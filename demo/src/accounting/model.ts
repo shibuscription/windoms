@@ -34,6 +34,7 @@ export type AccountingTransaction = {
   createdAt: string;
   date: string;
   type: TransactionType;
+  source?: "manual" | "reimbursement" | "purchase";
   amount: number;
   subjectId: string;
   memo?: string;

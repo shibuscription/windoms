@@ -1057,7 +1057,8 @@ body {
   margin: 0;
 }
 
-.purchases-header {
+.purchases-header,
+.reimbursements-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1079,10 +1080,11 @@ body {
 
 .purchase-card,
 .reimbursement-card {
+  position: relative;
   border: 1px solid #d6dde8;
   border-radius: 10px;
   background: #f8fafc;
-  padding: 10px 12px;
+  padding: 10px 12px 38px;
   display: grid;
   gap: 6px;
 }
@@ -1090,7 +1092,7 @@ body {
 .purchase-card-top,
 .reimbursement-card-top {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
@@ -1119,6 +1121,16 @@ body {
   color: #1d4ed8;
 }
 
+.reimbursement-status.unpaid {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.reimbursement-status.paid {
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .purchase-status.bought,
 .reimbursement-status.done {
   background: #dcfce7;
@@ -1136,6 +1148,22 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.reimbursement-delete-action {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: inline-flex;
+}
+
+.button-danger {
+  background: #b91c1c;
+  color: #fff;
+}
+
+.button-danger:hover {
+  background: #991b1b;
 }
 
 .purchases-complete-modal {

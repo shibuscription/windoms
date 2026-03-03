@@ -547,6 +547,8 @@ export function App() {
             element={
               <ReimbursementsPage
                 data={data}
+                currentUid={currentUid}
+                demoRole={readDemoRole()}
                 updateReimbursements={updateReimbursements}
               />
             }

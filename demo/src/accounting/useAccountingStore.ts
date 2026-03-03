@@ -26,6 +26,7 @@ export type TransactionInput = {
   periodId: string;
   type: TransactionType;
   date: string;
+  source?: AccountingTransaction["source"];
   amount: number;
   subjectId: string;
   memo?: string;
@@ -55,6 +56,7 @@ export const useAccountingStore = () => {
       createdAt: new Date().toISOString(),
       date: input.date,
       type: input.type,
+      source: input.source ?? "manual",
       amount: input.amount,
       subjectId: input.subjectId,
       memo: input.memo?.trim() || undefined,

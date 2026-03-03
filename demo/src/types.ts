@@ -147,6 +147,11 @@ export type Reimbursement = {
   buyer: string;
   memo?: string;
   receipt?: string;
+  receiptFilesMeta?: Array<{
+    name: string;
+    size: number;
+    type: string;
+  }>;
   relatedPurchaseRequestId?: string;
   paidByTreasurerAt?: string;
   receivedByBuyerAt?: string;

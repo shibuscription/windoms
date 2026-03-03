@@ -222,7 +222,7 @@ const demoReimbursements: DemoData["reimbursements"] = [
     title: "譜面コピー用紙",
     amount: 980,
     purchasedAt: "2026-02-18T12:10:00+09:00",
-    buyer: "g03",
+    buyer: "g01",
     paidByTreasurerAt: "2026-02-24T20:15:00+09:00",
   },
   {
@@ -232,7 +232,6 @@ const demoReimbursements: DemoData["reimbursements"] = [
     purchasedAt: "2026-02-17T17:20:00+09:00",
     buyer: "g07",
     memo: "色指定あり",
-    receivedByBuyerAt: "2026-02-23T08:40:00+09:00",
   },
   {
     id: "rb-004",
@@ -243,6 +242,14 @@ const demoReimbursements: DemoData["reimbursements"] = [
     receipt: "https://example.com/receipt/rb-004",
     paidByTreasurerAt: "2026-02-18T09:15:00+09:00",
     receivedByBuyerAt: "2026-02-19T21:05:00+09:00",
+  },
+  {
+    id: "rb-005",
+    title: "ガムテープ補充",
+    amount: 630,
+    purchasedAt: "2026-02-26T18:05:00+09:00",
+    buyer: "g01",
+    memo: "未精算サンプル（自分）",
   },
 ];
 
