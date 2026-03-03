@@ -1046,6 +1046,255 @@ body {
   color: #64748b;
 }
 
+.todos-page {
+  display: grid;
+  gap: 12px;
+}
+
+.todos-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.todos-page h1,
+.todos-page h2 {
+  margin: 0;
+}
+
+.todos-filters,
+.todos-section {
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 8px 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.todos-filter-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.todos-filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.todos-filter-toggle {
+  display: none;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.86rem;
+  cursor: pointer;
+  align-items: center;
+  gap: 6px;
+}
+
+.todos-filter-toggle.active-filter {
+  border-color: #93c5fd;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.todos-filter-badge {
+  display: inline-flex;
+  min-width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #1d4ed8;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 5px;
+}
+
+.todos-list {
+  display: grid;
+  gap: 8px;
+}
+
+.todo-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) 116px;
+  gap: 8px;
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  background: #fff;
+  padding: 8px 10px;
+}
+
+.todo-row.completed .todo-title {
+  text-decoration: line-through;
+  color: #64748b;
+}
+
+.todo-check {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  margin: 0;
+}
+
+.todo-main {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.todo-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.todo-meta {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #64748b;
+  font-size: 0.82rem;
+}
+
+.todo-related-link,
+.todo-related-text {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.todo-related-link {
+  border: 0;
+  background: transparent;
+  color: #1d4ed8;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.todo-actions {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  width: 116px;
+}
+
+.todo-actions > .button,
+.todo-actions > .todo-action-placeholder {
+  width: 100%;
+}
+
+.todo-action-placeholder {
+  display: block;
+  height: 30px;
+}
+
+.todo-row.compact {
+  grid-template-columns: 20px 1fr auto;
+  padding: 6px 8px;
+}
+
+.todo-row.completed {
+  opacity: 0.62;
+}
+
+.todos-edit-modal {
+  width: min(640px, calc(100vw - 24px));
+}
+
+.todos-related-modal {
+  width: min(540px, calc(100vw - 24px));
+}
+
+.related-todos-block {
+  margin-top: 6px;
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.related-todos-block h4 {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.related-todos-list {
+  display: grid;
+  gap: 6px;
+}
+
+.status-inbox-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.status-inbox-main {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.status-inbox-meta {
+  font-size: 0.8rem;
+  color: #cbd5e1;
+}
+
+.status-inline-link {
+  border: 0;
+  background: transparent;
+  color: #93c5fd;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+  .todos-filter-toggle {
+    display: inline-flex;
+  }
+
+  .todos-filter-row {
+    grid-template-columns: 1fr;
+  }
+
+  .todo-row {
+    grid-template-columns: 20px minmax(0, 1fr);
+  }
+
+  .todo-actions {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: auto;
+  }
+
+  .todo-actions > .button,
+  .todo-actions > .todo-action-placeholder {
+    width: auto;
+  }
+}
+
 .accounting-page {
   display: grid;
   gap: 12px;
@@ -3481,5 +3730,20 @@ textarea {
 @media (min-width: 601px) {
   .date-short {
     display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .container,
+  .page-wrap {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .card {
+    margin-left: 0;
+    margin-right: 0;
+    border-radius: 0;
+    width: 100%;
   }
 }

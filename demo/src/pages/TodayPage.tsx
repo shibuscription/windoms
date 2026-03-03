@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import type { DayLog, DemoData, DemoRsvp, DutyRequirement, RsvpStatus, SessionDoc } from "../types";
+import type { DayLog, DemoData, DemoRsvp, DutyRequirement, RsvpStatus, SessionDoc, Todo } from "../types";
 import {
   formatDateYmd,
   formatWeekdayJa,
@@ -10,10 +10,13 @@ import {
   todayDateKey,
   weekdayTone,
 } from "../utils/date";
+import { makeSessionRelatedId, sortTodosOpenFirst } from "../utils/todoUtils";
 
 type TodayPageProps = {
   data: DemoData;
   updateDayLog: (date: string, updater: (prev: DayLog) => DayLog) => void;
+  currentUid: string;
+  updateTodos: (updater: (prev: Todo[]) => Todo[]) => void;
 };
 
 const typeLabel: Record<SessionDoc["type"], string> = {
@@ -102,7 +105,7 @@ const buildMonthCells = (monthKey: string): Array<string | null> => {
   return cells;
 };
 
-export function TodayPage({ data, updateDayLog }: TodayPageProps) {
+export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: TodayPageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const today = todayDateKey();
@@ -170,6 +173,15 @@ export function TodayPage({ data, updateDayLog }: TodayPageProps) {
     () => (selectedSession ? sortRsvps(selectedSession.demoRsvps ?? [], data) : []),
     [selectedSession, data],
   );
+  const selectedSessionTodos = useMemo(() => {
+    if (!selectedSession) return [] as Todo[];
+    const relatedId = makeSessionRelatedId(date, selectedSession.order);
+    return sortTodosOpenFirst(
+      data.todos.filter(
+        (todo) => todo.related?.type === "session" && todo.related.id === relatedId,
+      ),
+    );
+  }, [data.todos, date, selectedSession]);
   const calendarCells = useMemo(() => buildMonthCells(calendarMonth), [calendarMonth]);
   const calendarPath = `/calendar?ym=${toMonthKey(date)}&date=${date}`;
 
@@ -212,6 +224,18 @@ export function TodayPage({ data, updateDayLog }: TodayPageProps) {
   const toggleMiniCalendar = () => {
     setCalendarMonth(toMonthKey(date));
     setIsCalendarOpen((prev) => !prev);
+  };
+
+  const assigneeLabel = (uid: string | null): string => {
+    if (!uid) return "未アサイン";
+    return data.users[uid]?.displayName ?? uid;
+  };
+
+  const takeoverLabel = (todo: Todo): string | null => {
+    if (todo.completed) return null;
+    if (todo.assigneeUid === null) return "引き取る";
+    if (todo.assigneeUid !== currentUid) return "引き継ぐ";
+    return null;
   };
 
   if (view) {
@@ -415,6 +439,56 @@ export function TodayPage({ data, updateDayLog }: TodayPageProps) {
                 </div>
               ))}
             </div>
+            <section className="related-todos-block">
+              <h4>関連TODO</h4>
+              <div className="related-todos-list">
+                {selectedSessionTodos.map((todo) => {
+                  const takeover = takeoverLabel(todo);
+                  return (
+                    <article key={todo.id} className={`todo-row compact ${todo.completed ? "completed" : ""}`}>
+                      <label className="todo-check">
+                        <input
+                          type="checkbox"
+                          checked={todo.completed}
+                          onChange={() =>
+                            updateTodos((prev) =>
+                              prev.map((item) =>
+                                item.id === todo.id ? { ...item, completed: !item.completed } : item,
+                              ),
+                            )
+                          }
+                        />
+                      </label>
+                      <div className="todo-main">
+                        <p className="todo-title">{todo.title}</p>
+                        <p className="todo-meta">
+                          <span>担当: {assigneeLabel(todo.assigneeUid)}</span>
+                          <span>期限: {todo.dueDate ?? "—"}</span>
+                        </p>
+                      </div>
+                      <div className="todo-actions">
+                        {takeover && (
+                          <button
+                            type="button"
+                            className="button button-small"
+                            onClick={() =>
+                              updateTodos((prev) =>
+                                prev.map((item) =>
+                                  item.id === todo.id ? { ...item, assigneeUid: currentUid } : item,
+                                ),
+                              )
+                            }
+                          >
+                            {takeover}
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+                {selectedSessionTodos.length === 0 && <p className="muted">関連TODOはありません。</p>}
+              </div>
+            </section>
           </div>
         </div>
       )}

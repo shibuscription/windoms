@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import type { DemoData, Todo } from "../types";
+import { sortTodosOpenFirst } from "../utils/todoUtils";
 import { todayDateKey } from "../utils/date";
 
 type DemoMenuRole = "child" | "parent" | "admin";
@@ -15,14 +17,6 @@ type DemoEvent = {
   eventSortDate: string;
   memo?: string;
   sessionIds?: string[];
-};
-
-type DemoEventTodo = {
-  id: string;
-  title: string;
-  done: boolean;
-  due?: string;
-  assignee?: string;
 };
 
 type LinkedSession = {
@@ -95,18 +89,6 @@ const demoEvents: DemoEvent[] = [
   },
 ];
 
-const eventTodos: Record<string, DemoEventTodo[]> = {
-  "teiki-2026": [
-    { id: "t1", title: "会場予約の最終確認", done: false, due: "03/01", assignee: "役員" },
-    { id: "t2", title: "演出用照明の発注", done: false, due: "03/08", assignee: "高橋" },
-    { id: "t3", title: "プログラム校正", done: true, due: "03/05", assignee: "佐藤" },
-  ],
-  "touki-2026": [
-    { id: "t1", title: "屋外ステージの電源確認", done: false, due: "02/20", assignee: "伊藤" },
-    { id: "t2", title: "譜面台の本数確認", done: true, due: "02/18", assignee: "鈴木" },
-    { id: "t3", title: "集合連絡の再送", done: false, assignee: "役員" },
-  ],
-};
 
 const linkedSessionsMap: Record<string, LinkedSession> = {
   "s-2026-03-20-am": {
@@ -181,10 +163,15 @@ const createInitialDraft = (): EventFormDraft => ({
   state: "active",
 });
 
-export function EventsPage() {
+type EventsPageProps = {
+  data: DemoData;
+  currentUid: string;
+  updateTodos: (updater: (prev: Todo[]) => Todo[]) => void;
+};
+
+export function EventsPage({ data, currentUid, updateTodos }: EventsPageProps) {
   const [events, setEvents] = useState<DemoEvent[]>(demoEvents);
   const [activeTab, setActiveTab] = useState<"active" | "done">("active");
-  const [isTodoModalOpen, setIsTodoModalOpen] = useState(false);
   const [isLinkedSessionsModalOpen, setIsLinkedSessionsModalOpen] = useState(false);
   const [isSessionBindModalOpen, setIsSessionBindModalOpen] = useState(false);
   const [unlinkTargetSessionId, setUnlinkTargetSessionId] = useState<string | null>(null);
@@ -252,7 +239,14 @@ export function EventsPage() {
   );
 
   const visibleEvents = activeTab === "active" ? activeEvents : filteredDoneEvents;
-  const todos = selectedEvent ? eventTodos[selectedEvent.id] ?? [] : [];
+  const eventRelatedTodos = useMemo(() => {
+    if (!selectedEvent) return [] as Todo[];
+    return sortTodosOpenFirst(
+      data.todos.filter(
+        (todo) => todo.related?.type === "event" && todo.related.id === selectedEvent.id,
+      ),
+    );
+  }, [data.todos, selectedEvent]);
 
   const showFeedback = (message: string) => {
     setFeedback(message);
@@ -262,10 +256,21 @@ export function EventsPage() {
   };
 
   const closeDetail = () => {
-    setIsTodoModalOpen(false);
     setIsLinkedSessionsModalOpen(false);
     setIsSessionBindModalOpen(false);
     navigate("/events");
+  };
+
+  const assigneeLabel = (uid: string | null): string => {
+    if (!uid) return "未アサイン";
+    return data.users[uid]?.displayName ?? uid;
+  };
+
+  const takeoverLabel = (todo: Todo): string | null => {
+    if (todo.completed) return null;
+    if (todo.assigneeUid === null) return "引き取る";
+    if (todo.assigneeUid !== currentUid) return "引き継ぐ";
+    return null;
   };
 
   const openCreateModal = () => {
@@ -462,9 +467,59 @@ export function EventsPage() {
             <button type="button" className="events-linked-summary" onClick={() => setIsLinkedSessionsModalOpen(true)}>
               紐づきセッション: {selectedEvent.sessionIds?.length ?? 0}件
             </button>
+            <section className="related-todos-block">
+              <h4>関連TODO</h4>
+              <div className="related-todos-list">
+                {eventRelatedTodos.map((todo) => {
+                  const takeover = takeoverLabel(todo);
+                  return (
+                    <article key={todo.id} className={`todo-row compact ${todo.completed ? "completed" : ""}`}>
+                      <label className="todo-check">
+                        <input
+                          type="checkbox"
+                          checked={todo.completed}
+                          onChange={() =>
+                            updateTodos((prev) =>
+                              prev.map((item) =>
+                                item.id === todo.id ? { ...item, completed: !item.completed } : item,
+                              ),
+                            )
+                          }
+                        />
+                      </label>
+                      <div className="todo-main">
+                        <p className="todo-title">{todo.title}</p>
+                        <p className="todo-meta">
+                          <span>担当: {assigneeLabel(todo.assigneeUid)}</span>
+                          <span>期限: {todo.dueDate ?? "—"}</span>
+                        </p>
+                      </div>
+                      <div className="todo-actions">
+                        {takeover && (
+                          <button
+                            type="button"
+                            className="button button-small"
+                            onClick={() =>
+                              updateTodos((prev) =>
+                                prev.map((item) =>
+                                  item.id === todo.id ? { ...item, assigneeUid: currentUid } : item,
+                                ),
+                              )
+                            }
+                          >
+                            {takeover}
+                          </button>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
+                {eventRelatedTodos.length === 0 && <p className="muted">関連TODOはありません。</p>}
+              </div>
+            </section>
             <div className="events-detail-actions">
-              <button type="button" className="button button-small button-secondary" onClick={() => setIsTodoModalOpen(true)}>
-                ✅ TODO
+              <button type="button" className="button button-small button-secondary" onClick={() => navigate("/todos")}>
+                TODOページへ
               </button>
               <button
                 type="button"
@@ -582,40 +637,6 @@ export function EventsPage() {
             <p className="muted">DEMO: 保存は行いません</p>
             <div className="modal-actions">
               <button type="button" className="button button-small" onClick={() => setIsSessionBindModalOpen(false)}>
-                閉じる
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
-
-      {selectedEvent && isTodoModalOpen && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setIsTodoModalOpen(false)}>
-          <section className="modal-panel events-todo-modal" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setIsTodoModalOpen(false)}>
-              ×
-            </button>
-            <h3>TODO（イベント）</h3>
-            <p className="modal-context">{selectedEvent.title}</p>
-            <ul className="events-todo-list">
-              {todos.map((todo) => (
-                <li key={todo.id} className="events-todo-item">
-                  <span className={`events-todo-mark ${todo.done ? "done" : "open"}`}>{todo.done ? "✓" : "・"}</span>
-                  <span className="events-todo-title">{todo.title}</span>
-                  {(todo.due || todo.assignee) && (
-                    <span className="events-todo-meta">
-                      {todo.due ? `期限 ${todo.due}` : ""}
-                      {todo.due && todo.assignee ? " / " : ""}
-                      {todo.assignee ? `担当 ${todo.assignee}` : ""}
-                    </span>
-                  )}
-                </li>
-              ))}
-              {todos.length === 0 && <li className="muted">DEMO: TODOは未登録です</li>}
-            </ul>
-            <p className="muted">DEMO: 保存は行いません</p>
-            <div className="modal-actions">
-              <button type="button" className="button button-small" onClick={() => setIsTodoModalOpen(false)}>
                 閉じる
               </button>
             </div>

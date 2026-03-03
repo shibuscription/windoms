@@ -1,10 +1,12 @@
 import type { DemoData, ScheduleDayDoc, SessionDoc } from "../types";
 import { shiftDateKey, todayDateKey } from "../utils/date";
+import { makeSessionRelatedId } from "../utils/todoUtils";
 
 const today = todayDateKey();
 const dayMinus1 = shiftDateKey(today, -1);
 const dayMinus2 = shiftDateKey(today, -2);
 const dayMinus3 = shiftDateKey(today, -3);
+export const DEMO_CURRENT_UID = "g01";
 const DUTY_LAST_NAMES = ["伊藤", "佐藤", "鈴木", "高橋", "-"] as const;
 
 const dutyNameBySeed = (seed: number): string => DUTY_LAST_NAMES[seed % DUTY_LAST_NAMES.length];
@@ -77,6 +79,68 @@ const buildFeb2026ScheduleDays = (): Record<string, ScheduleDayDoc> => {
   }
   return result;
 };
+
+const demoEvents = [
+  { id: "teiki-2026", title: "定期演奏会" },
+  { id: "touki-2026", title: "陶器まつり屋外演奏" },
+  { id: "camp-2025", title: "夏合宿" },
+  { id: "parent-meeting-2025", title: "保護者会" },
+];
+
+const demoTodos: DemoData["todos"] = [
+  {
+    id: "todo-001",
+    title: "配布資料の最終確認",
+    completed: false,
+    createdAt: "2026-02-18T08:10:00+09:00",
+    assigneeUid: null,
+    dueDate: "2026-03-01",
+    related: { type: "event", id: "teiki-2026" },
+  },
+  {
+    id: "todo-002",
+    title: "会場導線の掲示を準備",
+    completed: false,
+    createdAt: "2026-02-18T09:30:00+09:00",
+    assigneeUid: "g02",
+    dueDate: "2026-03-05",
+    related: { type: "event", id: "teiki-2026" },
+  },
+  {
+    id: "todo-003",
+    title: "当日セッションの出欠最終確認",
+    completed: false,
+    createdAt: "2026-02-19T11:00:00+09:00",
+    assigneeUid: DEMO_CURRENT_UID,
+    dueDate: "2026-03-03",
+    related: { type: "session", id: makeSessionRelatedId(today, 1) },
+  },
+  {
+    id: "todo-004",
+    title: "備品棚の整理",
+    completed: false,
+    createdAt: "2026-02-20T08:45:00+09:00",
+    assigneeUid: DEMO_CURRENT_UID,
+    related: null,
+  },
+  {
+    id: "todo-005",
+    title: "連絡テンプレートを更新",
+    completed: true,
+    createdAt: "2026-02-15T18:20:00+09:00",
+    assigneeUid: null,
+    dueDate: "2026-02-16",
+    related: { type: "session", id: makeSessionRelatedId("2026-02-23", 1) },
+  },
+  {
+    id: "todo-006",
+    title: "保護者会の議題たたき台を作る",
+    completed: false,
+    createdAt: "2026-02-21T07:30:00+09:00",
+    assigneeUid: "g04",
+    related: { type: "event", id: "parent-meeting-2025" },
+  },
+];
 
 export const mockData: DemoData = {
   demoDictionaries: {
@@ -157,6 +221,8 @@ export const mockData: DemoData = {
       ],
     },
   },
+  events: demoEvents,
+  todos: demoTodos,
   scheduleDays: {
     ...buildFeb2026ScheduleDays(),
     [today]: {

@@ -12,13 +12,15 @@ import { LunchPage } from "./pages/LunchPage";
 import { LinksPage } from "./pages/LinksPage";
 import { MembersPage } from "./pages/MembersPage";
 import { EventsPage } from "./pages/EventsPage";
+import { TodosPage } from "./pages/TodosPage";
 import { AccountingHome } from "./pages/Accounting/AccountingHome";
 import { AccountingPeriods } from "./pages/Accounting/AccountingPeriods";
 import { AccountingReport } from "./pages/Accounting/AccountingReport";
 import { AccountLedger } from "./pages/Accounting/AccountLedger";
-import { mockData } from "./data/mockData";
-import type { DayLog, DemoData, DemoRsvp } from "./types";
+import { DEMO_CURRENT_UID, mockData } from "./data/mockData";
+import type { DayLog, DemoData, DemoRsvp, Todo } from "./types";
 import { formatDateYmd, formatWeekdayJa, isValidDateKey, todayDateKey, weekdayTone } from "./utils/date";
+import { resolveTodoRelatedSummary, sortTodos } from "./utils/todoUtils";
 import {
   activityPlanStatusStorageKey,
   activityPlanUnansweredStorageKey,
@@ -52,13 +54,6 @@ type DemoNotification = {
   type: "actionable" | "info";
   read: boolean;
   resolved: boolean;
-};
-
-type DemoTodo = {
-  id: string;
-  title: string;
-  scope: "shared" | "private";
-  done: boolean;
 };
 
 const viewIsActive = (location: { pathname: string; search: string }, view: string) =>
@@ -125,9 +120,9 @@ const menuSections = (
           id: "todo",
           label: "TODO",
           icon: "✅",
-          to: "/today?view=todo",
+          to: "/todos",
           allowedRoles: ["parent", "admin"],
-          isActive: (location) => viewIsActive(location, "todo"),
+          isActive: (location) => location.pathname === "/todos",
         },
         {
           id: "event",
@@ -260,12 +255,7 @@ export function App() {
     { id: "n2", title: "3月の活動予定が通知されました", type: "info", read: false, resolved: true },
     { id: "n3", title: "見守り当番の調整が未完了です", type: "actionable", read: true, resolved: false },
   ]);
-  const [todos, setTodos] = useState<DemoTodo[]>([
-    { id: "t1", title: "活動予定の備考を最終確認", scope: "shared", done: false },
-    { id: "t2", title: "本番配布資料の部数確認", scope: "shared", done: false },
-    { id: "t3", title: "印刷物を職員室へ提出", scope: "private", done: false },
-  ]);
-  const [pendingTodoId, setPendingTodoId] = useState<string | null>(null);
+  const currentUid = DEMO_CURRENT_UID;
   const [isDevPanelOpen, setIsDevPanelOpen] = useState(false);
   const [demoMenuRole, setDemoMenuRole] = useState<DemoMenuRole>(() => {
     const saved = window.localStorage.getItem(DEMO_MENU_ROLE_KEY);
@@ -317,10 +307,17 @@ export function App() {
   }, [location.key]);
 
   const unreadNotificationCount = notifications.filter((item) => !item.read).length;
-  const incompleteTodoCount = todos.filter((item) => !item.done).length;
+  const inboxTodos = useMemo(
+    () =>
+      sortTodos(
+        data.todos.filter((todo) => todo.assigneeUid === currentUid && !todo.completed),
+      ),
+    [data.todos, currentUid],
+  );
+  const inboxTodoCount = inboxTodos.length;
   const statusButtons: Array<{ id: "notice" | "todo"; icon: string; label: string; badge: number }> = [
     { id: "notice", icon: "🔔", label: "Notices", badge: unreadNotificationCount },
-    { id: "todo", icon: "✅", label: "My TODO", badge: incompleteTodoCount + (hasShiftSurveyTodo ? 1 : 0) },
+    { id: "todo", icon: "✅", label: "My TODO", badge: inboxTodoCount + (hasShiftSurveyTodo ? 1 : 0) },
   ];
   const pendingNotifications = notifications.filter(
     (item) => item.type === "actionable" && !item.resolved,
@@ -328,8 +325,6 @@ export function App() {
   const historyNotifications = notifications.filter(
     (item) => item.read || item.type === "info",
   );
-  const sharedTodos = todos.filter((item) => !item.done && item.scope === "shared");
-  const privateTodos = todos.filter((item) => !item.done && item.scope === "private");
   const nextDuty = {
     label: "次の当番:",
     date: "2/21(土)",
@@ -419,13 +414,11 @@ export function App() {
     window.localStorage.setItem(DEMO_MENU_ROLE_KEY, nextRole);
   };
 
-  const confirmTodoCompletion = (todoId: string) => {
-    setTodos((prev) =>
-      prev.map((todo) =>
-        todo.id === todoId ? { ...todo, done: true } : todo,
-      ),
-    );
-    setPendingTodoId(null);
+  const updateTodos = (updater: (prev: Todo[]) => Todo[]) => {
+    setData((prev) => ({
+      ...prev,
+      todos: updater(prev.todos),
+    }));
   };
 
   return (
@@ -491,7 +484,14 @@ export function App() {
           <Route path="/" element={<HomePage />} />
           <Route
             path="/today"
-            element={<TodayPage data={context.data} updateDayLog={context.updateDayLog} />}
+            element={
+              <TodayPage
+                data={context.data}
+                updateDayLog={context.updateDayLog}
+                currentUid={currentUid}
+                updateTodos={updateTodos}
+              />
+            }
           />
           <Route path="/calendar" element={<CalendarPage data={context.data} />} />
           <Route
@@ -502,8 +502,18 @@ export function App() {
           <Route path="/watch" element={<WatchPage />} />
           <Route path="/shift-survey" element={<ShiftSurveyPage />} />
           <Route path="/lunch" element={<LunchPage />} />
-          <Route path="/events" element={<EventsPage />} />
-          <Route path="/events/:eventId" element={<EventsPage />} />
+          <Route
+            path="/events"
+            element={<EventsPage data={data} currentUid={currentUid} updateTodos={updateTodos} />}
+          />
+          <Route
+            path="/events/:eventId"
+            element={<EventsPage data={data} currentUid={currentUid} updateTodos={updateTodos} />}
+          />
+          <Route
+            path="/todos"
+            element={<TodosPage data={data} currentUid={currentUid} updateTodos={updateTodos} />}
+          />
           <Route path="/links" element={<LinksPage />} />
           <Route path="/members" element={<MembersPage />} />
           <Route path="/accounting" element={<AccountingHome />} />
@@ -648,43 +658,67 @@ export function App() {
             )}
             {activeStatusPanel === "todo" && (
               <>
-                <p className="status-panel-subtitle">担当TODO（DEMO）</p>
-                <h2 className="status-panel-title">TODO</h2>
+                <p className="status-panel-subtitle">自分の受信箱（DEMO）</p>
+                <h2 className="status-panel-title">TODO受信箱</h2>
                 <div className="status-todo-section">
-                  <h3>共有TODO</h3>
+                  <h3>未完了（自分担当）</h3>
                   <ul className="status-panel-list">
-                    {sharedTodos.map((item) => (
-                      <li key={item.id}>
-                        <label>
-                          <input
-                            type="checkbox"
-                            checked={false}
-                            onChange={() => setPendingTodoId(item.id)}
-                          />
-                          <span>{item.title}</span>
-                        </label>
-                      </li>
-                    ))}
-                    {sharedTodos.length === 0 && <li>共有TODOはありません</li>}
+                    {inboxTodos.map((item) => {
+                      const related = resolveTodoRelatedSummary(data, item);
+                      const relatedPath = related.to;
+                      return (
+                        <li key={item.id} className="status-inbox-row">
+                          <div className="status-inbox-main">
+                            <strong>{item.title}</strong>
+                            <span className="status-inbox-meta">期限: {item.dueDate ?? "—"}</span>
+                            <span className="status-inbox-meta">
+                              {related.to ? (
+                                <button
+                                  type="button"
+                                  className="status-inline-link"
+                                  onClick={() => {
+                                    if (!relatedPath) return;
+                                    setActiveStatusPanel(null);
+                                    navigate(relatedPath);
+                                  }}
+                                >
+                                  {related.label}
+                                </button>
+                              ) : (
+                                related.label
+                              )}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            className="button button-small button-secondary"
+                            onClick={() =>
+                              updateTodos((prev) =>
+                                prev.map((todo) =>
+                                  todo.id === item.id ? { ...todo, completed: true } : todo,
+                                ),
+                              )
+                            }
+                          >
+                            完了
+                          </button>
+                        </li>
+                      );
+                    })}
+                    {inboxTodos.length === 0 && <li>受信箱のTODOはありません</li>}
                   </ul>
-                </div>
-                <div className="status-todo-section">
-                  <h3>個人TODO</h3>
-                  <ul className="status-panel-list">
-                    {privateTodos.map((item) => (
-                      <li key={item.id}>
-                        <label>
-                          <input
-                            type="checkbox"
-                            checked={false}
-                            onChange={() => setPendingTodoId(item.id)}
-                          />
-                          <span>{item.title}</span>
-                        </label>
-                      </li>
-                    ))}
-                    {privateTodos.length === 0 && <li>個人TODOはありません</li>}
-                  </ul>
+                  <div className="modal-actions">
+                    <button
+                      type="button"
+                      className="button button-small"
+                      onClick={() => {
+                        setActiveStatusPanel(null);
+                        navigate("/todos");
+                      }}
+                    >
+                      TODOページを開く
+                    </button>
+                  </div>
                 </div>
                 {hasShiftSurveyTodo && (
                   <div className="status-todo-section">
@@ -708,37 +742,6 @@ export function App() {
                 )}
               </>
             )}
-          </section>
-        </div>
-      )}
-      {pendingTodoId && (
-        <div className="modal-backdrop" onClick={() => setPendingTodoId(null)}>
-          <section className="modal-panel" onClick={(event) => event.stopPropagation()}>
-            <button
-              type="button"
-              className="modal-close"
-              aria-label="モーダルを閉じる"
-              onClick={() => setPendingTodoId(null)}
-            >
-              ×
-            </button>
-            <p className="modal-context">完了にしますか？</p>
-            <div className="modal-actions">
-              <button
-                type="button"
-                className="button button-secondary"
-                onClick={() => setPendingTodoId(null)}
-              >
-                キャンセル
-              </button>
-              <button
-                type="button"
-                className="button button-small"
-                onClick={() => confirmTodoCompletion(pendingTodoId)}
-              >
-                完了する
-              </button>
-            </div>
           </section>
         </div>
       )}

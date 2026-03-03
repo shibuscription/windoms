@@ -86,12 +86,36 @@ export type DayLog = {
   >;
 };
 
+export type RelatedType = "event" | "session";
+
+export type RelatedRef = {
+  type: RelatedType;
+  id: string;
+};
+
+export type Todo = {
+  id: string;
+  title: string;
+  completed: boolean;
+  createdAt: string;
+  assigneeUid: string | null;
+  dueDate?: string;
+  related?: RelatedRef | null;
+};
+
+export type DemoEventSummary = {
+  id: string;
+  title: string;
+};
+
 export type DemoData = {
   scheduleDays: Record<string, ScheduleDayDoc>;
   dayLogs: Record<string, DayLog>;
   members: Record<string, DemoMember>;
   users: Record<string, DemoUser>;
   households: Record<string, Household>;
+  events: DemoEventSummary[];
+  todos: Todo[];
   demoDictionaries: {
     instructors: string[];
     seniors: string[];
