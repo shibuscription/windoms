@@ -15,6 +15,7 @@ import { EventsPage } from "./pages/EventsPage";
 import { TodosPage } from "./pages/TodosPage";
 import { PurchasesPage } from "./pages/PurchasesPage";
 import { ReimbursementsPage } from "./pages/ReimbursementsPage";
+import { ScorePage } from "./pages/ScorePage";
 import { AccountingHome } from "./pages/Accounting/AccountingHome";
 import { AccountingPeriods } from "./pages/Accounting/AccountingPeriods";
 import { AccountingReport } from "./pages/Accounting/AccountingReport";
@@ -28,6 +29,7 @@ import type {
   PurchaseRequest,
   QuoCard,
   Reimbursement,
+  Score,
   Todo,
 } from "./types";
 import { formatDateYmd, formatWeekdayJa, isValidDateKey, todayDateKey, weekdayTone } from "./utils/date";
@@ -208,9 +210,9 @@ const menuSections = (
           id: "scores",
           label: "楽譜",
           icon: "🎼",
-          to: "/today?view=scores",
+          to: "/scores",
           allowedRoles: ["child", "parent", "admin"],
-          isActive: (location) => viewIsActive(location, "scores"),
+          isActive: (location) => location.pathname.startsWith("/scores"),
         },
         {
           id: "docs",
@@ -468,6 +470,13 @@ export function App() {
     }));
   };
 
+  const updateScores = (updater: (prev: Score[]) => Score[]) => {
+    setData((prev) => ({
+      ...prev,
+      scores: updater(prev.scores),
+    }));
+  };
+
   return (
     <div className="app-shell">
       <div className="demo-badge">DEMO（データは仮）</div>
@@ -593,6 +602,16 @@ export function App() {
                 currentUid={currentUid}
                 demoRole={readDemoRole()}
                 updateReimbursements={updateReimbursements}
+              />
+            }
+          />
+          <Route
+            path="/scores"
+            element={
+              <ScorePage
+                data={data}
+                updateScores={updateScores}
+                isAdmin={readDemoRole() === "admin"}
               />
             }
           />

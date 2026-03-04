@@ -409,6 +409,7 @@ export const mockData: DemoData = {
   todos: demoTodos,
   purchaseRequests: demoPurchaseRequests,
   reimbursements: demoReimbursements,
+  scores: [],
   lunchRecords: demoLunchRecords,
   lunchDuties: demoLunchDuties,
   quoCards: demoQuoCards,

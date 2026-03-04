@@ -203,6 +203,16 @@ export type DemoEventSummary = {
   title: string;
 };
 
+export type Score = {
+  id: string;
+  no: number;
+  title: string;
+  publisher?: string;
+  productCode?: string;
+  duration?: string;
+  note?: string;
+};
+
 export type DemoData = {
   scheduleDays: Record<string, ScheduleDayDoc>;
   dayLogs: Record<string, DayLog>;
@@ -213,6 +223,7 @@ export type DemoData = {
   todos: Todo[];
   purchaseRequests: PurchaseRequest[];
   reimbursements: Reimbursement[];
+  scores: Score[];
   lunchRecords: LunchRecord[];
   lunchDuties: LunchDuty[];
   quoCards: QuoCard[];

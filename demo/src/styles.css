@@ -1052,6 +1052,99 @@ body {
   gap: 12px;
 }
 
+.scores-page {
+  display: grid;
+  gap: 12px;
+}
+
+.scores-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.scores-header h1 {
+  margin: 0;
+}
+
+.scores-search-field {
+  margin: 0;
+}
+
+.scores-search-field input {
+  font-size: 1rem;
+  padding: 10px 12px;
+}
+
+.scores-table-wrap {
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  overflow: auto;
+  background: #fff;
+}
+
+.scores-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 560px;
+}
+
+.scores-table th,
+.scores-table td {
+  border-bottom: 1px solid #e2e8f0;
+  padding: 10px 12px;
+  vertical-align: top;
+}
+
+.scores-table th {
+  background: #f8fafc;
+  text-align: left;
+  font-size: 0.86rem;
+}
+
+.scores-sort-button {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+
+.scores-row {
+  cursor: pointer;
+}
+
+.scores-row:hover {
+  background: #f8fafc;
+}
+
+.scores-row-readonly {
+  cursor: default;
+}
+
+.scores-row-readonly:hover {
+  background: transparent;
+}
+
+.scores-no {
+  width: 72px;
+  white-space: nowrap;
+}
+
+.scores-main {
+  margin: 0;
+  font-weight: 700;
+}
+
+.scores-sub {
+  margin: 2px 0 0;
+  color: #64748b;
+  font-size: 0.86rem;
+}
+
 .lunch-page {
   display: grid;
   gap: 12px;
