@@ -15,7 +15,7 @@ export function ReceiptImagePicker({
 }: ReceiptImagePickerProps) {
   return (
     <div className="purchase-receipts">
-      <p className="purchase-receipts-title">{title}</p>
+      {title ? <p className="purchase-receipts-title">{title}</p> : null}
       <input
         type="file"
         accept="image/*"

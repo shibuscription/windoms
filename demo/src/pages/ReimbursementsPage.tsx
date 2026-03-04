@@ -7,7 +7,7 @@ import { useReceiptPreviews } from "../hooks/useReceiptPreviews";
 type ReimbursementsPageProps = {
   data: DemoData;
   currentUid: string;
-  demoRole: "admin" | "member";
+  demoRole: "admin" | "parent";
   updateReimbursements: (updater: (prev: Reimbursement[]) => Reimbursement[]) => void;
 };
 

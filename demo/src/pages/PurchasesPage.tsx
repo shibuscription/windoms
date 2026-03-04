@@ -4,7 +4,7 @@ import { ReceiptImagePicker } from "../components/ReceiptImagePicker";
 import { useReceiptPreviews } from "../hooks/useReceiptPreviews";
 
 type PurchaseTab = "open" | "bought";
-type DemoRole = "admin" | "member";
+type DemoRole = "admin" | "parent";
 
 type PurchaseCreateDraft = {
   title: string;
@@ -205,7 +205,7 @@ export function PurchasesPage({
       quantity: item.quantity === undefined ? "" : String(item.quantity),
       amount: item.estimatedAmount === undefined ? "" : String(item.estimatedAmount),
       purchasedAt: toDateTimeInputValue(new Date()),
-      recordToReimbursement: demoRole === "member",
+      recordToReimbursement: demoRole === "parent",
       recordToAccounting: demoRole === "admin",
     });
     setItemNameError(null);
@@ -255,7 +255,7 @@ export function PurchasesPage({
                 purchasedAt: purchasedAtIso,
                 receiptFilesMeta,
                 reimbursementRecordRequested:
-                  demoRole === "member" ? completeDraft.recordToReimbursement : undefined,
+                  demoRole === "parent" ? completeDraft.recordToReimbursement : undefined,
                 accountingRecordRequested:
                   demoRole === "admin" ? completeDraft.recordToAccounting : undefined,
               },
@@ -264,7 +264,7 @@ export function PurchasesPage({
       ),
     );
 
-    if (demoRole === "member" && completeDraft.recordToReimbursement) {
+    if (demoRole === "parent" && completeDraft.recordToReimbursement) {
       updateReimbursements((prev) => [
         {
           id: `rb-${Date.now()}`,
@@ -474,7 +474,7 @@ export function PurchasesPage({
               onRemovePreview={removePreview}
             />
 
-            {demoRole === "member" && (
+            {demoRole === "parent" && (
               <label className="purchase-option-check">
                 <input
                   type="checkbox"

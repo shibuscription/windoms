@@ -1052,6 +1052,282 @@ body {
   gap: 12px;
 }
 
+.lunch-page {
+  display: grid;
+  gap: 12px;
+}
+
+.lunch-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lunch-header h1 {
+  margin: 0;
+}
+
+.lunch-subhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.lunch-duty-board {
+  display: grid;
+  gap: 4px;
+}
+
+.lunch-duty-row {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 6px;
+  align-items: start;
+}
+
+.lunch-duty-label {
+  color: #334155;
+  font-size: 0.88rem;
+}
+
+.lunch-duty-value {
+  color: #0f172a;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.lunch-you-badge {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1e3a8a;
+  vertical-align: middle;
+}
+
+.lunch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.lunch-tile {
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  grid-template-rows: auto auto;
+}
+
+.lunch-tile-image {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  display: block;
+}
+
+.lunch-tile-placeholder {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  display: grid;
+  place-items: center;
+  font-size: 2rem;
+  background: #f1f5f9;
+}
+
+.lunch-tile-meta {
+  padding: 8px;
+  font-size: 0.8rem;
+  color: #334155;
+  display: grid;
+  gap: 2px;
+  line-height: 1.25;
+}
+
+.lunch-tile-date,
+.lunch-tile-duty {
+  display: block;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lunch-quo-list {
+  display: grid;
+  gap: 8px;
+}
+
+.lunch-quo-card {
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 8px;
+}
+
+.lunch-quo-card strong {
+  display: block;
+}
+
+.lunch-quo-card .muted {
+  margin: 4px 0;
+}
+
+.lunch-quo-actions {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.lunch-archive-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+.lunch-manage-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.lunch-manage-header h3 {
+  margin: 0;
+}
+
+.lunch-manage-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lunch-manage-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.modal-backdrop-front {
+  z-index: 2200;
+}
+
+.modal-backdrop-front .modal-panel {
+  z-index: 2210;
+}
+
+.lunch-quo-add {
+  margin-top: 8px;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 10px;
+}
+
+.lunch-quo-add h4 {
+  margin: 0 0 8px;
+}
+
+.lunch-split {
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.lunch-split h4 {
+  margin: 0 0 8px;
+}
+
+.lunch-split-row {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) minmax(90px, 130px) auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.lunch-split-row-label {
+  font-size: 0.86rem;
+  line-height: 1.35;
+}
+
+.lunch-split-empty {
+  display: block;
+  min-height: 1px;
+}
+
+.lunch-split-row .field-error {
+  grid-column: 1 / -1;
+  margin-top: -2px;
+}
+
+.modal-panel.lunch-add-modal {
+  width: min(520px, calc(100vw - 24px));
+  max-height: 90vh;
+  max-height: calc(100dvh - 32px);
+  display: flex;
+  flex-direction: column;
+  margin-top: 0;
+}
+
+.lunch-add-modal-content {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  gap: 10px;
+  padding-right: 2px;
+}
+
+.lunch-add-modal-footer {
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 8px;
+  margin-top: 8px;
+}
+
+.lunch-fold-details {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 8px;
+}
+
+.lunch-fold-details > summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #334155;
+}
+
+.lunch-fold-body {
+  display: block;
+  margin-top: 8px;
+}
+
+.lunch-split-details .lunch-split {
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+
 .purchases-header h1,
 .reimbursements-header h1 {
   margin: 0;
@@ -3694,6 +3970,20 @@ textarea {
     --header-h: 54px;
   }
 
+  .modal-backdrop {
+    align-items: flex-start;
+    padding: 12px;
+    overflow-y: auto;
+  }
+
+  .modal-panel.lunch-add-modal {
+    margin-top: 24px;
+  }
+
+  .lunch-duty-row {
+    grid-template-columns: 156px minmax(0, 1fr);
+  }
+
   .field-grid,
   .split,
   .activity-form,
@@ -3810,6 +4100,10 @@ textarea {
     border-radius: 14px 14px 0 0;
     animation: sheet-slide-up 220ms ease-out;
     padding: 12px 12px 16px;
+  }
+
+  .lunch-split-row {
+    grid-template-columns: 1fr;
   }
 }
 

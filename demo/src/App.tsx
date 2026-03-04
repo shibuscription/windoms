@@ -20,7 +20,16 @@ import { AccountingPeriods } from "./pages/Accounting/AccountingPeriods";
 import { AccountingReport } from "./pages/Accounting/AccountingReport";
 import { AccountLedger } from "./pages/Accounting/AccountLedger";
 import { DEMO_CURRENT_UID, mockData } from "./data/mockData";
-import type { DayLog, DemoData, DemoRsvp, PurchaseRequest, Reimbursement, Todo } from "./types";
+import type {
+  DayLog,
+  DemoData,
+  DemoRsvp,
+  LunchRecord,
+  PurchaseRequest,
+  QuoCard,
+  Reimbursement,
+  Todo,
+} from "./types";
 import { formatDateYmd, formatWeekdayJa, isValidDateKey, todayDateKey, weekdayTone } from "./utils/date";
 import { resolveTodoRelatedSummary, sortTodos } from "./utils/todoUtils";
 import {
@@ -155,7 +164,7 @@ const menuSections = (
           icon: "🛍️",
           to: "/purchases",
           allowedRoles: ["parent", "admin"],
-          isActive: (location) => location.pathname === "/purchases",
+          isActive: (location) => location.pathname.startsWith("/purchases"),
         },
         {
           id: "reimbursement",
@@ -163,7 +172,15 @@ const menuSections = (
           icon: "🧾",
           to: "/reimbursements",
           allowedRoles: ["parent", "admin"],
-          isActive: (location) => location.pathname === "/reimbursements",
+          isActive: (location) => location.pathname.startsWith("/reimbursements"),
+        },
+        {
+          id: "lunch",
+          label: "お弁当",
+          icon: "🍱",
+          to: "/lunch",
+          allowedRoles: ["parent", "admin"],
+          isActive: (location) => location.pathname.startsWith("/lunch"),
         },
         {
           id: "accounting",
@@ -280,7 +297,7 @@ export function App() {
   const unansweredStorageKey = activityPlanUnansweredStorageKey(activityPlanMonthKey);
   const [demoStatus, setDemoStatus] = useState<string>(activityPlanStatus);
   const [demoUnanswered, setDemoUnanswered] = useState<string>(String(unansweredCount));
-  const [demoRoleDraft, setDemoRoleDraft] = useState<"admin" | "member">(readDemoRole());
+  const [demoRoleDraft, setDemoRoleDraft] = useState<"admin" | "parent">(readDemoRole());
   const visibleMenuSections = useMemo(
     () => menuSections(today, activityPlanBadgeText, demoMenuRole),
     [today, activityPlanBadgeText, demoMenuRole],
@@ -437,6 +454,20 @@ export function App() {
     }));
   };
 
+  const updateLunchRecords = (updater: (prev: LunchRecord[]) => LunchRecord[]) => {
+    setData((prev) => ({
+      ...prev,
+      lunchRecords: updater(prev.lunchRecords),
+    }));
+  };
+
+  const updateQuoCards = (updater: (prev: QuoCard[]) => QuoCard[]) => {
+    setData((prev) => ({
+      ...prev,
+      quoCards: updater(prev.quoCards),
+    }));
+  };
+
   return (
     <div className="app-shell">
       <div className="demo-badge">DEMO（データは仮）</div>
@@ -517,7 +548,19 @@ export function App() {
           <Route path="/attendance" element={<AttendancePage />} />
           <Route path="/watch" element={<WatchPage />} />
           <Route path="/shift-survey" element={<ShiftSurveyPage />} />
-          <Route path="/lunch" element={<LunchPage />} />
+          <Route
+            path="/lunch"
+            element={
+              <LunchPage
+                data={data}
+                currentUid={currentUid}
+                demoRole={readDemoRole()}
+                updateLunchRecords={updateLunchRecords}
+                updateReimbursements={updateReimbursements}
+                updateQuoCards={updateQuoCards}
+              />
+            }
+          />
           <Route
             path="/events"
             element={<EventsPage data={data} currentUid={currentUid} updateTodos={updateTodos} />}
@@ -835,10 +878,10 @@ export function App() {
                 <span>demo-role</span>
                 <select
                   value={demoRoleDraft}
-                  onChange={(event) => setDemoRoleDraft(event.target.value as "admin" | "member")}
+                  onChange={(event) => setDemoRoleDraft(event.target.value as "admin" | "parent")}
                 >
                   <option value="admin">admin</option>
-                  <option value="member">member</option>
+                  <option value="parent">parent</option>
                 </select>
               </label>
               <label className="dev-panel-field">

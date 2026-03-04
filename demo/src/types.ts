@@ -104,6 +104,22 @@ export type Todo = {
 };
 
 export type PurchaseRequestStatus = "OPEN" | "BOUGHT";
+export type PaymentMethod = "reimbursement" | "quo";
+export type ReceiptFileMeta = {
+  name: string;
+  size: number;
+  type: string;
+};
+export type LunchPaymentSplit =
+  | {
+      type: "quo";
+      cardId: string;
+      amount: number;
+    }
+  | {
+      type: "reimbursement";
+      amount: number;
+    };
 
 export type PurchaseRequest = {
   id: string;
@@ -123,11 +139,7 @@ export type PurchaseRequest = {
     quantity?: string | number;
     amount?: number;
     purchasedAt: string;
-    receiptFilesMeta?: Array<{
-      name: string;
-      size: number;
-      type: string;
-    }>;
+    receiptFilesMeta?: ReceiptFileMeta[];
     accountingRecordRequested?: boolean;
     reimbursementRecordRequested?: boolean;
   };
@@ -147,14 +159,43 @@ export type Reimbursement = {
   buyer: string;
   memo?: string;
   receipt?: string;
-  receiptFilesMeta?: Array<{
-    name: string;
-    size: number;
-    type: string;
-  }>;
+  receiptFilesMeta?: ReceiptFileMeta[];
+  source?: "purchase" | "lunch";
   relatedPurchaseRequestId?: string;
   paidByTreasurerAt?: string;
   receivedByBuyerAt?: string;
+};
+
+export type LunchRecord = {
+  id: string;
+  title: string;
+  amount: number;
+  purchasedAt: string;
+  date: string;
+  buyer: string;
+  dutyMemberId?: string;
+  dutyHouseholdId?: string;
+  memo?: string;
+  paymentSplits: LunchPaymentSplit[];
+  imageUrls?: string[];
+  receiptFilesMeta?: ReceiptFileMeta[];
+};
+
+export type LunchDutySlotType = "WEEKEND_PM";
+
+export type LunchDuty = {
+  date: string;
+  slotType: LunchDutySlotType;
+  assigneeHouseholdId: string;
+};
+
+export type QuoCard = {
+  id: string;
+  purchaseDate: string;
+  balance: number;
+  active: boolean;
+  archived?: boolean;
+  memo?: string;
 };
 
 export type DemoEventSummary = {
@@ -172,6 +213,9 @@ export type DemoData = {
   todos: Todo[];
   purchaseRequests: PurchaseRequest[];
   reimbursements: Reimbursement[];
+  lunchRecords: LunchRecord[];
+  lunchDuties: LunchDuty[];
+  quoCards: QuoCard[];
   demoDictionaries: {
     instructors: string[];
     seniors: string[];

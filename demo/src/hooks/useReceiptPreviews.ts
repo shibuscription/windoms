@@ -6,6 +6,7 @@ export type ReceiptPreview = {
   size: number;
   type: string;
   url: string;
+  file: File;
 };
 
 const makeReceiptPreviewId = (file: File) =>
@@ -32,6 +33,7 @@ export const useReceiptPreviews = () => {
       size: file.size,
       type: file.type,
       url: URL.createObjectURL(file),
+      file,
     }));
     setPreviews((prev) => [...prev, ...nextItems]);
   }, []);

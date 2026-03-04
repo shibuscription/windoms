@@ -21,10 +21,11 @@ export const activityPlanStatusStorageKey = (monthKey: string): string =>
 export const activityPlanUnansweredStorageKey = (monthKey: string): string =>
   `windoms:demo-unanswered:${monthKey}`;
 
-export const readDemoRole = (): "admin" | "member" => {
+export const readDemoRole = (): "admin" | "parent" => {
   if (typeof window === "undefined") return "admin";
   const role = window.localStorage.getItem("windoms:demo-role");
-  return role === "member" ? "member" : "admin";
+  if (role === "parent" || role === "member") return "parent";
+  return "admin";
 };
 
 export const readActivityPlanStatus = (monthKey: string): ActivityPlanStatus => {

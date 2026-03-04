@@ -6,6 +6,21 @@ const today = todayDateKey();
 const dayMinus1 = shiftDateKey(today, -1);
 const dayMinus2 = shiftDateKey(today, -2);
 const dayMinus3 = shiftDateKey(today, -3);
+
+const toDateFromKey = (dateKey: string): Date => {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
+
+const getNextWeekdayDateKey = (baseDateKey: string, weekday: number): string => {
+  const base = toDateFromKey(baseDateKey);
+  const diff = (weekday - base.getDay() + 7) % 7 || 7;
+  return shiftDateKey(baseDateKey, diff);
+};
+
+const nextSaturday = getNextWeekdayDateKey(today, 6);
+const nextSunday = getNextWeekdayDateKey(today, 0);
+const followingSaturday = shiftDateKey(nextSaturday, 7);
 export const DEMO_CURRENT_UID = "g01";
 const DUTY_LAST_NAMES = ["伊藤", "佐藤", "鈴木", "高橋", "-"] as const;
 
@@ -253,6 +268,64 @@ const demoReimbursements: DemoData["reimbursements"] = [
   },
 ];
 
+const demoLunchRecords: DemoData["lunchRecords"] = [
+  {
+    id: "ln-001",
+    title: "お弁当（からあげ）- QUO2枚",
+    amount: 500,
+    purchasedAt: `${today}T08:15:00+09:00`,
+    date: today,
+    buyer: "g01",
+    dutyMemberId: "g01",
+    dutyHouseholdId: "hh01",
+    paymentSplits: [
+      { type: "quo", cardId: "quo-old", amount: 300 },
+      { type: "quo", cardId: "quo-main", amount: 200 },
+    ],
+    memo: "朝にコンビニで購入",
+    imageUrls: ["https://picsum.photos/seed/windoms-lunch-1/640/640"],
+  },
+  {
+    id: "ln-002",
+    title: "お弁当（幕の内）- QUO+立替",
+    amount: 500,
+    purchasedAt: `${dayMinus1}T12:05:00+09:00`,
+    date: dayMinus1,
+    buyer: "g02",
+    dutyMemberId: "g02",
+    dutyHouseholdId: "hh01",
+    paymentSplits: [
+      { type: "quo", cardId: "quo-old", amount: 300 },
+      { type: "reimbursement", amount: 200 },
+    ],
+    memo: "練習後にまとめ買い",
+    imageUrls: ["https://picsum.photos/seed/windoms-lunch-2/640/640"],
+  },
+  {
+    id: "ln-003",
+    title: "お弁当（焼き魚）",
+    amount: 720,
+    purchasedAt: `${dayMinus2}T11:40:00+09:00`,
+    date: dayMinus2,
+    buyer: "g04",
+    dutyMemberId: "g04",
+    dutyHouseholdId: "hh03",
+    paymentSplits: [{ type: "reimbursement", amount: 720 }],
+  },
+];
+
+const demoLunchDuties: DemoData["lunchDuties"] = [
+  { date: nextSaturday, slotType: "WEEKEND_PM", assigneeHouseholdId: "hh01" },
+  { date: nextSunday, slotType: "WEEKEND_PM", assigneeHouseholdId: "hh03" },
+  { date: followingSaturday, slotType: "WEEKEND_PM", assigneeHouseholdId: "hh05" },
+];
+
+const demoQuoCards: DemoData["quoCards"] = [
+  { id: "quo-main", purchaseDate: "2026-03-01", balance: 6800, active: true },
+  { id: "quo-old", purchaseDate: "2026-02-10", balance: 1200, active: true },
+  { id: "quo-archived-01", purchaseDate: "2026-01-05", balance: 0, active: false, archived: true },
+];
+
 export const mockData: DemoData = {
   demoDictionaries: {
     instructors: ["講師A", "講師B", "講師C"],
@@ -336,6 +409,9 @@ export const mockData: DemoData = {
   todos: demoTodos,
   purchaseRequests: demoPurchaseRequests,
   reimbursements: demoReimbursements,
+  lunchRecords: demoLunchRecords,
+  lunchDuties: demoLunchDuties,
+  quoCards: demoQuoCards,
   scheduleDays: {
     ...buildFeb2026ScheduleDays(),
     [today]: {
@@ -353,7 +429,7 @@ export const mockData: DemoData = {
           dutyRequirement: "duty",
           requiresShift: true,
           location: "音楽室",
-          assignees: ["uid_001"],
+          assignees: ["g01"],
           assigneeNameSnapshot: "林 太郎",
           plannedInstructors: ["井野先生", "講師A"],
           plannedSeniors: ["先輩B"],
@@ -379,7 +455,7 @@ export const mockData: DemoData = {
           dutyRequirement: "watch",
           requiresShift: false,
           location: "文化ホール",
-          assignees: ["uid_004"],
+          assignees: ["g04"],
           assigneeNameSnapshot: "伊藤 花子",
           plannedInstructors: [],
           plannedSeniors: ["先輩C"],
@@ -392,6 +468,44 @@ export const mockData: DemoData = {
             { uid: "m06", displayName: "中村", status: "no" },
             { uid: "m07", displayName: "小林", status: "unknown" },
           ],
+        },
+      ],
+    },
+    [nextSaturday]: {
+      defaultLocation: "第1音楽室",
+      sessions: [
+        {
+          order: 1,
+          startTime: "09:00",
+          endTime: "12:00",
+          type: "normal",
+          dutyRequirement: "duty",
+          requiresShift: true,
+          location: "音楽室",
+          assignees: ["g02"],
+          assigneeNameSnapshot: "渋谷母",
+          plannedInstructors: ["講師A"],
+          plannedSeniors: [],
+          demoRsvps: [],
+        },
+      ],
+    },
+    [nextSunday]: {
+      defaultLocation: "第1音楽室",
+      sessions: [
+        {
+          order: 1,
+          startTime: "13:00",
+          endTime: "16:00",
+          type: "normal",
+          dutyRequirement: "duty",
+          requiresShift: true,
+          location: "音楽室",
+          assignees: ["g03"],
+          assigneeNameSnapshot: "田中母",
+          plannedInstructors: ["講師B"],
+          plannedSeniors: [],
+          demoRsvps: [],
         },
       ],
     },
