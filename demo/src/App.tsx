@@ -482,7 +482,14 @@ export function App() {
       <div className="demo-badge">DEMO（データは仮）</div>
       <header className="app-header">
         <Link to="/" className="brand">
-          <span className="brand-text">Windoms</span>
+          <picture>
+            <source srcSet="/assets/logo/logo-windoms.svg" type="image/svg+xml" />
+            <img
+              className="app-logo"
+              src="/assets/logo/logo-windoms.png"
+              alt="Windoms"
+            />
+          </picture>
         </Link>
         <div className="header-actions">
           <div className="next-duty" aria-label={`${nextDuty.label} ${nextDuty.date} ${nextDuty.time}`}>
