@@ -319,6 +319,11 @@ body {
   background: transparent;
   border: 0;
   border-radius: 0;
+}
+
+.menu-content {
+  width: min(1200px, 100%);
+  margin: 0 auto;
   padding: 12px 0 6px;
 }
 
@@ -4051,18 +4056,6 @@ textarea {
   color: #64748b;
 }
 
-.demo-badge {
-  position: fixed;
-  top: 56px;
-  right: 12px;
-  background: #b91c1c;
-  color: #fff;
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 0.85rem;
-  z-index: 100;
-}
-
 @media (max-width: 760px) {
   :root {
     --header-h: 54px;
@@ -4124,6 +4117,9 @@ textarea {
 
   .menu-panel {
     border-radius: 0;
+  }
+
+  .menu-content {
     padding: 12px 0 2px;
   }
 
@@ -4243,7 +4239,6 @@ textarea {
   }
 
   .app-header,
-  .demo-badge,
   .dev-panel,
   .dev-panel-fab {
     display: none !important;

@@ -1,0 +1,9 @@
+{
+  "hosting": [
+    {
+      "target": "demo",
+      "public": "demo/dist",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+    }
+  ]
+}

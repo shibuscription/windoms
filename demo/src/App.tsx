@@ -79,6 +79,31 @@ const resolveLunchDate = (location: { pathname: string; search: string }, fallba
   return date && isValidDateKey(date) ? date : fallback;
 };
 
+const resolvePageLabel = (pathname: string, search: string): string | null => {
+  if (pathname === "/today") {
+    const view = new URLSearchParams(search).get("view");
+    if (view === "practice-log") return "練習日誌";
+    if (view === "homework") return "宿題";
+    if (view === "instruments") return "楽器";
+    if (view === "docs") return "資料";
+    if (view === "settings") return "設定";
+    return "Today";
+  }
+  if (pathname === "/calendar") return "カレンダー";
+  if (pathname.startsWith("/logs/")) return "当番日誌";
+  if (pathname === "/todos") return "TODO";
+  if (pathname === "/events" || pathname.startsWith("/events/")) return "イベント";
+  if (pathname === "/activity-plan" || pathname === "/shift-survey") return "シフト作成";
+  if (pathname === "/purchases") return "購入依頼";
+  if (pathname === "/reimbursements") return "立替";
+  if (pathname.startsWith("/lunch")) return "お弁当";
+  if (pathname === "/accounting" || pathname.startsWith("/accounting/")) return "会計";
+  if (pathname === "/scores") return "楽譜";
+  if (pathname === "/members") return "メンバー";
+  if (pathname === "/links") return "リンク集";
+  return null;
+};
+
 const menuSections = (
   today: string,
   activityPlanBadgeText: string | undefined,
@@ -327,6 +352,23 @@ export function App() {
     setActiveStatusPanel(null);
   }, [location.key]);
 
+  useEffect(() => {
+    const updateDocumentTitle = () => {
+      const rawHash = window.location.hash.startsWith("#")
+        ? window.location.hash.slice(1)
+        : window.location.hash;
+      const [pathPart, queryPart] = rawHash.split("?");
+      const pathname = pathPart || "/";
+      const search = queryPart ? `?${queryPart}` : "";
+      const label = resolvePageLabel(pathname, search);
+      document.title = label ? `Windoms | ${label}` : "Windoms";
+    };
+
+    updateDocumentTitle();
+    window.addEventListener("hashchange", updateDocumentTitle);
+    return () => window.removeEventListener("hashchange", updateDocumentTitle);
+  }, [location.pathname, location.search]);
+
   const unreadNotificationCount = notifications.filter((item) => !item.read).length;
   const inboxTodos = useMemo(
     () =>
@@ -479,9 +521,8 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <div className="demo-badge">DEMO（データは仮）</div>
       <header className="app-header">
-        <Link to="/" className="brand">
+        <Link to="/today" className="brand">
           <picture>
             <source srcSet="/assets/logo/logo-windoms.svg" type="image/svg+xml" />
             <img
@@ -644,51 +685,53 @@ export function App() {
       </main>
       {isMenuOpen && (
         <div className="menu-overlay" onClick={() => setIsMenuOpen(false)}>
-          <div className="menu-panel" onClick={(event) => event.stopPropagation()}>
-            <button
-              type="button"
-              className="menu-close"
-              aria-label="メニューを閉じる"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              ×
-            </button>
-            <button
-              type="button"
-              className="menu-today-header"
-              onClick={() => {
-                setIsMenuOpen(false);
-                navigate("/today");
-              }}
-            >
-              <span className="menu-today-date">{formatDateYmd(today)}</span>
-              <span className={`menu-today-weekday ${weekdayTone(today)}`}>（{formatWeekdayJa(today)}）</span>
-            </button>
-            <div className="menu-sections">
-              {visibleMenuSections.map((section) => (
-                <section key={section.id} className="menu-section">
-                  <h2 className="menu-section-title">{section.heading}</h2>
-                  <div className="menu-grid">
-                    {section.items.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className={`menu-item ${item.isActive(location) ? "active" : ""}`}
-                        onClick={() => {
-                          setIsMenuOpen(false);
-                          navigate(item.to);
-                        }}
-                      >
-                        <span className="menu-item-icon" aria-hidden="true">
-                          {item.icon}
-                        </span>
-                        <span className="menu-item-label">{item.label}</span>
-                        {item.badgeText && <span className="menu-item-badge">{item.badgeText}</span>}
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              ))}
+          <div className="menu-panel">
+            <div className="menu-content">
+              <button
+                type="button"
+                className="menu-close"
+                aria-label="メニューを閉じる"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                ×
+              </button>
+              <button
+                type="button"
+                className="menu-today-header"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  navigate("/today");
+                }}
+              >
+                <span className="menu-today-date">{formatDateYmd(today)}</span>
+                <span className={`menu-today-weekday ${weekdayTone(today)}`}>（{formatWeekdayJa(today)}）</span>
+              </button>
+              <div className="menu-sections">
+                {visibleMenuSections.map((section) => (
+                  <section key={section.id} className="menu-section">
+                    <h2 className="menu-section-title">{section.heading}</h2>
+                    <div className="menu-grid">
+                      {section.items.map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className={`menu-item ${item.isActive(location) ? "active" : ""}`}
+                          onClick={() => {
+                            setIsMenuOpen(false);
+                            navigate(item.to);
+                          }}
+                        >
+                          <span className="menu-item-icon" aria-hidden="true">
+                            {item.icon}
+                          </span>
+                          <span className="menu-item-label">{item.label}</span>
+                          {item.badgeText && <span className="menu-item-badge">{item.badgeText}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
             </div>
           </div>
         </div>

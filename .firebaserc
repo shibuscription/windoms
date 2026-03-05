@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "windoms-prod"
+  },
+  "targets": {
+    "windoms-prod": {
+      "hosting": {
+        "demo": [
+          "windoms-demo"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
