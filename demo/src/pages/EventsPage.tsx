@@ -99,7 +99,7 @@ const linkedSessionsMap: Record<string, LinkedSession> = {
     type: "event",
     eventName: "定期演奏会（午前リハ）",
     location: "文化会館",
-    dutyName: "伊藤",
+    dutyName: "渋谷",
   },
   "s-2026-03-20-pm": {
     id: "s-2026-03-20-pm",
@@ -109,7 +109,7 @@ const linkedSessionsMap: Record<string, LinkedSession> = {
     type: "event",
     eventName: "定期演奏会（本番）",
     location: "文化会館",
-    dutyName: "佐藤",
+    dutyName: "瀬古",
   },
   "s-2026-02-23-pm": {
     id: "s-2026-02-23-pm",
@@ -128,7 +128,7 @@ const linkedSessionsMap: Record<string, LinkedSession> = {
     endTime: "12:00",
     type: "normal",
     location: "合宿所ホール",
-    dutyName: "鈴木",
+    dutyName: "中村",
   },
   "s-2025-08-11-am": {
     id: "s-2025-08-11-am",
@@ -137,7 +137,7 @@ const linkedSessionsMap: Record<string, LinkedSession> = {
     endTime: "12:00",
     type: "self",
     location: "合宿所ホール",
-    dutyName: "高橋",
+    dutyName: "今井",
   },
 };
 
@@ -375,7 +375,7 @@ export function EventsPage({ data, currentUid, updateTodos }: EventsPageProps) {
       <header className="events-header">
         <h1>イベント</h1>
         {isManager && (
-          <button type="button" className="links-add-button" aria-label="イベント追加" onClick={openCreateModal}>
+          <button type="button" className="links-add-button" aria-label="追加" title="追加" onClick={openCreateModal}>
             ＋
           </button>
         )}
@@ -454,7 +454,7 @@ export function EventsPage({ data, currentUid, updateTodos }: EventsPageProps) {
       {selectedEvent && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={closeDetail}>
           <section className="modal-panel events-detail-modal" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={closeDetail}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeDetail}>
               ×
             </button>
             <p className="modal-context">{toDateLabel(selectedEvent.eventSortDate)}</p>
@@ -536,7 +536,7 @@ export function EventsPage({ data, currentUid, updateTodos }: EventsPageProps) {
       {selectedEvent && isLinkedSessionsModalOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setIsLinkedSessionsModalOpen(false)}>
           <section className="modal-panel events-linked-sessions-modal" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setIsLinkedSessionsModalOpen(false)}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsLinkedSessionsModalOpen(false)}>
               ×
             </button>
             <div className="events-linked-header">
@@ -545,7 +545,8 @@ export function EventsPage({ data, currentUid, updateTodos }: EventsPageProps) {
                 <button
                   type="button"
                   className="links-add-button"
-                  aria-label="紐づけ"
+                  aria-label="追加"
+                  title="追加"
                   onClick={() => setIsSessionBindModalOpen(true)}
                 >
                   ＋
@@ -600,7 +601,7 @@ export function EventsPage({ data, currentUid, updateTodos }: EventsPageProps) {
       {selectedEvent && isSessionBindModalOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setIsSessionBindModalOpen(false)}>
           <section className="modal-panel events-bind-sessions-modal" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setIsSessionBindModalOpen(false)}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsSessionBindModalOpen(false)}>
               ×
             </button>
             <h3>イベントセッションを選択</h3>
@@ -647,7 +648,7 @@ export function EventsPage({ data, currentUid, updateTodos }: EventsPageProps) {
       {unlinkTargetSession && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setUnlinkTargetSessionId(null)}>
           <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setUnlinkTargetSessionId(null)}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setUnlinkTargetSessionId(null)}>
               ×
             </button>
             <h3>イベントから解除しますか？</h3>
@@ -670,10 +671,10 @@ export function EventsPage({ data, currentUid, updateTodos }: EventsPageProps) {
       {editingEventId && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={closeEditModal}>
           <section className="modal-panel events-editor-modal" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={closeEditModal}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeEditModal}>
               ×
             </button>
-            <h3>{isCreateMode ? "イベント追加" : "イベント編集"}</h3>
+            <h3>{isCreateMode ? "追加" : "イベント編集"}</h3>
             <label>
               タイトル
               <input value={formDraft.title} onChange={(event) => setFormDraft((current) => ({ ...current, title: event.target.value }))} />
@@ -723,7 +724,7 @@ export function EventsPage({ data, currentUid, updateTodos }: EventsPageProps) {
       {deleteTargetEvent && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setDeleteTargetId(null)}>
           <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setDeleteTargetId(null)}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setDeleteTargetId(null)}>
               ×
             </button>
             <h3>イベントを削除しますか？</h3>

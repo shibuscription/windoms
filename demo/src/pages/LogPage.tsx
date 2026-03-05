@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { Activity, DayLog, DemoData, DemoRsvp, RsvpStatus, SessionDoc } from "../types";
 import { formatDateYmd, formatTimeNoLeadingZero, formatWeekdayJa, weekdayTone } from "../utils/date";
@@ -254,7 +254,7 @@ function InlineSuggestAdd<T>({
             setPinnedClose(false);
           }}
         >
-          ＋追加
+          ＋ 追加
         </button>
       )}
     </>
@@ -458,7 +458,7 @@ function SongInlineSuggestAdd({
             setPinnedClose(false);
           }}
         >
-          ＋追加
+          ＋ 追加
         </button>
       )}
     </>
@@ -547,7 +547,7 @@ const DEMO_STAMP_USER = {
   uid: "demo_writer",
   name: "渋谷",
 };
-const MAIN_INSTRUCTOR_NAME = "井野先生";
+const MAIN_INSTRUCTOR_NAME = "大滝";
 
 export function LogPage({
   data,
@@ -656,7 +656,7 @@ export function LogPage({
         : plannedSeniors;
   const refModalTitle =
     refModal === "mainInstructor"
-      ? "講師予定（井野先生）"
+      ? "講師予定（大滝）"
       : refModal === "instructors"
         ? "外部講師予定"
         : "先輩予定";
@@ -954,7 +954,7 @@ export function LogPage({
           Todayへ
         </Link>
         <button type="button" className="button button-small" onClick={onSaveDemo}>
-          保存（デモ）
+          保存
         </button>
       </div>
 
@@ -1065,7 +1065,7 @@ export function LogPage({
         <div className="log-panel">
           <div className="ref-panel">
             <div className="section-header">
-              <h2>講師（井野先生）</h2>
+              <h2>講師（大滝）</h2>
               <button
                 type="button"
                 className="button button-small ghost-button section-action"
@@ -1210,7 +1210,7 @@ export function LogPage({
           </ul>
         )}
         <button type="button" className="button button-small ghost-button" onClick={openCreateActivityModal}>
-          ＋追加
+          ＋ 追加
         </button>
       </div>
 
@@ -1273,7 +1273,7 @@ export function LogPage({
       {isSaveNoticeOpen && (
         <div className="modal-backdrop" onClick={() => setIsSaveNoticeOpen(false)}>
           <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" onClick={() => setIsSaveNoticeOpen(false)} aria-label="閉じる">
+            <button type="button" className="modal-close" onClick={() => setIsSaveNoticeOpen(false)} aria-label="閉じる" title="閉じる">
               ×
             </button>
             <p className="modal-context">保存しました（デモ）</p>
@@ -1293,7 +1293,7 @@ export function LogPage({
               type="button"
               className="modal-close"
               onClick={() => setPendingDeleteActivityIndex(null)}
-              aria-label="閉じる"
+              aria-label="閉じる" title="閉じる"
             >
               ×
             </button>
@@ -1317,7 +1317,7 @@ export function LogPage({
       {pendingStampSession && (
         <div className="modal-backdrop" onClick={() => setPendingStampSession(null)}>
           <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" onClick={() => setPendingStampSession(null)} aria-label="閉じる">
+            <button type="button" className="modal-close" onClick={() => setPendingStampSession(null)} aria-label="閉じる" title="閉じる">
               ×
             </button>
             <p className="modal-context">
@@ -1345,7 +1345,7 @@ export function LogPage({
       {refModal && (
         <div className="modal-backdrop" onClick={() => setRefModal(null)}>
           <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" onClick={() => setRefModal(null)} aria-label="閉じる">
+            <button type="button" className="modal-close" onClick={() => setRefModal(null)} aria-label="閉じる" title="閉じる">
               ×
             </button>
             <p className="modal-context">{refModalTitle}</p>
@@ -1357,7 +1357,7 @@ export function LogPage({
       {isActivityModalOpen && (
         <div className="modal-backdrop" onClick={closeActivityModal}>
           <div className="modal-panel activity-modal-panel" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" onClick={closeActivityModal} aria-label="閉じる">
+            <button type="button" className="modal-close" onClick={closeActivityModal} aria-label="閉じる" title="閉じる">
               ×
             </button>
             <p className="modal-context">活動記録 {editingActivityIndex === null ? "追加" : "編集"}</p>
@@ -1513,7 +1513,7 @@ export function LogPage({
       {selectedRsvpSession && (
         <div className="modal-backdrop" onClick={closeRsvpModal}>
           <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" onClick={closeRsvpModal} aria-label="閉じる">
+            <button type="button" className="modal-close" onClick={closeRsvpModal} aria-label="閉じる" title="閉じる">
               ×
             </button>
             <p className="modal-context">

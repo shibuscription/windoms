@@ -20,7 +20,7 @@ type DemoMember = {
 const memberItems: DemoMember[] = [
   {
     id: "child-1",
-    name: "渋谷 花",
+    name: "渋谷",
     type: "child",
     role: "member",
     status: "active",
@@ -30,7 +30,7 @@ const memberItems: DemoMember[] = [
   },
   {
     id: "child-2",
-    name: "渋谷 陸",
+    name: "瀬古",
     type: "child",
     role: "member",
     status: "active",
@@ -40,7 +40,7 @@ const memberItems: DemoMember[] = [
   },
   {
     id: "child-3",
-    name: "田中 奏",
+    name: "中村",
     type: "child",
     role: "member",
     status: "active",
@@ -48,10 +48,10 @@ const memberItems: DemoMember[] = [
     part: "パーカッション",
     parentIds: ["parent-3"],
   },
-  { id: "parent-1", name: "渋谷 父", type: "parent", role: "member", status: "active", childIds: ["child-1", "child-2"] },
-  { id: "parent-2", name: "渋谷 母", type: "parent", role: "member", status: "active", childIds: ["child-1", "child-2"] },
-  { id: "parent-3", name: "田中 母", type: "parent", role: "member", status: "active", childIds: ["child-3"] },
-  { id: "teacher-1", name: "井野 先生", type: "teacher", role: "member", status: "active" },
+  { id: "parent-1", name: "渋谷", type: "parent", role: "member", status: "active", childIds: ["child-1", "child-2"] },
+  { id: "parent-2", name: "渋谷", type: "parent", role: "member", status: "active", childIds: ["child-1", "child-2"] },
+  { id: "parent-3", name: "中村", type: "parent", role: "member", status: "active", childIds: ["child-3"] },
+  { id: "teacher-1", name: "大滝", type: "teacher", role: "member", status: "active" },
 ];
 
 const tabItems: Array<{ id: MemberTab; label: string }> = [
@@ -185,7 +185,7 @@ export function MembersPage() {
             <button
               type="button"
               className="modal-close"
-              aria-label="閉じる"
+              aria-label="閉じる" title="閉じる"
               onClick={() => setRelationModalTargetId(null)}
             >
               ×
@@ -224,7 +224,7 @@ export function MembersPage() {
             <button
               type="button"
               className="modal-close"
-              aria-label="閉じる"
+              aria-label="閉じる" title="閉じる"
               onClick={() => setDetailModalTargetId(null)}
             >
               ×

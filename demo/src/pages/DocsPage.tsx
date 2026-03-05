@@ -85,9 +85,10 @@ export function DocsListPage({ data }: DocsPageProps) {
           type="button"
           className="links-add-button"
           onClick={() => navigate("/docs/new")}
-          aria-label="メモを新規作成"
+          aria-label="追加"
+          title="追加"
         >
-          ＋
+          ＋ 追加
         </button>
       </div>
       <p className="muted">Dropbox等の実体資料は外部管理。ここでは要点メモを管理します。</p>
@@ -207,7 +208,7 @@ export function DocsEditorPage({ data, updateDocs, mode }: DocsEditorProps) {
   return (
     <section className="card docs-page">
       <div className="docs-header">
-        <h1>{mode === "edit" ? "資料メモ編集" : "資料メモ新規作成"}</h1>
+        <h1>{mode === "edit" ? "資料メモ編集" : "資料メモ追加"}</h1>
       </div>
 
       <label>

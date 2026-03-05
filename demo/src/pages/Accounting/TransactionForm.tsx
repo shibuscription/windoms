@@ -87,7 +87,7 @@ export function TransactionForm({ mode, period, onClose, onSubmit }: Props) {
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <section className="modal-panel accounting-modal-panel">
-        <button type="button" className="modal-close" aria-label="閉じる" onClick={onClose}>
+        <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={onClose}>
           ×
         </button>
         <h3>{titleMap[mode]}</h3>

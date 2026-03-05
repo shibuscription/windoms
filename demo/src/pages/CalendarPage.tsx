@@ -169,7 +169,7 @@ export function CalendarPage({ data }: CalendarPageProps) {
       message: `${formatTimeNoLeadingZero(session.startTime)}-${formatTimeNoLeadingZero(
         session.endTime,
       )} を削除しますか？`,
-      confirmLabel: "削除する",
+      confirmLabel: "削除",
       onConfirm: () => {
         // DEMO: 実データ更新は行わない
       },
@@ -266,7 +266,7 @@ export function CalendarPage({ data }: CalendarPageProps) {
       {selectedDay && (
         <div className="calendar-sheet-backdrop" onClick={closeSheet}>
           <section className="calendar-day-sheet" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="calendar-session-sheet-close" onClick={closeSheet} aria-label="閉じる">
+            <button type="button" className="calendar-session-sheet-close" onClick={closeSheet} aria-label="閉じる" title="閉じる">
               ×
             </button>
             <header className="calendar-day-sheet-header">
@@ -389,7 +389,7 @@ export function CalendarPage({ data }: CalendarPageProps) {
       {attendanceSession && (
         <div className="modal-backdrop calendar-attendance-backdrop" onClick={closeAttendanceModal}>
           <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" onClick={closeAttendanceModal} aria-label="閉じる">
+            <button type="button" className="modal-close" onClick={closeAttendanceModal} aria-label="閉じる" title="閉じる">
               ×
             </button>
             <p className="modal-context">

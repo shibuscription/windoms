@@ -290,7 +290,7 @@ export function PurchasesPage({
       <header className="purchases-header">
         <h1>購入依頼</h1>
         <button type="button" className="button button-small" onClick={openCreateModal}>
-          ＋購入依頼を追加
+          ＋ 追加
         </button>
       </header>
 
@@ -360,7 +360,7 @@ export function PurchasesPage({
       {isCreateModalOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={closeCreateModal}>
           <section className="modal-panel purchases-create-modal" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={closeCreateModal}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeCreateModal}>
               ×
             </button>
             <h3>購入依頼を追加</h3>
@@ -419,7 +419,7 @@ export function PurchasesPage({
       {modalTarget && completeDraft && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={closeCompleteModal}>
           <section className="modal-panel purchases-complete-modal" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={closeCompleteModal}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeCompleteModal}>
               ×
             </button>
             <h3>購入完了</h3>
@@ -522,7 +522,7 @@ export function PurchasesPage({
       {confirmDialog && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setConfirmDialog(null)}>
           <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setConfirmDialog(null)}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setConfirmDialog(null)}>
               ×
             </button>
             <h3>この購入依頼を削除しますか？</h3>

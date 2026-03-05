@@ -284,7 +284,8 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
         <button
           type="button"
           className="links-add-button"
-          aria-label="TODO追加"
+          aria-label="追加"
+          title="追加"
           onClick={() => {
             setCreateDraftState(createDraft());
             setCreateErrors({});
@@ -356,7 +357,7 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
       {editingId && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setEditingId(null)}>
           <section className="modal-panel todos-edit-modal" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setEditingId(null)}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setEditingId(null)}>
               ×
             </button>
             <h3>TODO編集</h3>
@@ -435,7 +436,7 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
       {isAddModalOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setIsAddModalOpen(false)}>
           <section className="modal-panel todos-edit-modal" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setIsAddModalOpen(false)}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsAddModalOpen(false)}>
               ×
             </button>
             <h3>TODO追加</h3>
@@ -521,7 +522,7 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
       {relatedDetailTodo && relatedDetail && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setRelatedDetailTodoId(null)}>
           <section className="modal-panel todos-related-modal" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setRelatedDetailTodoId(null)}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setRelatedDetailTodoId(null)}>
               ×
             </button>
             <h3>紐づき先詳細</h3>
@@ -576,7 +577,7 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
       {deleteTarget && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setDeleteTargetId(null)}>
           <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setDeleteTargetId(null)}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setDeleteTargetId(null)}>
               ×
             </button>
             <h3>TODOを削除しますか？</h3>

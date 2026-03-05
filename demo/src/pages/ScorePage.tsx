@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { DemoData, Score } from "../types";
 
 type ScorePageProps = {
@@ -330,7 +330,7 @@ export function ScorePage({ data, updateScores, isAdmin }: ScorePageProps) {
         <h1>楽譜リスト（曲名検索）</h1>
         {isAdmin && (
           <button type="button" className="button button-small" onClick={openCreate}>
-            ＋追加
+            ＋ 追加
           </button>
         )}
       </header>
@@ -410,7 +410,7 @@ export function ScorePage({ data, updateScores, isAdmin }: ScorePageProps) {
             className="modal-panel purchases-create-modal"
             onClick={(event) => event.stopPropagation()}
           >
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={closeModal}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeModal}>
               ×
             </button>
             <h3>{mode === "create" ? "楽譜を追加" : "楽譜を編集"}</h3>

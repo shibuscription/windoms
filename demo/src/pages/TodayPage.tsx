@@ -415,7 +415,7 @@ export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: Today
               type="button"
               className="modal-close"
               onClick={() => setSelectedSession(null)}
-              aria-label="閉じる"
+              aria-label="閉じる" title="閉じる"
             >
               ×
             </button>
@@ -499,7 +499,7 @@ export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: Today
               type="button"
               className="modal-close"
               onClick={() => setIsFutureLogConfirmOpen(false)}
-              aria-label="閉じる"
+              aria-label="閉じる" title="閉じる"
             >
               ×
             </button>

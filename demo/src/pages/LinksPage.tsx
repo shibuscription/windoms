@@ -159,7 +159,7 @@ export function LinksPage() {
     };
     setItems((current) => [nextItem, ...current]);
     closeEditor();
-    showFeedback("リンクを追加しました");
+    showFeedback("追加しました");
   };
 
   const confirmDelete = () => {
@@ -197,8 +197,8 @@ export function LinksPage() {
       <div className="links-header">
         <h1>リンク集</h1>
         {isOfficer && (
-          <button type="button" className="links-add-button" onClick={openCreate} aria-label="リンクを追加">
-            ➕
+          <button type="button" className="links-add-button" onClick={openCreate} aria-label="追加" title="追加">
+            ＋ 追加
           </button>
         )}
       </div>
@@ -221,8 +221,8 @@ export function LinksPage() {
       {editingId && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className="modal-panel">
-            <button className="modal-close" type="button" onClick={closeEditor} aria-label="閉じる">×</button>
-            <h3>{isEditMode ? "リンクを編集" : "リンクを追加"}</h3>
+            <button className="modal-close" type="button" onClick={closeEditor} aria-label="閉じる" title="閉じる">×</button>
+            <h3>{isEditMode ? "リンクを編集" : "追加"}</h3>
             <label>
               タイトル
               <input
@@ -269,7 +269,7 @@ export function LinksPage() {
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={closeEditor}>キャンセル</button>
               <button type="button" className="button" onClick={submitEditor}>
-                {isEditMode ? "保存する" : "追加する"}
+                {isEditMode ? "保存" : "追加"}
               </button>
             </div>
           </div>
@@ -279,7 +279,7 @@ export function LinksPage() {
       {deleteTarget && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className="modal-panel">
-            <button className="modal-close" type="button" onClick={() => setDeleteTargetId(null)} aria-label="閉じる">×</button>
+            <button className="modal-close" type="button" onClick={() => setDeleteTargetId(null)} aria-label="閉じる" title="閉じる">×</button>
             <h3>リンクを削除しますか？</h3>
             <p className="modal-summary">{deleteTarget.title}</p>
             <div className="modal-actions">
@@ -287,7 +287,7 @@ export function LinksPage() {
                 キャンセル
               </button>
               <button type="button" className="button" onClick={confirmDelete}>
-                削除する
+                削除
               </button>
             </div>
           </div>

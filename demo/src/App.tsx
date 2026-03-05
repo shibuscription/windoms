@@ -705,7 +705,7 @@ export function App() {
               <button
                 type="button"
                 className="menu-close"
-                aria-label="メニューを閉じる"
+                aria-label="閉じる" title="閉じる"
                 onClick={() => setIsMenuOpen(false)}
               >
                 ×
@@ -757,7 +757,7 @@ export function App() {
             <button
               type="button"
               className="status-panel-close"
-              aria-label="パネルを閉じる"
+              aria-label="閉じる" title="閉じる"
               onClick={() => setActiveStatusPanel(null)}
             >
               ×

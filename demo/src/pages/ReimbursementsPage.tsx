@@ -239,7 +239,7 @@ export function ReimbursementsPage({
       <header className="reimbursements-header">
         <h1>立替</h1>
         <button type="button" className="button button-small" onClick={openCreateModal}>
-          ＋立替を追加
+          ＋ 追加
         </button>
       </header>
       <div className="purchases-tabs">
@@ -342,7 +342,7 @@ export function ReimbursementsPage({
       {isCreateModalOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={closeCreateModal}>
           <section className="modal-panel purchases-complete-modal" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={closeCreateModal}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeCreateModal}>
               ×
             </button>
             <h3>立替を追加</h3>
@@ -408,7 +408,7 @@ export function ReimbursementsPage({
       {paidModalTarget && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={closeMarkPaidModal}>
           <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={closeMarkPaidModal}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeMarkPaidModal}>
               ×
             </button>
             <h3>支払済にしますか？</h3>
@@ -440,7 +440,7 @@ export function ReimbursementsPage({
       {confirmDialog && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setConfirmDialog(null)}>
           <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setConfirmDialog(null)}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setConfirmDialog(null)}>
               ×
             </button>
             <h3>{confirmDialogTitle}</h3>

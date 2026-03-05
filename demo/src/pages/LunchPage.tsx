@@ -556,7 +556,7 @@ export function LunchPage({
       <header className="lunch-header">
         <h1>お弁当</h1>
         <button type="button" className="button button-small" onClick={openAddModal}>
-          ＋ お弁当を追加
+          ＋ 追加
         </button>
       </header>
       <div className="lunch-duty-board">
@@ -636,7 +636,7 @@ export function LunchPage({
             className="modal-panel purchases-complete-modal lunch-add-modal"
             onClick={(event) => event.stopPropagation()}
           >
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={closeAddModal}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeAddModal}>
               ×
             </button>
             <h3>お弁当を追加</h3>
@@ -772,7 +772,7 @@ export function LunchPage({
       {detailTarget && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setDetailTarget(null)}>
           <section className="modal-panel purchases-complete-modal" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setDetailTarget(null)}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setDetailTarget(null)}>
               ×
             </button>
             <h3>{detailTarget.title}</h3>
@@ -806,7 +806,7 @@ export function LunchPage({
                 <button
                   type="button"
                   className="button button-small button-secondary"
-                  aria-label="閉じる"
+                  aria-label="閉じる" title="閉じる"
                   onClick={() => setIsQuoManageOpen(false)}
                 >
                   ×
@@ -870,7 +870,7 @@ export function LunchPage({
       {isAdmin && isQuoManageOpen && isQuoAddModalOpen && (
         <div className="modal-backdrop modal-backdrop-front" role="dialog" aria-modal="true" onClick={closeQuoAddModal}>
           <section className="modal-panel purchases-create-modal" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={closeQuoAddModal}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeQuoAddModal}>
               ×
             </button>
             <h3>QUOカード購入</h3>

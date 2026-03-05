@@ -664,7 +664,7 @@ export function ActivityPlanPage() {
       {sessionCreateDraft && (
         <div className="modal-backdrop" onClick={() => setSessionCreateDraft(null)}>
           <div className="modal-panel activity-modal-panel" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setSessionCreateDraft(null)}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setSessionCreateDraft(null)}>
               ×
             </button>
             <p className="modal-context">セッション追加</p>
@@ -692,7 +692,7 @@ export function ActivityPlanPage() {
                 キャンセル
               </button>
               <button type="button" className="button save-button" onClick={confirmSessionCreate}>
-                追加する
+                追加
               </button>
             </div>
           </div>
@@ -701,7 +701,7 @@ export function ActivityPlanPage() {
       {noteEditDraft && (
         <div className="modal-backdrop" onClick={() => setNoteEditDraft(null)}>
           <div className="modal-panel activity-modal-panel" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setNoteEditDraft(null)}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setNoteEditDraft(null)}>
               ×
             </button>
             <p className="modal-context">{noteEditDraft.field === "teacher" ? "先生予定を編集" : "備考を編集"}</p>
@@ -724,7 +724,7 @@ export function ActivityPlanPage() {
                 キャンセル
               </button>
               <button type="button" className="button save-button" onClick={confirmNoteEdit}>
-                保存する
+                保存
               </button>
             </div>
           </div>
@@ -733,7 +733,7 @@ export function ActivityPlanPage() {
       {isSurveyModalOpen && (
         <div className="modal-backdrop" onClick={() => setIsSurveyModalOpen(false)}>
           <div className="modal-panel activity-modal-panel" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setIsSurveyModalOpen(false)}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsSurveyModalOpen(false)}>
               ×
             </button>
             <p className="modal-context">当番可否アンケート作成</p>
@@ -780,7 +780,7 @@ export function ActivityPlanPage() {
       {isAiDraftModalOpen && (
         <div className="modal-backdrop" onClick={() => setIsAiDraftModalOpen(false)}>
           <div className="modal-panel activity-modal-panel" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setIsAiDraftModalOpen(false)}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsAiDraftModalOpen(false)}>
               ×
             </button>
             <p className="modal-context">AIで当番を仮割当</p>
@@ -800,7 +800,7 @@ export function ActivityPlanPage() {
       {isManualDraftModalOpen && (
         <div className="modal-backdrop" onClick={() => setIsManualDraftModalOpen(false)}>
           <div className="modal-panel activity-modal-panel" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setIsManualDraftModalOpen(false)}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsManualDraftModalOpen(false)}>
               ×
             </button>
             <p className="modal-context">AIを使わずに進む</p>
@@ -827,7 +827,7 @@ export function ActivityPlanPage() {
       {isShiftConfirmModalOpen && (
         <div className="modal-backdrop" onClick={() => setIsShiftConfirmModalOpen(false)}>
           <div className="modal-panel activity-modal-panel" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setIsShiftConfirmModalOpen(false)}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsShiftConfirmModalOpen(false)}>
               ×
             </button>
             <p className="modal-context">シフト確定</p>
@@ -853,7 +853,7 @@ export function ActivityPlanPage() {
       {isNotifyConfirmModalOpen && (
         <div className="modal-backdrop" onClick={() => setIsNotifyConfirmModalOpen(false)}>
           <div className="modal-panel activity-modal-panel" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setIsNotifyConfirmModalOpen(false)}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsNotifyConfirmModalOpen(false)}>
               ×
             </button>
             <p className="modal-context">通知確認</p>
@@ -879,7 +879,7 @@ export function ActivityPlanPage() {
       {isDutyEditorModalOpen && dutyEditorSession && (
         <div className="modal-backdrop" onClick={closeDutyEditorModal}>
           <div className="modal-panel activity-modal-panel" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={closeDutyEditorModal}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeDutyEditorModal}>
               ×
             </button>
             <p className="modal-context">当番編集</p>
@@ -980,7 +980,7 @@ export function ActivityPlanPage() {
       {isDutyCountModalOpen && (
         <div className="modal-backdrop" onClick={() => setIsDutyCountModalOpen(false)}>
           <div className="modal-panel activity-modal-panel" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" onClick={() => setIsDutyCountModalOpen(false)}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsDutyCountModalOpen(false)}>
               ×
             </button>
             <p className="modal-context">当番回数（月内）</p>
