@@ -811,6 +811,22 @@ Windomsは単なる管理ツールではなく、
 - 将来、特定クラブが個別最適で別物化した場合のみ、そのクラブに限って別 Firebase プロジェクトへ分離可能とする。
   - ただし初期構成は単一 Firebase プロジェクトで開始する。
 
+#### 19.6.0 ドメインの役割分担
+
+- Windoms のドメインは次の役割で運用する。
+- `windoms.club`
+  - サービス紹介ページ
+  - ドキュメント / 導入案内
+  - 将来のLP
+- `demo.windoms.club`
+  - Windoms デモ環境
+- `{clubId}.windoms.club`
+  - 各クラブの Windoms インスタンス
+- 例:
+  - `minamigaoka.windoms.club`
+  - `sakuragaoka.windoms.club`
+- サブドメイン = `clubId` とする。
+
 #### 19.6.1 Firebase Hosting multi-site の上限
 
 - 1 Firebase プロジェクトあたりの Hosting サイトは最大36サイトまでとする。
@@ -825,12 +841,44 @@ Windomsは単なる管理ツールではなく、
   - `demo.windoms.club` -> Hosting site `windoms-demo`
   - `minamigaoka.windoms.club` -> Hosting site `windoms-minamigaoka`（例）
 
+#### 19.6.2.1 siteId / target 命名規約
+
+- Firebase Hosting multi-site では次の命名ルールを採用する。
+- `siteId`
+  - `windoms-{clubId}`
+- 例:
+  - `windoms-demo`
+  - `windoms-minamigaoka`
+- `target`（ローカル deploy 名）
+  - `clubId` または `demo`
+- 例:
+  - `firebase deploy --only hosting:demo`
+- `siteId` は Firebase 全体で一意である必要がある。
+
 #### 19.6.3 DNS 設定ルール
 
 - サブドメインは CNAME で `SITE_ID.web.app` に向ける。
 - 例: `demo.windoms.club` は `windoms-demo.web.app` に向ける。
 - 同一ホスト名に A/AAAA レコードと CNAME レコードを混在させない（競合回避）。
 - DNS 伝播および SSL 証明書の発行反映には最大24時間かかることがある。
+
+#### 19.6.3.1 DNS トラブルシュート
+
+- DNS が正しく設定されているかは次のコマンドで確認する。
+- `nslookup -type=cname demo.windoms.club`
+- 期待結果:
+  - `demo.windoms.club canonical name = windoms-demo.web.app`
+- 注意:
+  - 同じホストに A / AAAA と CNAME を共存させない
+  - DNS 反映には数分〜数時間かかる
+
+#### 19.6.3.2 SSL 証明書反映とキャッシュ
+
+- Firebase Hosting でカスタムドメインを追加すると、SSL 証明書の発行に最大24時間かかる場合がある。
+- 証明書が発行された直後はブラウザキャッシュにより「保護されていない通信」と表示されることがある。
+- 確認方法:
+  - シークレットウィンドウでアクセス
+  - 強制リロード（Ctrl + Shift + R）
 
 #### 19.6.4 追加クラブを作る手順（Hosting側）
 
@@ -849,6 +897,17 @@ Windomsは単なる管理ツールではなく、
   - `demo` ディレクトリで `npm run build` を実行する。
   - リポジトリルートで `firebase deploy --only hosting:demo` を実行する。
 - 実際に配信されるディレクトリは `firebase.json` の `public` 設定に依存するため、変更時は必ず整合を確認する。
+
+#### 19.6.6 GitHub 自動デプロイについて
+
+- Firebase Hosting は GitHub Actions による自動デプロイも可能だが、Windoms では当面手動 deploy を採用する。
+- 理由:
+  - デモ段階では手動の方が安全
+  - multi-site deploy の管理を簡単にするため
+- 基本 deploy:
+  - `cd demo`
+  - `npm run build`
+  - `firebase deploy --only hosting:demo`
 
 ---
 
