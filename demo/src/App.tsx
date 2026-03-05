@@ -13,6 +13,7 @@ import { LinksPage } from "./pages/LinksPage";
 import { MembersPage } from "./pages/MembersPage";
 import { EventsPage } from "./pages/EventsPage";
 import { TodosPage } from "./pages/TodosPage";
+import { DocsDetailPage, DocsEditorPage, DocsListPage } from "./pages/DocsPage";
 import { PurchasesPage } from "./pages/PurchasesPage";
 import { ReimbursementsPage } from "./pages/ReimbursementsPage";
 import { ScorePage } from "./pages/ScorePage";
@@ -24,6 +25,7 @@ import { DEMO_CURRENT_UID, mockData } from "./data/mockData";
 import type {
   DayLog,
   DemoData,
+  DocMemo,
   DemoRsvp,
   LunchRecord,
   PurchaseRequest,
@@ -99,6 +101,7 @@ const resolvePageLabel = (pathname: string, search: string): string | null => {
   if (pathname.startsWith("/lunch")) return "お弁当";
   if (pathname === "/accounting" || pathname.startsWith("/accounting/")) return "会計";
   if (pathname === "/scores") return "楽譜";
+  if (pathname === "/docs" || pathname.startsWith("/docs/")) return "資料";
   if (pathname === "/members") return "メンバー";
   if (pathname === "/links") return "リンク集";
   return null;
@@ -243,9 +246,10 @@ const menuSections = (
           id: "docs",
           label: "資料",
           icon: "📁",
-          to: "/today?view=docs",
+          to: "/docs",
           allowedRoles: ["child", "parent", "admin"],
-          isActive: (location) => viewIsActive(location, "docs"),
+          isActive: (location) =>
+            location.pathname === "/docs" || location.pathname.startsWith("/docs/"),
         },
         {
           id: "members",
@@ -484,6 +488,13 @@ export function App() {
     }));
   };
 
+  const updateDocs = (updater: (prev: DocMemo[]) => DocMemo[]) => {
+    setData((prev) => ({
+      ...prev,
+      docs: updater(prev.docs),
+    }));
+  };
+
   const updatePurchaseRequests = (updater: (prev: PurchaseRequest[]) => PurchaseRequest[]) => {
     setData((prev) => ({
       ...prev,
@@ -630,6 +641,10 @@ export function App() {
             path="/todos"
             element={<TodosPage data={data} currentUid={currentUid} updateTodos={updateTodos} />}
           />
+          <Route path="/docs" element={<DocsListPage data={data} updateDocs={updateDocs} />} />
+          <Route path="/docs/new" element={<DocsEditorPage data={data} updateDocs={updateDocs} mode="new" />} />
+          <Route path="/docs/:id" element={<DocsDetailPage data={data} updateDocs={updateDocs} />} />
+          <Route path="/docs/:id/edit" element={<DocsEditorPage data={data} updateDocs={updateDocs} mode="edit" />} />
           <Route
             path="/purchases"
             element={

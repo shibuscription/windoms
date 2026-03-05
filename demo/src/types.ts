@@ -213,6 +213,25 @@ export type Score = {
   note?: string;
 };
 
+export type DocCategory =
+  | "運営"
+  | "会計"
+  | "シフト"
+  | "楽器"
+  | "楽譜"
+  | "イベント"
+  | "その他";
+
+export type DocMemo = {
+  id: string;
+  title: string;
+  body: string;
+  category?: DocCategory;
+  tags?: string[];
+  pinned?: boolean;
+  updatedAt: string;
+};
+
 export type DemoData = {
   scheduleDays: Record<string, ScheduleDayDoc>;
   dayLogs: Record<string, DayLog>;
@@ -224,6 +243,7 @@ export type DemoData = {
   purchaseRequests: PurchaseRequest[];
   reimbursements: Reimbursement[];
   scores: Score[];
+  docs: DocMemo[];
   lunchRecords: LunchRecord[];
   lunchDuties: LunchDuty[];
   quoCards: QuoCard[];

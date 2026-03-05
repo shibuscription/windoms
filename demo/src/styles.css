@@ -615,6 +615,169 @@ body {
   gap: 10px;
 }
 
+.docs-page {
+  display: grid;
+  gap: 12px;
+}
+
+.docs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.docs-header h1 {
+  margin: 0;
+}
+
+.docs-filters {
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  gap: 10px;
+}
+
+.docs-filter-field {
+  margin: 0;
+}
+
+.docs-list {
+  display: grid;
+  gap: 10px;
+}
+
+.docs-card {
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 6px;
+}
+
+.docs-card:hover {
+  border-color: #93c5fd;
+  background: #eef6ff;
+}
+
+.docs-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.docs-card-meta {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.86rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.docs-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.docs-tag {
+  display: inline-block;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: #fff;
+  color: #475569;
+  font-size: 0.8rem;
+}
+
+.docs-pin {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.docs-pin-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.docs-pin-field input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+
+.docs-editor-toggle {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.docs-body-input {
+  min-height: 260px;
+}
+
+.docs-preview {
+  margin-top: 6px;
+}
+
+.docs-markdown {
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  background: #fff;
+  padding: 12px;
+  line-height: 1.6;
+}
+
+.docs-markdown p {
+  margin: 0 0 10px;
+}
+
+.docs-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.docs-markdown ul {
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+
+.docs-markdown blockquote {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-left: 3px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.docs-markdown h1,
+.docs-markdown h2,
+.docs-markdown h3,
+.docs-markdown h4 {
+  margin: 0 0 10px;
+  line-height: 1.35;
+}
+
+.docs-markdown code {
+  background: #f1f5f9;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.92em;
+}
+
+.docs-markdown a {
+  color: #1d4ed8;
+  word-break: break-all;
+}
+
 .links-officer-heading {
   margin: 8px 0 0;
   font-size: 0.95rem;
@@ -4080,6 +4243,7 @@ textarea {
   .activity-form,
   .log-two-cols,
   .log-three-cols,
+  .docs-filters,
   .accounting-account-grid,
   .accounting-summary {
     grid-template-columns: 1fr;

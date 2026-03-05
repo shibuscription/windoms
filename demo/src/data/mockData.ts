@@ -157,6 +157,48 @@ const demoTodos: DemoData["todos"] = [
   },
 ];
 
+const demoDocs: DemoData["docs"] = [
+  {
+    id: "doc-001",
+    title: "定期演奏会 進行メモ",
+    body: `# 定期演奏会メモ
+
+- 集合: 8:30
+- 会場入り: 9:00
+- 開場: 13:30
+
+詳細資料は Dropbox を参照:
+https://www.dropbox.com/`,
+    category: "イベント",
+    tags: ["定演", "進行"],
+    pinned: true,
+    updatedAt: "2026-03-04T09:00:00+09:00",
+  },
+  {
+    id: "doc-002",
+    title: "会計 月次確認チェック",
+    body: `- 現金残高確認
+- 立替の未精算確認
+- 収支計算書ドラフト確認
+
+[会計共有フォルダ](https://www.dropbox.com/)`,
+    category: "会計",
+    tags: ["会計", "月次"],
+    updatedAt: "2026-03-02T18:20:00+09:00",
+  },
+  {
+    id: "doc-003",
+    title: "楽譜管理メモ",
+    body: `## 運用方針
+
+楽譜の実体管理は外部フォルダを正とする。
+Windoms には要点とリンクのみ残す。`,
+    category: "楽譜",
+    tags: ["楽譜"],
+    updatedAt: "2026-02-28T12:00:00+09:00",
+  },
+];
+
 const demoPurchaseRequests: DemoData["purchaseRequests"] = [
   {
     id: "pr-001",
@@ -410,6 +452,7 @@ export const mockData: DemoData = {
   purchaseRequests: demoPurchaseRequests,
   reimbursements: demoReimbursements,
   scores: [],
+  docs: demoDocs,
   lunchRecords: demoLunchRecords,
   lunchDuties: demoLunchDuties,
   quoCards: demoQuoCards,
