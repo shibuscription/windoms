@@ -22,9 +22,14 @@ const nextSaturday = getNextWeekdayDateKey(today, 6);
 const nextSunday = getNextWeekdayDateKey(today, 0);
 const followingSaturday = shiftDateKey(nextSaturday, 7);
 export const DEMO_CURRENT_UID = "g01";
-const DUTY_LAST_NAMES = ["伊藤", "佐藤", "鈴木", "高橋", "-"] as const;
+const DUTY_LAST_NAMES = ["渋谷", "瀬古", "中村", "今井", "水野", "熊澤", "青木", "加藤", "大滝", "-"] as const;
 
-const dutyNameBySeed = (seed: number): string => DUTY_LAST_NAMES[seed % DUTY_LAST_NAMES.length];
+const DUTY_LAST_NAMES_NO_BLANK = DUTY_LAST_NAMES.filter((name) => name !== "-");
+
+const dutyNameBySeed = (seed: number, allowBlank = false): string => {
+  const source = allowBlank ? DUTY_LAST_NAMES : DUTY_LAST_NAMES_NO_BLANK;
+  return source[seed % source.length];
+};
 
 const makeSession = (
   order: number,
@@ -39,11 +44,11 @@ const makeSession = (
   endTime,
   type,
   eventName,
-  dutyRequirement: "duty",
-  requiresShift: true,
+  dutyRequirement: type === "self" ? "watch" : "duty",
+  requiresShift: type !== "self",
   location: type === "event" ? "市内会場" : "第1音楽室",
   assignees: [],
-  assigneeNameSnapshot: dutyNameBySeed(dutySeed),
+  assigneeNameSnapshot: dutyNameBySeed(dutySeed, type === "self"),
   plannedInstructors: [],
   plannedSeniors: [],
 });
@@ -84,6 +89,42 @@ const buildFeb2026ScheduleDays = (): Record<string, ScheduleDayDoc> => {
       sessions.length = 0;
       sessions.push(makeSession(1, "13:00", "16:00", "event", dutySeed, "陶器まつり屋外演奏"));
       dutySeed += 1;
+    }
+
+    if (sessions.length === 0) continue;
+    result[dateKey] = {
+      defaultLocation: "第1音楽室",
+      sessions,
+    };
+  }
+  return result;
+};
+
+const buildMar2026ScheduleDays = (): Record<string, ScheduleDayDoc> => {
+  const result: Record<string, ScheduleDayDoc> = {};
+  let dutySeed = 0;
+  const year = 2026;
+  const month = 3;
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const dateKey = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const weekday = new Date(year, month - 1, day).getDay();
+    const sessions: SessionDoc[] = [];
+
+    if (weekday === 2 || weekday === 4) {
+      sessions.push(makeSession(1, "17:00", "18:30", "normal", dutySeed));
+      dutySeed += 1;
+    }
+    if (weekday === 6) {
+      sessions.push(makeSession(1, "09:00", "12:00", "self", dutySeed));
+      sessions.push(makeSession(2, "12:00", "15:00", "normal", dutySeed + 1));
+      dutySeed += 2;
+    }
+    if (weekday === 0) {
+      sessions.push(makeSession(1, "09:00", "12:00", "normal", dutySeed));
+      sessions.push(makeSession(2, "12:00", "15:00", "self", dutySeed + 1));
+      dutySeed += 2;
     }
 
     if (sessions.length === 0) continue;
@@ -458,6 +499,7 @@ export const mockData: DemoData = {
   quoCards: demoQuoCards,
   scheduleDays: {
     ...buildFeb2026ScheduleDays(),
+    ...buildMar2026ScheduleDays(),
     [today]: {
       defaultLocation: "第1音楽室",
       notice:
