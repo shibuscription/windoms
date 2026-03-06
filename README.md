@@ -1675,3 +1675,61 @@ TODO：
 - TODOは責務軸
 
 この三軸が交差することで、Windomsはクラブ運営の全体像を表現する。
+
+## 29. Instruments Module (DEMO v0)
+
+### 29.1 Scope
+- DEMO-only implementation.
+- Source of truth is `demo/src/data/mockData.ts` `instruments`.
+- No DB/Firestore persistence.
+- Screens: List, Detail, Create, Edit, Delete (with confirmation dialog).
+
+### 29.2 Data Model
+- `id: string`
+- `code: string`
+- `name: string`
+- `category: string` (`Woodwind` / `Brass` / `Drums` / `Percussion` / `Keyboard Percussion`)
+- `status: string` (`良好` / `要調整` / `修理中` / `貸出中`)
+- `location: string`
+- `assignees: string[]`
+- `note: string`
+
+### 29.3 Assignee Rules
+- Woodwind/Brass are managed with assignees.
+- Max assignee count is 1 per instrument record (one physical instrument).
+- Drums/Percussion/Keyboard Percussion have empty assignees and UI displays `—`.
+- Fixed DEMO assignees:
+  - Flute: 瀬古 / 大滝
+  - Clarinet: 中村
+  - Alto Sax: 今井 / 青木
+  - Tenor Sax: 水野
+  - Trumpet: 渋谷
+  - Trombone: 熊澤
+- For multiple copies of the same instrument, assign only as many records as designated people, and leave extra records unassigned (`—`).
+- Kato (percussion) is not included in DEMO data.
+
+### 29.4 DEMO Inventory Policy
+- Include many instruments, including currently unused ones.
+- Drums are managed as 2 set records (`DR-01`, `DR-02`).
+- Small percussion and keyboard percussion are managed as individual records.
+- Distribute `status` and `location` values to keep realistic variance.
+
+### 29.5 UI Rules
+- List shows grouped sections in this fixed order:
+  - `木管楽器`
+  - `金管楽器`
+  - `ドラム`
+  - `小物打楽器`
+  - `鍵盤打楽器`
+- Group-internal row sort is `管理番号(code)` ascending.
+- List columns are: `管理番号 / 楽器名 / 状態 / 保管場所 / 担当` (no category column).
+- Category is kept as internal data for grouping only; category labels are not shown in row cells.
+- Empty assignee displays `—`.
+- Required fields in Create/Edit: `管理番号 / 楽器名 / カテゴリ / 状態 / 保管場所`.
+- Required validation errors are displayed directly under each field on submit.
+- Button labels:
+  - List: `＋追加`
+  - Detail: `編集` / `削除` / `閉じる`
+  - Form: `保存` / `キャンセル`
+  - Delete confirm: `削除` / `キャンセル`
+- `×` close buttons must have `aria-label="閉じる"` and `title="閉じる"`.

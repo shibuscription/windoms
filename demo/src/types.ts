@@ -213,6 +213,19 @@ export type Score = {
   note?: string;
 };
 
+export type InstrumentStatus = "良好" | "要調整" | "修理中" | "貸出中";
+
+export type Instrument = {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  status: InstrumentStatus;
+  location: string;
+  assignees: string[];
+  note: string;
+};
+
 export type DocCategory =
   | "運営"
   | "会計"
@@ -242,6 +255,7 @@ export type DemoData = {
   todos: Todo[];
   purchaseRequests: PurchaseRequest[];
   reimbursements: Reimbursement[];
+  instruments: Instrument[];
   scores: Score[];
   docs: DocMemo[];
   lunchRecords: LunchRecord[];

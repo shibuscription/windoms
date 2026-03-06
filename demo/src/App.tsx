@@ -17,6 +17,7 @@ import { DocsDetailPage, DocsEditorPage, DocsListPage } from "./pages/DocsPage";
 import { PurchasesPage } from "./pages/PurchasesPage";
 import { ReimbursementsPage } from "./pages/ReimbursementsPage";
 import { ScorePage } from "./pages/ScorePage";
+import { InstrumentsPage } from "./pages/InstrumentsPage";
 import { AccountingHome } from "./pages/Accounting/AccountingHome";
 import { AccountingPeriods } from "./pages/Accounting/AccountingPeriods";
 import { AccountingReport } from "./pages/Accounting/AccountingReport";
@@ -27,6 +28,7 @@ import type {
   DemoData,
   DocMemo,
   DemoRsvp,
+  Instrument,
   LunchRecord,
   PurchaseRequest,
   QuoCard,
@@ -100,6 +102,7 @@ const resolvePageLabel = (pathname: string, search: string): string | null => {
   if (pathname === "/reimbursements") return "立替";
   if (pathname.startsWith("/lunch")) return "お弁当";
   if (pathname === "/accounting" || pathname.startsWith("/accounting/")) return "会計";
+  if (pathname === "/instruments") return "楽器";
   if (pathname === "/scores") return "楽譜";
   if (pathname === "/docs" || pathname.startsWith("/docs/")) return "資料";
   if (pathname === "/members") return "メンバー";
@@ -230,9 +233,9 @@ const menuSections = (
           id: "instruments",
           label: "楽器",
           icon: "🎷",
-          to: "/today?view=instruments",
+          to: "/instruments",
           allowedRoles: ["child", "parent", "admin"],
-          isActive: (location) => viewIsActive(location, "instruments"),
+          isActive: (location) => location.pathname.startsWith("/instruments"),
         },
         {
           id: "scores",
@@ -530,6 +533,13 @@ export function App() {
     }));
   };
 
+  const updateInstruments = (updater: (prev: Instrument[]) => Instrument[]) => {
+    setData((prev) => ({
+      ...prev,
+      instruments: updater(prev.instruments),
+    }));
+  };
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -667,6 +677,10 @@ export function App() {
                 updateReimbursements={updateReimbursements}
               />
             }
+          />
+          <Route
+            path="/instruments"
+            element={<InstrumentsPage data={data} updateInstruments={updateInstruments} />}
           />
           <Route
             path="/scores"
