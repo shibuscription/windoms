@@ -29,6 +29,15 @@ const dutyLabel: Record<DutyRequirement, string> = {
   duty: "当番",
   watch: "見守り",
 };
+
+const toFamilyName = (name?: string): string => {
+  const value = (name ?? "").trim();
+  if (!value || value === "-") return "-";
+  if (value.includes(" ")) return value.split(" ")[0] || "-";
+  if (value.includes("　")) return value.split("　")[0] || "-";
+  return value;
+};
+
 const statusSymbol: Record<RsvpStatus, string> = {
   yes: "◯",
   maybe: "△",
@@ -379,7 +388,7 @@ export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: Today
                 <div className="kv-row">
                   <span className="kv-key">{dutyLabel[session.dutyRequirement]}：</span>
                   <span className="kv-val shift-role">
-                    {session.assigneeNameSnapshot || "未割当"}
+                    {toFamilyName(session.assigneeNameSnapshot)}
                   </span>
                 </div>
                 <div className="kv-row">
