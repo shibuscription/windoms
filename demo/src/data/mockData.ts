@@ -567,13 +567,13 @@ export const mockData: DemoData = {
     m11: { uid: "m11", grade: 1, instrumentOrder: 3, kana: "まつもと" },
   },
   users: {
-    g01: { uid: "g01", displayName: "渋谷父", householdId: "hh01" },
-    g02: { uid: "g02", displayName: "渋谷母", householdId: "hh01" },
-    g03: { uid: "g03", displayName: "田中母", householdId: "hh02" },
-    g04: { uid: "g04", displayName: "佐藤祖母", householdId: "hh03" },
-    g05: { uid: "g05", displayName: "高橋叔母", householdId: "hh04" },
-    g06: { uid: "g06", displayName: "伊藤父", householdId: "hh05" },
-    g07: { uid: "g07", displayName: "渡辺母", householdId: "hh06" },
+    g01: { uid: "g01", displayName: "渋谷", householdId: "hh01" },
+    g02: { uid: "g02", displayName: "渋谷", householdId: "hh01" },
+    g03: { uid: "g03", displayName: "中村", householdId: "hh02" },
+    g04: { uid: "g04", displayName: "今井", householdId: "hh03" },
+    g05: { uid: "g05", displayName: "青木", householdId: "hh04" },
+    g06: { uid: "g06", displayName: "水野", householdId: "hh05" },
+    g07: { uid: "g07", displayName: "加藤", householdId: "hh06" },
   },
   households: {
     hh01: {
@@ -588,7 +588,7 @@ export const mockData: DemoData = {
     },
     hh02: {
       householdId: "hh02",
-      label: "田中家",
+      label: "中村家",
       members: [
         { uid: "g03", role: "guardian", relationshipToChild: "mother" },
         { uid: "m03", role: "child" },
@@ -596,7 +596,7 @@ export const mockData: DemoData = {
     },
     hh03: {
       householdId: "hh03",
-      label: "佐藤家",
+      label: "今井家",
       members: [
         { uid: "g04", role: "guardian", relationshipToChild: "grandmother" },
         { uid: "m04", role: "child" },
@@ -604,7 +604,7 @@ export const mockData: DemoData = {
     },
     hh04: {
       householdId: "hh04",
-      label: "高橋家",
+      label: "青木家",
       members: [
         { uid: "g05", role: "guardian", relationshipToChild: "aunt" },
         { uid: "m05", role: "child" },
@@ -612,7 +612,7 @@ export const mockData: DemoData = {
     },
     hh05: {
       householdId: "hh05",
-      label: "伊藤家",
+      label: "水野家",
       members: [
         { uid: "g06", role: "guardian", relationshipToChild: "father" },
         { uid: "m06", role: "child" },
@@ -620,7 +620,7 @@ export const mockData: DemoData = {
     },
     hh06: {
       householdId: "hh06",
-      label: "渡辺家",
+      label: "加藤家",
       members: [
         { uid: "g07", role: "guardian", relationshipToChild: "mother" },
         { uid: "m07", role: "child" },
@@ -660,17 +660,17 @@ export const mockData: DemoData = {
           plannedInstructors: ["井野先生", "講師A"],
           plannedSeniors: ["先輩B"],
           demoRsvps: [
-            { uid: "m01", displayName: "田中", status: "yes" },
-            { uid: "m02", displayName: "佐藤", status: "yes" },
-            { uid: "m03", displayName: "高橋", status: "yes" },
-            { uid: "m04", displayName: "伊藤", status: "yes" },
-            { uid: "m05", displayName: "渡辺", status: "yes" },
+            { uid: "m01", displayName: "瀬古", status: "yes" },
+            { uid: "m02", displayName: "大滝", status: "yes" },
+            { uid: "m03", displayName: "中村", status: "yes" },
+            { uid: "m04", displayName: "今井", status: "yes" },
+            { uid: "m05", displayName: "青木", status: "yes" },
             { uid: "m06", displayName: "中村", status: "yes" },
-            { uid: "m07", displayName: "小林", status: "yes" },
-            { uid: "m08", displayName: "加藤", status: "yes" },
-            { uid: "m09", displayName: "吉田", status: "maybe" },
-            { uid: "m10", displayName: "山本", status: "no" },
-            { uid: "m11", displayName: "松本", status: "unknown" },
+            { uid: "m07", displayName: "水野", status: "yes" },
+            { uid: "m08", displayName: "渋谷", status: "yes" },
+            { uid: "m09", displayName: "熊澤", status: "maybe" },
+            { uid: "m10", displayName: "加藤", status: "no" },
+            { uid: "m11", displayName: "瀬古", status: "unknown" },
           ],
         },
         {
@@ -686,13 +686,13 @@ export const mockData: DemoData = {
           plannedInstructors: [],
           plannedSeniors: ["先輩C"],
           demoRsvps: [
-            { uid: "m01", displayName: "田中", status: "yes" },
-            { uid: "m02", displayName: "佐藤", status: "yes" },
-            { uid: "m03", displayName: "高橋", status: "yes" },
-            { uid: "m04", displayName: "伊藤", status: "maybe" },
-            { uid: "m05", displayName: "渡辺", status: "maybe" },
+            { uid: "m01", displayName: "瀬古", status: "yes" },
+            { uid: "m02", displayName: "大滝", status: "yes" },
+            { uid: "m03", displayName: "中村", status: "yes" },
+            { uid: "m04", displayName: "今井", status: "maybe" },
+            { uid: "m05", displayName: "青木", status: "maybe" },
             { uid: "m06", displayName: "中村", status: "no" },
-            { uid: "m07", displayName: "小林", status: "unknown" },
+            { uid: "m07", displayName: "水野", status: "unknown" },
           ],
         },
       ],

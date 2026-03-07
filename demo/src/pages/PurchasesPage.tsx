@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { DemoData, PurchaseRequest, Reimbursement } from "../types";
 import { ReceiptImagePicker } from "../components/ReceiptImagePicker";
 import { useReceiptPreviews } from "../hooks/useReceiptPreviews";
+import { toDemoFamilyName } from "../utils/demoName";
 
 type PurchaseTab = "open" | "bought";
 type DemoRole = "admin" | "parent";
@@ -159,7 +160,7 @@ export function PurchasesPage({
 
   const userName = (uid?: string): string => {
     if (!uid) return "—";
-    return data.users[uid]?.displayName ?? uid;
+    return toDemoFamilyName(data.users[uid]?.displayName ?? uid, uid);
   };
 
   const openCreateModal = () => {

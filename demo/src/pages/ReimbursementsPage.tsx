@@ -3,6 +3,7 @@ import type { DemoData, Reimbursement, ReimbursementStatus } from "../types";
 import { useAccountingStore } from "../accounting/useAccountingStore";
 import { ReceiptImagePicker } from "../components/ReceiptImagePicker";
 import { useReceiptPreviews } from "../hooks/useReceiptPreviews";
+import { toDemoFamilyName } from "../utils/demoName";
 
 type ReimbursementsPageProps = {
   data: DemoData;
@@ -273,7 +274,7 @@ export function ReimbursementsPage({
                 </span>
               </div>
               <p className="reimbursement-meta">
-                <span>購入者: {data.users[item.buyer]?.displayName ?? item.buyer}</span>
+                <span>購入者: {toDemoFamilyName(data.users[item.buyer]?.displayName ?? item.buyer, item.buyer)}</span>
                 <span>購入日: {toDateLabel(item.purchasedAt)}</span>
                 <span>金額: {item.amount.toLocaleString()}円</span>
               </p>
@@ -414,7 +415,7 @@ export function ReimbursementsPage({
             <h3>支払済にしますか？</h3>
             <p className="modal-summary">{paidModalTarget.title}</p>
             <p className="muted">金額: {paidModalTarget.amount.toLocaleString()}円</p>
-            <p className="muted">購入者: {data.users[paidModalTarget.buyer]?.displayName ?? paidModalTarget.buyer}</p>
+            <p className="muted">購入者: {toDemoFamilyName(data.users[paidModalTarget.buyer]?.displayName ?? paidModalTarget.buyer, paidModalTarget.buyer)}</p>
             <p className="muted">購入日: {toDateLabel(paidModalTarget.purchasedAt)}</p>
             <label className="purchase-option-check">
               <input

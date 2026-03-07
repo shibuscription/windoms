@@ -328,7 +328,7 @@ export function ScorePage({ data, updateScores, isAdmin }: ScorePageProps) {
   return (
     <section className="card scores-page">
       <header className="scores-header">
-        <h1>楽譜リスト（曲名検索）</h1>
+        <h1>楽譜</h1>
         {isAdmin && (
           <button type="button" className="button button-small" onClick={openCreate}>
             ＋ 追加

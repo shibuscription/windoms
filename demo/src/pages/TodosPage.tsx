@@ -7,6 +7,7 @@ import {
   resolveTodoRelatedSummary,
   sortTodos,
 } from "../utils/todoUtils";
+import { toDemoFamilyName } from "../utils/demoName";
 
 type TodosPageProps = {
   data: DemoData;
@@ -83,7 +84,7 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
   const userOptions = useMemo(
     () =>
       Object.values(data.users)
-        .map((user) => ({ uid: user.uid, name: user.displayName }))
+        .map((user) => ({ uid: user.uid, name: toDemoFamilyName(user.displayName, user.uid) }))
         .sort((a, b) => a.name.localeCompare(b.name, "ja")),
     [data.users],
   );
@@ -139,7 +140,7 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
 
   const userNameByUid = (uid: string | null): string => {
     if (!uid) return "未アサイン";
-    return data.users[uid]?.displayName ?? uid;
+    return toDemoFamilyName(data.users[uid]?.displayName ?? uid, uid);
   };
 
   const updateDraftRelationType = (
@@ -283,7 +284,7 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
         <h1>TODO</h1>
         <button
           type="button"
-          className="links-add-button"
+          className="button button-small"
           aria-label="追加"
           title="追加"
           onClick={() => {
@@ -292,7 +293,7 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
             setIsAddModalOpen(true);
           }}
         >
-          ＋
+          ＋ 追加
         </button>
       </div>
 

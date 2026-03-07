@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { DemoData, DemoRsvp, RsvpStatus, SessionDoc } from "../types";
 import { formatDateYmd, formatTimeNoLeadingZero, formatWeekdayJa, isValidDateKey, todayDateKey } from "../utils/date";
+import { toDemoFamilyName } from "../utils/demoName";
 
 type CalendarPageProps = {
   data: DemoData;
@@ -84,7 +85,8 @@ const countRsvps = (session: SessionDoc) => {
   };
 };
 
-const sortRsvps = (items: DemoRsvp[]): DemoRsvp[] => [...items].sort((a, b) => a.displayName.localeCompare(b.displayName, "ja"));
+const sortRsvps = (items: DemoRsvp[]): DemoRsvp[] =>
+  [...items].sort((a, b) => toDemoFamilyName(a.displayName).localeCompare(toDemoFamilyName(b.displayName), "ja"));
 
 export function CalendarPage({ data }: CalendarPageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -413,7 +415,7 @@ export function CalendarPage({ data }: CalendarPageProps) {
               ) : (
                 selectedAttendanceRsvps.map((rsvp) => (
                   <div key={rsvp.uid} className="rsvp-row">
-                    <span>{rsvp.displayName}</span>
+                    <span>{toDemoFamilyName(rsvp.displayName, "-")}</span>
                     <span className={`rsvp-mark ${rsvp.status}`}>{statusSymbol[rsvp.status]}</span>
                   </div>
                 ))

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import type { DemoData, Todo } from "../types";
 import { sortTodosOpenFirst } from "../utils/todoUtils";
 import { todayDateKey } from "../utils/date";
+import { toDemoFamilyName } from "../utils/demoName";
 
 type DemoMenuRole = "child" | "parent" | "admin";
 type EventKind = "コンクール" | "演奏会" | "合同練習" | "その他";
@@ -263,7 +264,7 @@ export function EventsPage({ data, currentUid, updateTodos }: EventsPageProps) {
 
   const assigneeLabel = (uid: string | null): string => {
     if (!uid) return "未アサイン";
-    return data.users[uid]?.displayName ?? uid;
+    return toDemoFamilyName(data.users[uid]?.displayName ?? uid, uid);
   };
 
   const takeoverLabel = (todo: Todo): string | null => {
@@ -375,8 +376,8 @@ export function EventsPage({ data, currentUid, updateTodos }: EventsPageProps) {
       <header className="events-header">
         <h1>イベント</h1>
         {isManager && (
-          <button type="button" className="links-add-button" aria-label="追加" title="追加" onClick={openCreateModal}>
-            ＋
+          <button type="button" className="button button-small" aria-label="追加" title="追加" onClick={openCreateModal}>
+            ＋ 追加
           </button>
         )}
       </header>
@@ -544,12 +545,12 @@ export function EventsPage({ data, currentUid, updateTodos }: EventsPageProps) {
               {isManager && (
                 <button
                   type="button"
-                  className="links-add-button"
+                  className="button button-small"
                   aria-label="追加"
                   title="追加"
                   onClick={() => setIsSessionBindModalOpen(true)}
                 >
-                  ＋
+                  ＋ 追加
                 </button>
               )}
             </div>

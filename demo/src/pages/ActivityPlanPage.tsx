@@ -442,7 +442,7 @@ export function ActivityPlanPage() {
 
   return (
     <section className="card">
-      <h1>活動予定</h1>
+      <h1>シフト作成</h1>
       <p>対象月: {monthKey}</p>
       <p>現在の状態: {statusLabelJa[monthlyStatus]}</p>
       <div className="activity-steps" aria-label="活動予定の進行ステップ">
