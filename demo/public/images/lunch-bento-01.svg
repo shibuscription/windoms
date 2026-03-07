@@ -1,0 +1,19 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fdf2e9"/>
+      <stop offset="100%" stop-color="#fde68a"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="640" fill="url(#bg)"/>
+  <rect x="96" y="128" width="448" height="384" rx="24" fill="#1f2937"/>
+  <rect x="118" y="150" width="404" height="340" rx="18" fill="#fef3c7"/>
+  <rect x="136" y="170" width="188" height="150" rx="12" fill="#f59e0b"/>
+  <circle cx="190" cy="220" r="26" fill="#b91c1c"/>
+  <circle cx="260" cy="250" r="22" fill="#b91c1c"/>
+  <rect x="336" y="170" width="170" height="90" rx="12" fill="#34d399"/>
+  <rect x="336" y="270" width="170" height="50" rx="10" fill="#10b981"/>
+  <rect x="136" y="334" width="370" height="138" rx="12" fill="#f3f4f6"/>
+  <ellipse cx="320" cy="402" rx="150" ry="46" fill="#ffffff"/>
+  <text x="320" y="558" text-anchor="middle" font-size="34" fill="#92400e" font-family="sans-serif">からあげ弁当</text>
+</svg>

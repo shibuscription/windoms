@@ -21,6 +21,16 @@ const getNextWeekdayDateKey = (baseDateKey: string, weekday: number): string => 
 const nextSaturday = getNextWeekdayDateKey(today, 6);
 const nextSunday = getNextWeekdayDateKey(today, 0);
 const followingSaturday = shiftDateKey(nextSaturday, 7);
+const recentPastSaturday = shiftDateKey(nextSaturday, -14);
+const recentPastSunday = shiftDateKey(nextSunday, -14);
+const olderPastSaturday = shiftDateKey(nextSaturday, -21);
+const olderPastSunday = shiftDateKey(nextSunday, -21);
+const pastSaturday3 = shiftDateKey(nextSaturday, -28);
+const pastSunday3 = shiftDateKey(nextSunday, -28);
+const pastSaturday4 = shiftDateKey(nextSaturday, -35);
+const pastSunday4 = shiftDateKey(nextSunday, -35);
+const pastSaturday5 = shiftDateKey(nextSaturday, -42);
+const pastSunday5 = shiftDateKey(nextSunday, -42);
 export const DEMO_CURRENT_UID = "g01";
 const DUTY_LAST_NAMES = ["渋谷", "瀬古", "中村", "今井", "水野", "熊澤", "青木", "加藤", "大滝", "-"] as const;
 
@@ -396,8 +406,8 @@ const demoLunchRecords: DemoData["lunchRecords"] = [
     id: "ln-001",
     title: "お弁当（からあげ）- QUO2枚",
     amount: 500,
-    purchasedAt: `${today}T08:15:00+09:00`,
-    date: today,
+    purchasedAt: `${recentPastSunday}T12:15:00+09:00`,
+    date: recentPastSunday,
     buyer: "g01",
     dutyMemberId: "g01",
     dutyHouseholdId: "hh01",
@@ -406,14 +416,14 @@ const demoLunchRecords: DemoData["lunchRecords"] = [
       { type: "quo", cardId: "quo-main", amount: 200 },
     ],
     memo: "朝にコンビニで購入",
-    imageUrls: ["https://picsum.photos/seed/windoms-lunch-1/640/640"],
+    imageUrls: ["/images/lunch-bento-01.svg", "/images/lunch-receipt-01.svg"],
   },
   {
     id: "ln-002",
     title: "お弁当（幕の内）- QUO+立替",
     amount: 500,
-    purchasedAt: `${dayMinus1}T12:05:00+09:00`,
-    date: dayMinus1,
+    purchasedAt: `${recentPastSaturday}T11:50:00+09:00`,
+    date: recentPastSaturday,
     buyer: "g02",
     dutyMemberId: "g02",
     dutyHouseholdId: "hh01",
@@ -422,18 +432,107 @@ const demoLunchRecords: DemoData["lunchRecords"] = [
       { type: "reimbursement", amount: 200 },
     ],
     memo: "練習後にまとめ買い",
-    imageUrls: ["https://picsum.photos/seed/windoms-lunch-2/640/640"],
+    imageUrls: ["/images/lunch-bento-02.svg", "/images/lunch-receipt-02.svg"],
   },
   {
     id: "ln-003",
     title: "お弁当（焼き魚）",
     amount: 720,
-    purchasedAt: `${dayMinus2}T11:40:00+09:00`,
-    date: dayMinus2,
+    purchasedAt: `${olderPastSunday}T12:05:00+09:00`,
+    date: olderPastSunday,
     buyer: "g04",
     dutyMemberId: "g04",
     dutyHouseholdId: "hh03",
     paymentSplits: [{ type: "reimbursement", amount: 720 }],
+    imageUrls: ["/images/lunch-bento-03.svg", "/images/lunch-receipt-03.svg"],
+  },
+  {
+    id: "ln-004",
+    title: "お弁当（鶏そぼろ）",
+    amount: 640,
+    purchasedAt: `${olderPastSaturday}T11:35:00+09:00`,
+    date: olderPastSaturday,
+    buyer: "g06",
+    dutyMemberId: "g06",
+    dutyHouseholdId: "hh05",
+    paymentSplits: [{ type: "reimbursement", amount: 640 }],
+    memo: "温かいうちに配布",
+    imageUrls: ["/images/lunch-bento-04.svg", "/images/lunch-receipt-01.svg"],
+  },
+  {
+    id: "ln-005",
+    title: "お弁当（のり弁）",
+    amount: 560,
+    purchasedAt: `${pastSunday3}T12:08:00+09:00`,
+    date: pastSunday3,
+    buyer: "g03",
+    dutyMemberId: "g03",
+    dutyHouseholdId: "hh02",
+    paymentSplits: [{ type: "reimbursement", amount: 560 }],
+    imageUrls: ["/images/lunch-bento-05.svg", "/images/lunch-receipt-02.svg"],
+  },
+  {
+    id: "ln-006",
+    title: "お弁当（チキン南蛮）",
+    amount: 700,
+    purchasedAt: `${pastSaturday3}T11:42:00+09:00`,
+    date: pastSaturday3,
+    buyer: "g05",
+    dutyMemberId: "g05",
+    dutyHouseholdId: "hh04",
+    paymentSplits: [
+      { type: "quo", cardId: "quo-main", amount: 500 },
+      { type: "reimbursement", amount: 200 },
+    ],
+    imageUrls: ["/images/lunch-bento-06.svg", "/images/lunch-receipt-03.svg"],
+  },
+  {
+    id: "ln-007",
+    title: "お弁当（生姜焼き）",
+    amount: 680,
+    purchasedAt: `${pastSunday4}T12:00:00+09:00`,
+    date: pastSunday4,
+    buyer: "g07",
+    dutyMemberId: "g07",
+    dutyHouseholdId: "hh06",
+    paymentSplits: [{ type: "reimbursement", amount: 680 }],
+    imageUrls: ["/images/lunch-bento-01.svg", "/images/lunch-receipt-01.svg"],
+  },
+  {
+    id: "ln-008",
+    title: "お弁当（ハンバーグ）",
+    amount: 760,
+    purchasedAt: `${pastSaturday4}T11:54:00+09:00`,
+    date: pastSaturday4,
+    buyer: "g01",
+    dutyMemberId: "g01",
+    dutyHouseholdId: "hh01",
+    paymentSplits: [{ type: "reimbursement", amount: 760 }],
+    imageUrls: ["/images/lunch-bento-02.svg", "/images/lunch-receipt-02.svg"],
+  },
+  {
+    id: "ln-009",
+    title: "お弁当（鮭の塩焼き）",
+    amount: 720,
+    purchasedAt: `${pastSunday5}T12:20:00+09:00`,
+    date: pastSunday5,
+    buyer: "g04",
+    dutyMemberId: "g04",
+    dutyHouseholdId: "hh03",
+    paymentSplits: [{ type: "reimbursement", amount: 720 }],
+    imageUrls: ["/images/lunch-bento-03.svg", "/images/lunch-receipt-03.svg"],
+  },
+  {
+    id: "ln-010",
+    title: "お弁当（ミックスフライ）",
+    amount: 740,
+    purchasedAt: `${pastSaturday5}T11:38:00+09:00`,
+    date: pastSaturday5,
+    buyer: "g02",
+    dutyMemberId: "g02",
+    dutyHouseholdId: "hh01",
+    paymentSplits: [{ type: "reimbursement", amount: 740 }],
+    imageUrls: ["/images/lunch-bento-04.svg", "/images/lunch-receipt-01.svg"],
   },
 ];
 

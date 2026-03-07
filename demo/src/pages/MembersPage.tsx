@@ -8,6 +8,7 @@ type MemberTab = "all" | MemberType;
 type DemoMember = {
   id: string;
   name: string;
+  kana?: string;
   type: MemberType;
   role: MemberRole;
   status: MemberStatus;
@@ -20,38 +21,118 @@ type DemoMember = {
 const memberItems: DemoMember[] = [
   {
     id: "child-1",
-    name: "渋谷",
+    name: "瀬古 芽生",
+    kana: "せこ めい",
     type: "child",
     role: "member",
     status: "active",
-    enrollmentYear: 2025,
-    part: "トランペット",
+    enrollmentYear: 2024,
+    part: "フルート",
     parentIds: ["parent-1", "parent-2"],
   },
   {
     id: "child-2",
-    name: "瀬古",
+    name: "中村 凌大",
+    kana: "なかむら りお",
     type: "child",
     role: "member",
     status: "active",
     enrollmentYear: 2024,
     part: "クラリネット",
-    parentIds: ["parent-1", "parent-2"],
+    parentIds: ["parent-3"],
   },
   {
     id: "child-3",
-    name: "中村",
+    name: "今井 卯多",
+    kana: "いまい うた",
     type: "child",
     role: "member",
     status: "active",
-    enrollmentYear: 2023,
-    part: "パーカッション",
-    parentIds: ["parent-3"],
+    enrollmentYear: 2024,
+    part: "アルトサックス",
+    parentIds: ["parent-4"],
   },
-  { id: "parent-1", name: "渋谷", type: "parent", role: "member", status: "active", childIds: ["child-1", "child-2"] },
-  { id: "parent-2", name: "渋谷", type: "parent", role: "member", status: "active", childIds: ["child-1", "child-2"] },
-  { id: "parent-3", name: "中村", type: "parent", role: "member", status: "active", childIds: ["child-3"] },
-  { id: "teacher-1", name: "大滝", type: "teacher", role: "member", status: "active" },
+  {
+    id: "child-4",
+    name: "水野 結衣",
+    kana: "みずの ゆい",
+    type: "child",
+    role: "member",
+    status: "active",
+    enrollmentYear: 2024,
+    part: "テナーサックス",
+    parentIds: ["parent-5", "parent-6"],
+  },
+  {
+    id: "child-5",
+    name: "渋谷 釉奈",
+    kana: "しぶや ゆうな",
+    type: "child",
+    role: "member",
+    status: "active",
+    enrollmentYear: 2024,
+    part: "トランペット",
+    parentIds: ["parent-7", "parent-8"],
+  },
+  {
+    id: "child-6",
+    name: "熊澤 春登",
+    kana: "くまざわ はると",
+    type: "child",
+    role: "member",
+    status: "active",
+    enrollmentYear: 2024,
+    part: "トロンボーン",
+    parentIds: ["parent-9"],
+  },
+  {
+    id: "child-7",
+    name: "青木 すみれ",
+    kana: "あおき すみれ",
+    type: "child",
+    role: "member",
+    status: "active",
+    enrollmentYear: 2025,
+    part: "アルトサックス",
+    parentIds: ["parent-10", "parent-11"],
+  },
+  {
+    id: "child-8",
+    name: "大滝 杏奈",
+    kana: "おおたき あんな",
+    type: "child",
+    role: "member",
+    status: "active",
+    enrollmentYear: 2025,
+    part: "フルート",
+    parentIds: ["parent-12"],
+  },
+  {
+    id: "child-9",
+    name: "加藤 瑳姫",
+    kana: "かとう さき",
+    type: "child",
+    role: "member",
+    status: "active",
+    enrollmentYear: 2025,
+    part: "パーカッション",
+    parentIds: ["parent-13", "parent-14"],
+  },
+  { id: "parent-1", name: "瀬古（父）", type: "parent", role: "member", status: "active", childIds: ["child-1"] },
+  { id: "parent-2", name: "瀬古（母）", type: "parent", role: "member", status: "active", childIds: ["child-1"] },
+  { id: "parent-3", name: "中村（母）", type: "parent", role: "member", status: "active", childIds: ["child-2"] },
+  { id: "parent-4", name: "今井（母）", type: "parent", role: "member", status: "active", childIds: ["child-3"] },
+  { id: "parent-5", name: "水野（父）", type: "parent", role: "member", status: "active", childIds: ["child-4"] },
+  { id: "parent-6", name: "水野（母）", type: "parent", role: "member", status: "active", childIds: ["child-4"] },
+  { id: "parent-7", name: "渋谷（父）", type: "parent", role: "member", status: "active", childIds: ["child-5"] },
+  { id: "parent-8", name: "渋谷（母）", type: "parent", role: "member", status: "active", childIds: ["child-5"] },
+  { id: "parent-9", name: "熊澤（母）", type: "parent", role: "member", status: "active", childIds: ["child-6"] },
+  { id: "parent-10", name: "青木（父）", type: "parent", role: "member", status: "active", childIds: ["child-7"] },
+  { id: "parent-11", name: "青木（母）", type: "parent", role: "member", status: "active", childIds: ["child-7"] },
+  { id: "parent-12", name: "大滝（父）", type: "parent", role: "member", status: "active", childIds: ["child-8"] },
+  { id: "parent-13", name: "加藤（父）", type: "parent", role: "member", status: "active", childIds: ["child-9"] },
+  { id: "parent-14", name: "加藤（母）", type: "parent", role: "member", status: "active", childIds: ["child-9"] },
+  { id: "teacher-1", name: "井野 勝彦", type: "teacher", role: "member", status: "active" },
 ];
 
 const tabItems: Array<{ id: MemberTab; label: string }> = [
@@ -143,6 +224,11 @@ export function MembersPage() {
     return <span className="member-child-meta">{label}</span>;
   };
 
+  const childKana = (member: DemoMember) => {
+    if (member.type !== "child" || !member.kana?.trim()) return null;
+    return <span className="member-kana">{member.kana}</span>;
+  };
+
   return (
     <section className="card members-page">
       <h1>メンバー</h1>
@@ -169,6 +255,7 @@ export function MembersPage() {
               </span>
               <div className="member-meta">
                 <strong className="member-name">{member.name}</strong>
+                {childKana(member)}
                 <span className="member-type">{typeLabel[member.type]}</span>
                 {childMeta(member)}
               </div>
@@ -205,6 +292,7 @@ export function MembersPage() {
                     </span>
                     <div className="member-meta">
                       <strong className="member-name">{member.name}</strong>
+                      {childKana(member)}
                       <span className="member-type">{typeLabel[member.type]}</span>
                       {childMeta(member)}
                     </div>
@@ -230,6 +318,7 @@ export function MembersPage() {
               ×
             </button>
             <h3>{detailTarget.name}</h3>
+            {childKana(detailTarget)}
             <p className="modal-summary">種別: {typeLabel[detailTarget.type]}</p>
             {detailTarget.type === "child" && childMetaLabel(detailTarget) && (
               <p className="modal-summary">

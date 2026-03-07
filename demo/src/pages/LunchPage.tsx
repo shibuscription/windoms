@@ -150,6 +150,39 @@ export function LunchPage({
   updateReimbursements,
   updateQuoCards,
 }: LunchPageProps) {
+  const lunchFamilyNameByHouseholdId: Record<string, string> = {
+    hh01: "渋谷",
+    hh02: "中村",
+    hh03: "今井",
+    hh04: "青木",
+    hh05: "水野",
+    hh06: "加藤",
+  };
+  const whitelistLunchNames = new Set([
+    "瀬古",
+    "大滝",
+    "中村",
+    "今井",
+    "青木",
+    "水野",
+    "渋谷",
+    "熊澤",
+    "加藤",
+    "井野",
+  ]);
+  const normalizeLunchPersonName = (rawName?: string): string => {
+    const value = (rawName ?? "").trim();
+    if (!value) return "未定";
+    if (value === "井野") return value;
+    const family = value
+      .replace(/（.*?）/g, "")
+      .replace(/家$/, "")
+      .replace(/父|母|祖母|叔母|先生/g, "")
+      .trim()
+      .split(/\s+/)[0];
+    if (!family) return "未定";
+    return whitelistLunchNames.has(family) ? family : "中村";
+  };
   const [searchParams] = useSearchParams();
   const fallbackDate = todayDateKey();
   const queryDate = searchParams.get("date") ?? "";
@@ -208,8 +241,10 @@ export function LunchPage({
   );
   const getFamilyDisplayName = (householdId: string | null | undefined): string => {
     if (!householdId) return "未定";
+    const mapped = lunchFamilyNameByHouseholdId[householdId];
+    if (mapped) return mapped;
     const label = data.households[householdId]?.label ?? householdId;
-    return label.replace(/家$/, "");
+    return normalizeLunchPersonName(label);
   };
   const currentUserHouseholdId = data.users[currentUid]?.householdId ?? null;
   const upcomingLunchDuties = useMemo(() => {
@@ -548,7 +583,13 @@ export function LunchPage({
     }
     const buyerHouseholdId = data.users[record.buyer]?.householdId;
     if (buyerHouseholdId) return getFamilyDisplayName(buyerHouseholdId);
-    return data.users[record.buyer]?.displayName ?? record.buyer;
+    return normalizeLunchPersonName(data.users[record.buyer]?.displayName ?? record.buyer);
+  };
+
+  const resolveBuyerName = (record: LunchRecord): string => {
+    const buyerHouseholdId = data.users[record.buyer]?.householdId;
+    if (buyerHouseholdId) return getFamilyDisplayName(buyerHouseholdId);
+    return normalizeLunchPersonName(data.users[record.buyer]?.displayName ?? record.buyer);
   };
 
   return (
@@ -777,7 +818,7 @@ export function LunchPage({
             </button>
             <h3>{detailTarget.title}</h3>
             <p className="muted">購入日: {toDateLabel(detailTarget.purchasedAt)}</p>
-            <p className="muted">購入者: {data.users[detailTarget.buyer]?.displayName ?? detailTarget.buyer}</p>
+            <p className="muted">購入者: {resolveBuyerName(detailTarget)}</p>
             <p className="muted">金額: {detailTarget.amount.toLocaleString()}円</p>
             <p className="muted">支払い内訳: {toSplitSummary(detailTarget.paymentSplits, data.quoCards)}</p>
             {detailTarget.memo && <p className="muted">メモ: {detailTarget.memo}</p>}

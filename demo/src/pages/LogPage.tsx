@@ -547,7 +547,7 @@ const DEMO_STAMP_USER = {
   uid: "demo_writer",
   name: "渋谷",
 };
-const MAIN_INSTRUCTOR_NAME = "大滝";
+const MAIN_INSTRUCTOR_NAME = "井野";
 
 export function LogPage({
   data,
@@ -656,7 +656,7 @@ export function LogPage({
         : plannedSeniors;
   const refModalTitle =
     refModal === "mainInstructor"
-      ? "講師予定（大滝）"
+      ? "講師予定（井野）"
       : refModal === "instructors"
         ? "外部講師予定"
         : "先輩予定";
@@ -1065,7 +1065,7 @@ export function LogPage({
         <div className="log-panel">
           <div className="ref-panel">
             <div className="section-header">
-              <h2>講師（大滝）</h2>
+              <h2>講師（井野）</h2>
               <button
                 type="button"
                 className="button button-small ghost-button section-action"

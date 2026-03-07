@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DemoData, Score } from "../types";
 
 type ScorePageProps = {
@@ -162,6 +162,7 @@ const toForm = (score: Score): ScoreFormState => ({
 
 export function ScorePage({ data, updateScores, isAdmin }: ScorePageProps) {
   const [query, setQuery] = useState("");
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("no");
   const [sortOrder, setSortOrder] = useState<SortOrder>("asc");
   const [mode, setMode] = useState<"create" | "edit" | null>(null);
@@ -337,10 +338,25 @@ export function ScorePage({ data, updateScores, isAdmin }: ScorePageProps) {
 
       <label className="scores-search-field">
         <input
+          ref={searchInputRef}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="曲名 / 出版社 / 品番 / 備考 で検索"
         />
+        {query && (
+          <button
+            type="button"
+            className="scores-search-clear"
+            aria-label="検索語をクリア"
+            title="クリア"
+            onClick={() => {
+              setQuery("");
+              searchInputRef.current?.focus();
+            }}
+          >
+            ×
+          </button>
+        )}
       </label>
 
       <div className="scores-table-wrap">

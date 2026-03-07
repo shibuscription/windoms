@@ -926,6 +926,11 @@ body {
   font-size: 0.98rem;
 }
 
+.member-kana {
+  font-size: 0.76rem;
+  color: #64748b;
+}
+
 .member-type {
   font-size: 0.8rem;
   color: #64748b;
@@ -1373,11 +1378,37 @@ body {
 
 .scores-search-field {
   margin: 0;
+  position: relative;
+  display: block;
 }
 
 .scores-search-field input {
   font-size: 1rem;
   padding: 10px 12px;
+  padding-right: 40px;
+}
+
+.scores-search-clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.scores-search-clear:hover {
+  background: #cbd5e1;
 }
 
 .scores-table-wrap {

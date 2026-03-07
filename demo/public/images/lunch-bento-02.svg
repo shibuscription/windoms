@@ -1,0 +1,14 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+  <rect width="640" height="640" fill="#fff7ed"/>
+  <rect x="88" y="118" width="464" height="404" rx="26" fill="#0f172a"/>
+  <rect x="112" y="142" width="416" height="356" rx="16" fill="#ffedd5"/>
+  <rect x="130" y="160" width="180" height="170" rx="12" fill="#f97316"/>
+  <rect x="322" y="160" width="188" height="78" rx="12" fill="#86efac"/>
+  <rect x="322" y="246" width="188" height="84" rx="12" fill="#4ade80"/>
+  <rect x="130" y="340" width="380" height="138" rx="12" fill="#f8fafc"/>
+  <ellipse cx="320" cy="406" rx="160" ry="44" fill="#ffffff"/>
+  <circle cx="176" cy="206" r="18" fill="#7c2d12"/>
+  <circle cx="228" cy="248" r="24" fill="#7c2d12"/>
+  <circle cx="272" cy="206" r="16" fill="#7c2d12"/>
+  <text x="320" y="558" text-anchor="middle" font-size="34" fill="#9a3412" font-family="sans-serif">幕の内</text>
+</svg>
