@@ -587,6 +587,7 @@ body {
 .links-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
 }
 
@@ -595,12 +596,16 @@ body {
 }
 
 .links-add-button {
-  border: 1px solid #cbd5e1;
-  background: #fff;
-  border-radius: 999px;
-  width: 32px;
-  height: 32px;
-  line-height: 1;
+  border: 0;
+  background: #1d4ed8;
+  color: #fff;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
 }
 
@@ -2023,7 +2028,7 @@ body {
 
 .todo-row {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) 116px;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
   gap: 8px;
   border: 1px solid #d6dde8;
   border-radius: 10px;
@@ -2081,20 +2086,42 @@ body {
 }
 
 .todo-actions {
-  display: grid;
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
-  align-content: start;
-  width: 116px;
-}
-
-.todo-actions > .button,
-.todo-actions > .todo-action-placeholder {
-  width: 100%;
+  justify-self: end;
+  min-height: 30px;
 }
 
 .todo-action-placeholder {
-  display: block;
-  height: 30px;
+  display: inline-block;
+  width: 64px;
+  height: 1px;
+}
+
+.todo-actions > .button.button-small {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.todo-actions .link-icon-button {
+  font-size: 0;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.todo-edit-icon-button::before {
+  content: "✏️";
+  font-size: 0.95rem;
+}
+
+.todo-delete-icon-button::before {
+  content: "🗑️";
+  font-size: 0.95rem;
 }
 
 .todo-row.compact {
@@ -2182,13 +2209,13 @@ body {
 
   .todo-actions {
     grid-column: 1 / -1;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    width: auto;
+    justify-self: stretch;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
   }
 
-  .todo-actions > .button,
-  .todo-actions > .todo-action-placeholder {
-    width: auto;
+  .todo-action-placeholder {
+    width: 0;
   }
 }
 

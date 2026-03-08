@@ -252,10 +252,10 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
             </button>
           )}
           {!actionLabel && <span className="todo-action-placeholder" aria-hidden="true" />}
-          <button type="button" className="button button-small button-secondary" onClick={() => startEdit(todo)}>
+          <button type="button" className="link-icon-button todo-edit-icon-button" aria-label="編集" title="編集" onClick={() => startEdit(todo)}>
             編集
           </button>
-          <button type="button" className="button button-small events-danger-button" onClick={() => setDeleteTargetId(todo.id)}>
+          <button type="button" className="link-icon-button todo-delete-icon-button" aria-label="削除" title="削除" onClick={() => setDeleteTargetId(todo.id)}>
             削除
           </button>
         </div>

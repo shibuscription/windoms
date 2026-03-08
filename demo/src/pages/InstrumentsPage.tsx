@@ -15,7 +15,7 @@ type InstrumentDraft = {
   category: CategoryKey;
   status: InstrumentStatus;
   location: string;
-  assigneesText: string;
+  assignee: string;
   note: string;
 };
 
@@ -26,6 +26,8 @@ type InstrumentFormErrors = {
   status?: string;
   location?: string;
 };
+
+const assigneeOptions = ["-", "瀬古", "中村", "今井", "水野", "渋谷", "熊澤", "青木", "大滝", "加藤"] as const;
 
 const categoryOptions: Array<{ value: CategoryKey; label: string }> = [
   { value: "woodwind", label: "木管楽器" },
@@ -51,7 +53,7 @@ const emptyDraft = (): InstrumentDraft => ({
   category: "woodwind",
   status: "良好",
   location: "",
-  assigneesText: "",
+  assignee: "-",
   note: "",
 });
 
@@ -70,13 +72,7 @@ const categoryLabel = (category: string): string => {
   return groupOrder.find((item) => item.key === key)?.label ?? "小物打楽器";
 };
 
-const toAssignees = (raw: string): string[] => {
-  const first = raw
-    .split(/[,、]/)
-    .map((name) => name.trim())
-    .find(Boolean);
-  return first ? [first] : [];
-};
+const toAssignees = (assignee: string): string[] => (assignee === "-" ? [] : [assignee]);
 
 const assigneesLabel = (assignees: string[]): string =>
   assignees.length > 0 ? assignees[0] : "—";
@@ -87,7 +83,7 @@ const draftFromInstrument = (instrument: Instrument): InstrumentDraft => ({
   category: normalizeCategory(instrument.category),
   status: instrument.status,
   location: instrument.location,
-  assigneesText: instrument.assignees[0] ?? "",
+  assignee: instrument.assignees[0] ?? "-",
   note: instrument.note,
 });
 
@@ -169,7 +165,7 @@ export function InstrumentsPage({ data, updateInstruments }: InstrumentsPageProp
       category: draft.category,
       status: draft.status,
       location: draft.location.trim(),
-      assignees: toAssignees(draft.assigneesText),
+      assignees: toAssignees(draft.assignee),
       note: draft.note.trim(),
     };
 
@@ -391,11 +387,16 @@ export function InstrumentsPage({ data, updateInstruments }: InstrumentsPageProp
 
             <label>
               担当
-              <input
-                value={draft.assigneesText}
-                onChange={(event) => setDraft((prev) => ({ ...prev, assigneesText: event.target.value }))}
-                placeholder="例: 瀬古"
-              />
+              <select
+                value={draft.assignee}
+                onChange={(event) => setDraft((prev) => ({ ...prev, assignee: event.target.value }))}
+              >
+                {assigneeOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <label>
