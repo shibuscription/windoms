@@ -1948,6 +1948,151 @@ body {
   height: 16px;
 }
 
+.receipt-ocr-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.ocr-debug-panel {
+  border: 1px solid #d6dde8;
+  border-radius: 8px;
+  background: #f8fafc;
+  margin-top: 8px;
+}
+
+.ocr-debug-toggle {
+  cursor: pointer;
+  list-style: none;
+  padding: 8px 10px;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.ocr-debug-content {
+  border-top: 1px solid #e2e8f0;
+  padding: 8px 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.ocr-debug-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ocr-debug-meta {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+.ocr-debug-block {
+  display: grid;
+  gap: 4px;
+}
+
+.ocr-debug-block h4 {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #334155;
+}
+
+.ocr-debug-block pre {
+  margin: 0;
+  max-height: 180px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.76rem;
+  white-space: pre-wrap;
+}
+
+.ocr-debug-block ul {
+  margin: 0;
+  padding-left: 18px;
+  max-height: 160px;
+  overflow: auto;
+}
+
+.ocr-debug-block li {
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.ocr-debug-block li.selected {
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.ocr-debug-image-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ocr-debug-image-grid figure {
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.ocr-debug-image-grid figcaption {
+  font-size: 0.76rem;
+  color: #475569;
+}
+
+.ocr-debug-image-grid img {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  display: block;
+}
+
+.ocr-debug-image-placeholder {
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+  min-height: 84px;
+  display: grid;
+  place-items: center;
+  font-size: 0.76rem;
+  color: #64748b;
+  background: #fff;
+}
+
+.ocr-progress-modal {
+  width: min(420px, calc(100vw - 24px));
+  display: grid;
+  gap: 10px;
+}
+
+.ocr-progress-phase {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #334155;
+  font-weight: 600;
+}
+
+.ocr-progress-track {
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.ocr-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb 0%, #60a5fa 100%);
+  transition: width 180ms ease;
+}
+
 .todos-page {
   display: grid;
   gap: 12px;
@@ -4567,6 +4712,15 @@ textarea {
   }
 
   .lunch-split-row {
+    grid-template-columns: 1fr;
+  }
+
+  .receipt-ocr-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ocr-debug-image-grid {
     grid-template-columns: 1fr;
   }
 }

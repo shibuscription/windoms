@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DemoData, Reimbursement, ReimbursementStatus } from "../types";
 import { useAccountingStore } from "../accounting/useAccountingStore";
 import { ReceiptImagePicker } from "../components/ReceiptImagePicker";
 import { useReceiptPreviews } from "../hooks/useReceiptPreviews";
 import { toDemoFamilyName } from "../utils/demoName";
+import { ReceiptOcrCanceledError, readReceiptSuggestion } from "../utils/receiptOcr";
 
 type ReimbursementsPageProps = {
   data: DemoData;
@@ -18,6 +19,14 @@ type ConfirmDialogState =
       reimbursement: Reimbursement;
     }
   | null;
+
+type ReceiptOcrDebugView = NonNullable<Awaited<ReturnType<typeof readReceiptSuggestion>>>["debug"] & {
+  trigger?: "auto_select";
+  canceled?: boolean;
+  appliedAmount?: number | null;
+  phase?: string;
+  progress?: number;
+};
 
 const resolveReimbursementStatus = (
   paidByTreasurerAt?: string,
@@ -78,6 +87,24 @@ const isTabMatched = (status: ReimbursementUiStatus, tab: ReimbursementTab): boo
   return status !== "done";
 };
 
+const hasDebugFlag = (value: string): boolean => {
+  const normalized = value.startsWith("?") ? value.slice(1) : value;
+  return new URLSearchParams(normalized).get("debug") === "1";
+};
+
+const resolveOcrDebugEnabled = (): boolean => {
+  if (typeof window === "undefined") return false;
+  if (hasDebugFlag(window.location.search)) return true;
+
+  const hash = window.location.hash.replace(/^#/, "");
+  const questionIndex = hash.indexOf("?");
+  if (questionIndex >= 0) {
+    return hasDebugFlag(hash.slice(questionIndex + 1));
+  }
+
+  return false;
+};
+
 export function ReimbursementsPage({
   data,
   currentUid,
@@ -95,6 +122,16 @@ export function ReimbursementsPage({
   const [createPurchasedAt, setCreatePurchasedAt] = useState(toDateTimeInputValue(new Date()));
   const [createMemo, setCreateMemo] = useState("");
   const [createErrors, setCreateErrors] = useState<{ title?: string; amount?: string; purchasedAt?: string }>({});
+  const [isReadingReceipt, setIsReadingReceipt] = useState(false);
+  const [ocrToastMessage, setOcrToastMessage] = useState("");
+  const [ocrDebug, setOcrDebug] = useState<ReceiptOcrDebugView | null>(null);
+  const [isOcrDebugOpen, setIsOcrDebugOpen] = useState(false);
+  const [isOcrDebugEnabled, setIsOcrDebugEnabled] = useState(resolveOcrDebugEnabled);
+  const [ocrPhaseLabel, setOcrPhaseLabel] = useState("画像を準備中");
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const ocrToastTimerRef = useRef<number | null>(null);
+  const ocrRunIdRef = useRef(0);
+  const lastOcrTargetReceiptIdRef = useRef<string | null>(null);
   const {
     previews: createReceiptPreviews,
     addFiles: addCreateReceiptFiles,
@@ -122,14 +159,254 @@ export function ReimbursementsPage({
     setCreateMemo("");
     clearCreateReceiptPreviews();
     setCreateErrors({});
+    setIsReadingReceipt(false);
+    setOcrToastMessage("");
+    setOcrDebug(null);
+    setIsOcrDebugOpen(false);
+    setOcrPhaseLabel("画像を準備中");
+    setOcrProgress(0);
+    ocrRunIdRef.current += 1;
+    lastOcrTargetReceiptIdRef.current = null;
     setIsCreateModalOpen(true);
   };
 
   const closeCreateModal = () => {
     setIsCreateModalOpen(false);
     setCreateErrors({});
+    setIsReadingReceipt(false);
+    setOcrToastMessage("");
+    setOcrDebug(null);
+    setIsOcrDebugOpen(false);
+    setOcrPhaseLabel("画像を準備中");
+    setOcrProgress(0);
+    ocrRunIdRef.current += 1;
+    lastOcrTargetReceiptIdRef.current = null;
     clearCreateReceiptPreviews();
   };
+
+  useEffect(() => {
+    return () => {
+      if (ocrToastTimerRef.current !== null) {
+        window.clearTimeout(ocrToastTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    const syncDebugFlag = () => {
+      setIsOcrDebugEnabled(resolveOcrDebugEnabled());
+    };
+
+    syncDebugFlag();
+    window.addEventListener("hashchange", syncDebugFlag);
+    window.addEventListener("popstate", syncDebugFlag);
+
+    return () => {
+      window.removeEventListener("hashchange", syncDebugFlag);
+      window.removeEventListener("popstate", syncDebugFlag);
+    };
+  }, []);
+
+  const showOcrToast = (message: string) => {
+    setOcrToastMessage(message);
+    if (ocrToastTimerRef.current !== null) {
+      window.clearTimeout(ocrToastTimerRef.current);
+    }
+    ocrToastTimerRef.current = window.setTimeout(() => {
+      setOcrToastMessage("");
+      ocrToastTimerRef.current = null;
+    }, 2000);
+  };
+
+  const copyTextToClipboard = async (text: string) => {
+    if (!text.trim()) {
+      showOcrToast("コピー対象がありません");
+      return;
+    }
+    try {
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+        throw new Error("clipboard unavailable");
+      }
+      await navigator.clipboard.writeText(text);
+      showOcrToast("コピーしました");
+    } catch {
+      showOcrToast("コピーに失敗しました");
+    }
+  };
+
+  const buildOcrDebugCopyText = (debug: ReceiptOcrDebugView | null): string => {
+    if (!debug) return "";
+    const amountCandidates = debug.amountCandidates
+      .map(
+        (candidate, index) =>
+          `${index + 1}. 値:${candidate.value} score:${candidate.score} line:[${candidate.lineIndex}] ${candidate.lineText} reason:${candidate.reason.join(", ")}`,
+      )
+      .join("\n");
+    const titleCandidates = debug.titleCandidates
+      .map(
+        (candidate, index) =>
+          `${index + 1}. 候補:${candidate.title} score:${candidate.score} line:[${candidate.lineIndex}] ${candidate.lineText} reason:${candidate.reason.join(", ")}`,
+      )
+      .join("\n");
+    const lines = debug.lines.map((line) => `[${line.index}] ${line.text}`).join("\n");
+    return [
+      "【OCRデバッグ結果】",
+      `実行結果: ${debug.success ? "成功" : "失敗"}`,
+      `起動: ${debug.trigger ?? "(なし)"}`,
+      `中止: ${debug.canceled ? "はい" : "いいえ"}`,
+      `OCR対象: ${debug.sourceImageIndex + 1}枚目`,
+      `フェーズ: ${debug.phase ?? "(なし)"}`,
+      `進捗: ${debug.progress !== undefined ? `${Math.round(debug.progress * 100)}%` : "(なし)"}`,
+      `反映金額: ${debug.appliedAmount ?? "(なし)"}`,
+      `採用金額: ${debug.selectedAmount ?? "(なし)"} (score: ${debug.selectedAmountScore ?? "(なし)"})`,
+      `採用タイトル候補: ${debug.selectedTitle ?? "(なし)"} (score: ${debug.selectedTitleScore ?? "(なし)"})`,
+      "",
+      "【前処理】",
+      `状態: ${debug.preprocess.status}`,
+      `使用画像: ${debug.preprocess.usedImage}`,
+      `詳細: ${debug.preprocess.message}`,
+      `検出矩形: ${
+        debug.preprocess.detectedRect
+          ? `x=${debug.preprocess.detectedRect.x}, y=${debug.preprocess.detectedRect.y}, w=${debug.preprocess.detectedRect.width}, h=${debug.preprocess.detectedRect.height}`
+          : "(なし)"
+      }`,
+      "",
+      "【OCR生テキスト】",
+      debug.rawText || "(なし)",
+      "",
+      "【正規化後テキスト】",
+      debug.normalizedText || "(なし)",
+      "",
+      "【行分解結果】",
+      lines || "(なし)",
+      "",
+      "【金額候補】",
+      amountCandidates || "(なし)",
+      "",
+      "【タイトル候補】",
+      titleCandidates || "(なし)",
+    ].join("\n");
+  };
+
+  const runReceiptOcr = async (trigger: "auto_select") => {
+    const firstReceipt = createReceiptPreviews[0];
+    if (!firstReceipt) {
+      setOcrDebug({
+        success: false,
+        sourceImageIndex: 0,
+        preprocess: {
+          status: "failed",
+          usedImage: "original",
+          message: "画像未選択",
+          sourcePreviewDataUrl: null,
+          processedPreviewDataUrl: null,
+          detectedRect: null,
+          workingSize: { width: 0, height: 0 },
+        },
+        rawText: "",
+        normalizedText: "",
+        lines: [],
+        amountCandidates: [],
+        selectedAmount: null,
+        selectedAmountScore: null,
+        titleCandidates: [],
+        selectedTitle: null,
+        selectedTitleScore: null,
+        trigger,
+        canceled: false,
+        appliedAmount: null,
+        phase: "画像未選択",
+        progress: 0,
+      });
+      return;
+    }
+
+    const runId = ocrRunIdRef.current + 1;
+    ocrRunIdRef.current = runId;
+    setIsReadingReceipt(true);
+    setOcrPhaseLabel("画像を準備中");
+    setOcrProgress(0.08);
+    let latestPhase = "画像を準備中";
+    let latestProgress = 0.08;
+
+    try {
+      const suggestion = await readReceiptSuggestion(firstReceipt.file, {
+        shouldCancel: () => ocrRunIdRef.current !== runId,
+        onProgress: (phase, progress) => {
+          if (ocrRunIdRef.current !== runId) return;
+          latestPhase = phase;
+          latestProgress = progress;
+          setOcrPhaseLabel(phase);
+          setOcrProgress(progress);
+        },
+      });
+      if (ocrRunIdRef.current !== runId) return;
+      if (!suggestion) {
+        setOcrDebug(null);
+        showOcrToast("読み取れませんでした");
+        return;
+      }
+      let appliedAmount: number | null = null;
+
+      if (suggestion.amount !== null) {
+        setCreateAmount(String(suggestion.amount));
+        setCreateErrors((prev) => ({ ...prev, amount: undefined }));
+        appliedAmount = suggestion.amount;
+      }
+
+      setOcrDebug({
+        ...suggestion.debug,
+        trigger,
+        canceled: false,
+        appliedAmount,
+        phase: latestPhase,
+        progress: latestProgress,
+      });
+
+      if (appliedAmount === null) {
+        showOcrToast("読み取れませんでした");
+        return;
+      }
+      showOcrToast("レシートから金額を入力しました");
+    } catch (error) {
+      if (error instanceof ReceiptOcrCanceledError || ocrRunIdRef.current !== runId) {
+        return;
+      }
+      showOcrToast("読み取れませんでした");
+    } finally {
+      if (ocrRunIdRef.current !== runId) return;
+      setIsReadingReceipt(false);
+      setOcrProgress(0);
+      setOcrPhaseLabel("画像を準備中");
+    }
+  };
+
+  const cancelReceiptOcr = () => {
+    if (!isReadingReceipt) return;
+    ocrRunIdRef.current += 1;
+    setIsReadingReceipt(false);
+    setOcrProgress(0);
+    setOcrPhaseLabel("中止しました");
+    setOcrDebug((prev) =>
+      prev
+        ? { ...prev, canceled: true, phase: "中止しました", progress: 0 }
+        : null,
+    );
+    showOcrToast("読み取りを中止しました");
+  };
+
+  useEffect(() => {
+    if (!isCreateModalOpen) return;
+    const firstReceipt = createReceiptPreviews[0];
+    if (!firstReceipt) {
+      lastOcrTargetReceiptIdRef.current = null;
+      return;
+    }
+    if (isReadingReceipt) return;
+    if (lastOcrTargetReceiptIdRef.current === firstReceipt.id) return;
+    lastOcrTargetReceiptIdRef.current = firstReceipt.id;
+    void runReceiptOcr("auto_select");
+  }, [createReceiptPreviews, isCreateModalOpen, isReadingReceipt]);
 
   const submitCreate = () => {
     const nextErrors: { title?: string; amount?: string; purchasedAt?: string } = {};
@@ -347,6 +624,129 @@ export function ReimbursementsPage({
               ×
             </button>
             <h3>立替を追加</h3>
+            <div className="suggestion-anchor">
+              {ocrToastMessage && <div className="inline-toast">{ocrToastMessage}</div>}
+            </div>
+            <ReceiptImagePicker
+              previews={createReceiptPreviews}
+              onAddFiles={addCreateReceiptFiles}
+              onRemovePreview={removeCreateReceiptPreview}
+            />
+            {isOcrDebugEnabled && (
+              <details className="ocr-debug-panel" open={isOcrDebugOpen}>
+                <summary
+                  className="ocr-debug-toggle"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setIsOcrDebugOpen((prev) => !prev);
+                  }}
+                >
+                  OCRデバッグを表示
+                </summary>
+                {isOcrDebugOpen && (
+                  <div className="ocr-debug-content">
+                    <div className="ocr-debug-actions">
+                      <button
+                        type="button"
+                        className="button button-small button-secondary"
+                        onClick={() => copyTextToClipboard(ocrDebug?.rawText ?? "")}
+                      >
+                        OCR生テキストをコピー
+                      </button>
+                      <button
+                        type="button"
+                        className="button button-small button-secondary"
+                        onClick={() => copyTextToClipboard(buildOcrDebugCopyText(ocrDebug))}
+                      >
+                        デバッグ結果をコピー
+                      </button>
+                    </div>
+                    <p className="ocr-debug-meta">
+                      実行結果: {ocrDebug?.success ? "成功" : "失敗"} / OCR対象: {ocrDebug ? `${ocrDebug.sourceImageIndex + 1}枚目` : "未実行"}
+                    </p>
+                    <p className="ocr-debug-meta">
+                      起動: {ocrDebug?.trigger ?? "(なし)"} / 中止: {ocrDebug?.canceled ? "はい" : "いいえ"} / 反映金額:{" "}
+                      {ocrDebug?.appliedAmount ?? "(なし)"} / フェーズ: {ocrDebug?.phase ?? "(なし)"} / 進捗:{" "}
+                      {ocrDebug?.progress !== undefined ? `${Math.round(ocrDebug.progress * 100)}%` : "(なし)"}
+                    </p>
+                    <div className="ocr-debug-block">
+                      <h4>前処理（自動トリミング）</h4>
+                      <p className="ocr-debug-meta">
+                        状態: {ocrDebug?.preprocess.status ?? "(なし)"} / 使用画像: {ocrDebug?.preprocess.usedImage ?? "(なし)"} / 詳細:{" "}
+                        {ocrDebug?.preprocess.message ?? "(なし)"}
+                      </p>
+                      {ocrDebug?.preprocess.detectedRect && (
+                        <p className="ocr-debug-meta">
+                          検出矩形: x={ocrDebug.preprocess.detectedRect.x}, y={ocrDebug.preprocess.detectedRect.y}, w=
+                          {ocrDebug.preprocess.detectedRect.width}, h={ocrDebug.preprocess.detectedRect.height}
+                        </p>
+                      )}
+                      <div className="ocr-debug-image-grid">
+                        <figure>
+                          <figcaption>元画像</figcaption>
+                          {ocrDebug?.preprocess.sourcePreviewDataUrl ? (
+                            <img src={ocrDebug.preprocess.sourcePreviewDataUrl} alt="OCR前処理前の元画像" />
+                          ) : (
+                            <div className="ocr-debug-image-placeholder">(なし)</div>
+                          )}
+                        </figure>
+                        <figure>
+                          <figcaption>トリミング後</figcaption>
+                          {ocrDebug?.preprocess.processedPreviewDataUrl ? (
+                            <img src={ocrDebug.preprocess.processedPreviewDataUrl} alt="OCR前処理後の画像" />
+                          ) : (
+                            <div className="ocr-debug-image-placeholder">(なし)</div>
+                          )}
+                        </figure>
+                      </div>
+                    </div>
+                    <div className="ocr-debug-block">
+                      <h4>OCR生テキスト</h4>
+                      <pre>{ocrDebug?.rawText || "(なし)"}</pre>
+                    </div>
+                    <div className="ocr-debug-block">
+                      <h4>正規化後テキスト</h4>
+                      <pre>{ocrDebug?.normalizedText || "(なし)"}</pre>
+                    </div>
+                    <div className="ocr-debug-block">
+                      <h4>行分解結果</h4>
+                      <ul>
+                        {(ocrDebug?.lines ?? []).map((line) => (
+                          <li key={`line-${line.index}`}>
+                            [{line.index}] {line.text}
+                          </li>
+                        ))}
+                        {(ocrDebug?.lines ?? []).length === 0 && <li>(なし)</li>}
+                      </ul>
+                    </div>
+                    <div className="ocr-debug-block">
+                      <h4>金額候補</h4>
+                      <p className="ocr-debug-meta">採用: {ocrDebug?.selectedAmount ?? "(なし)"} / score: {ocrDebug?.selectedAmountScore ?? "(なし)"}</p>
+                      <ul>
+                        {(ocrDebug?.amountCandidates ?? []).map((candidate, index) => (
+                          <li key={`amount-${candidate.lineIndex}-${index}`} className={candidate.value === ocrDebug?.selectedAmount ? "selected" : ""}>
+                            値: {candidate.value} / score: {candidate.score} / line: [{candidate.lineIndex}] {candidate.lineText} / reason: {candidate.reason.join(", ")}
+                          </li>
+                        ))}
+                        {(ocrDebug?.amountCandidates ?? []).length === 0 && <li>(なし)</li>}
+                      </ul>
+                    </div>
+                    <div className="ocr-debug-block">
+                      <h4>タイトル候補</h4>
+                      <p className="ocr-debug-meta">採用: {ocrDebug?.selectedTitle ?? "(なし)"} / score: {ocrDebug?.selectedTitleScore ?? "(なし)"}</p>
+                      <ul>
+                        {(ocrDebug?.titleCandidates ?? []).map((candidate, index) => (
+                          <li key={`title-${candidate.lineIndex}-${index}`} className={candidate.title === ocrDebug?.selectedTitle ? "selected" : ""}>
+                            候補: {candidate.title} / score: {candidate.score} / line: [{candidate.lineIndex}] {candidate.lineText} / reason: {candidate.reason.join(", ")}
+                          </li>
+                        ))}
+                        {(ocrDebug?.titleCandidates ?? []).length === 0 && <li>(なし)</li>}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+              </details>
+            )}
             <label>
               タイトル
               <input
@@ -388,18 +788,30 @@ export function ReimbursementsPage({
               <textarea value={createMemo} onChange={(event) => setCreateMemo(event.target.value)} />
             </label>
 
-            <ReceiptImagePicker
-              previews={createReceiptPreviews}
-              onAddFiles={addCreateReceiptFiles}
-              onRemovePreview={removeCreateReceiptPreview}
-            />
-
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={closeCreateModal}>
                 キャンセル
               </button>
               <button type="button" className="button" onClick={submitCreate}>
                 追加
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {isCreateModalOpen && isReadingReceipt && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+          <section className="modal-panel ocr-progress-modal" onClick={(event) => event.stopPropagation()}>
+            <h3>レシートから金額を読み取り中です</h3>
+            <p className="muted">完了までしばらくお待ちください。中止して手入力に切り替えることもできます。</p>
+            <p className="ocr-progress-phase">{ocrPhaseLabel}</p>
+            <div className="ocr-progress-track" aria-hidden="true">
+              <div className="ocr-progress-fill" style={{ width: `${Math.max(5, Math.round(ocrProgress * 100))}%` }} />
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="button button-secondary" onClick={cancelReceiptOcr}>
+                中止
               </button>
             </div>
           </section>
