@@ -1761,3 +1761,256 @@ TODO：
   - Form: `保存` / `キャンセル`
   - Delete confirm: `削除` / `キャンセル`
 - `×` close buttons must have `aria-label="閉じる"` and `title="閉じる"`.
+
+## 30. minamigaoka 本番仮運用フェーズ
+
+### 30.1 位置づけ
+- 2026-04-01 から南ヶ丘向けの本番仮運用を開始する。
+- `demo` は引き続き DEMO 用として維持し、既存の見せ方・デバッグ導線・挙動を壊さない。
+- `minamigaoka` は南ヶ丘向け本番仮運用環境として新設し、`demo` と並行運用する。
+- 今回の目的は「本番用の器」を先に作ることであり、全モジュールの本番化は今回の範囲に含めない。
+- 9月ごろの本運用開始を目標とし、4月時点は仮運用フェーズとする。
+
+### 30.2 Phase 定義
+- Phase 1: 環境分離、本番用ディレクトリ新設、認証土台、デバッグ非表示。
+- Phase 2: 優先モジュールの Firestore 永続化。
+- Phase 3: 運用改善と本運用安定化。
+
+### 30.3 ディレクトリ責務
+- `demo/`
+  - DEMO 用アプリ。
+  - 既存の開発確認 UI・DEV PANEL・DEMO 用導線を維持する。
+- `minamigaoka/`
+  - 南ヶ丘向け本番仮運用アプリ。
+  - 本番 Firebase 設定・本番認証方針・本番向け表示制御を持つ。
+- 今後別クラブを追加する場合も、まずは `demo` を壊さずにクラブ単位ディレクトリを追加する。
+- ただし現時点では過剰な共通化は行わず、安定性と可読性を優先する。
+
+### 30.4 Firebase / Hosting 方針
+- Firebase プロジェクトは `demo` 用と `minamigaoka` 用で分離する。
+- `demo` と `minamigaoka` は別 Hosting サイトとしてデプロイできる状態にする。
+- `minamigaoka` 用 Firebase プロジェクトは新規作成する。
+- `minamigaoka` 側では `.env` または設定ファイルで Firebase 設定を差し替えられる構成にする。
+- `minamigaoka` 用 Firebase プロジェクトでは Firebase Hosting を有効化する。
+- カスタムドメイン `minamigaoka.windoms.club` を接続する。
+- DNS 設定は Firebase Hosting コンソールの案内に従って行う。
+
+#### 30.4.1 minamigaoka の設定値
+- `minamigaoka/.env` を作成し、少なくとも次を設定する。
+  - `VITE_FIREBASE_API_KEY`
+  - `VITE_FIREBASE_AUTH_DOMAIN`
+  - `VITE_FIREBASE_PROJECT_ID`
+  - `VITE_FIREBASE_STORAGE_BUCKET`
+  - `VITE_FIREBASE_MESSAGING_SENDER_ID`
+  - `VITE_FIREBASE_APP_ID`
+- 認証/運用補助の設定値として次を使えるようにする。
+  - `VITE_MINAMIGAOKA_AUTH_EMAIL_DOMAIN`
+  - `VITE_MINAMIGAOKA_DEFAULT_ROLE`
+  - `VITE_MINAMIGAOKA_ADMIN_LOGIN_IDS`
+  - `VITE_MINAMIGAOKA_LOGIN_USER_MAP`
+  - `VITE_FIREBASE_FUNCTIONS_REGION`
+- `VITE_MINAMIGAOKA_LOGIN_USER_MAP` は `loginid:appUid` のカンマ区切りとし、Phase 1 ではログイン ID と画面内の仮ユーザーを対応付けるために使う。
+- 例: `admin:g01,parent01:g02,parent02:g04`
+
+### 30.5 認証方針（Phase 1）
+- 認証は当面 Firebase Authentication の Email/Password を使う。
+- 利用者にはメールアドレスではなく「ログイン ID」を配布する。
+- ログイン時は入力されたログイン ID を内部で `[userid]@minamigaoka.windoms.club` に変換し、Firebase Authentication の Email/Password で認証する。
+- ログイン ID の前後空白はトリムしてから利用する。
+- ログイン ID の英字は小文字化して扱う。つまり `ABC123` と `abc123` は同一 ID とみなす。
+- 内部メールアドレスは受信を想定しない。
+- そのため Firebase 標準のメール送信型パスワード再設定は使用しない。
+- パスワード再設定は管理者による再発行方式とする。
+- 管理者再発行画面は将来追加するが、Phase 1 では未実装とする。
+- 認証状態は毎回ログインではなく、Firebase の長期保持を前提とする。
+- ログアウト導線は残す。
+- ログイン画面にはメール前提の導線は出さず、必要に応じて「パスワードを忘れた場合は管理者へ連絡してください」と案内する。
+
+### 30.6 画面表示方針
+- `minamigaoka` では開発用デバッグ UI を表示しない。
+- `minamigaoka` では以下を描画しない。
+  - DEV PANEL
+  - 右下のデバッグパネル
+  - demo 用ショートカット
+  - 開発確認用導線
+  - debug 前提の補助表示
+  - 運用者に見せるべきでないデバッグ文言
+- 非表示は CSS で隠すのではなく、可能な限り描画自体を行わない。
+
+### 30.7 4月仮運用の優先モジュール
+- 優先 1: メンバー管理、スケジュール登録、シフト管理、Today、カレンダー、日誌。
+- 優先 2: TODO、イベント。
+- 優先 3: 購入依頼、立替、会計簡易版。
+
+### 30.8 データ移行の考え方
+- Phase 1 の `minamigaoka` は、まだ全画面を Firestore 永続化しない。
+- ただし今後の本番化に向けて、mock / 仮データ / demo 固有挙動への依存箇所を把握しやすくする。
+- `minamigaoka` 側では、将来 Firestore に置き換える起点となるデータ取得層・設定分岐を最小限整理する。
+- 大規模リファクタは行わず、壊れにくい足場づくりを優先する。
+
+### 30.9 Phase 2: family / member / memberRelation 基盤
+
+#### 30.9.1 データモデルの基本方針
+- `family` は家庭単位のまとまりを表す。
+- `member` は個人を表す。
+- `memberRelation` は個人同士の関係を表す。
+- `family` は生活単位、当番単位、車両所有単位の基盤とする。
+- `member` はログイン主体、権限主体、会費対象、出欠や日誌の主体とする。
+- `memberRelation` は続柄などの関係性を表す。
+- `member` は原則として 1 つの `family` にのみ所属する。
+- 血縁や関係性が複雑でも、`family` の複数所属ではなく `memberRelation` で表現する。
+
+#### 30.9.2 ロールと権限
+- `role` は人の立場や属性を表す。
+- `permission` は画面や操作の可否を表す。
+- `role` と `permission` は分離する。
+- 初期 `role` 候補は `admin` / `officer` / `parent` / `child` / `teacher` とする。
+- `permissions` は `string[]` で持つ。
+- 2026-04 の仮運用時点では `admin` のみ管理画面へアクセス可能とする。
+- `officer` 以下の細かい権限制御は将来拡張とする。
+
+#### 30.9.3 認証紐付け
+- Windoms 側の正は Firestore 上の `members` とする。
+- Firebase Auth はログイン基盤とする。
+- `members.authUid` で Auth ユーザーとメンバーを紐付ける。
+- `members.loginId` を持つ。
+- `members.authEmail` には内部用メールアドレスまたは Auth 側の email を保存する。
+- 内部用メールアドレスは `[loginId]@minamigaoka.windoms.club` 形式とする。
+- Auth ユーザーの作成 UI とパスワード再発行 UI は今回未実装とする。
+- 当面は Firebase コンソールから管理者が手動で Auth ユーザー作成・パスワード再発行を行う。
+- 認証済み利用者のアプリ内ユーザー解決は Firestore `members` を正とする。
+- ただし既存ログイン成功状態を壊さないため、Phase 1 の `LOGIN_USER_MAP` 的な暫定処理は Firestore `members` 未紐付け時の fallback として当面残してよい。
+
+#### 30.9.4 family
+- `families` コレクションを導入する。
+- `family` は家庭単位のまとまりである。
+- 当番や車両は将来 `family` 単位で扱う。
+- `member.familyId` は 1 つのみ持つ。
+- `family` の複数所属は今回は扱わない。
+
+#### 30.9.5 memberRelation
+- `memberRelation` は個人同士の関係を表す。
+- 親子関係は N 対 N を許容する。
+- 続柄は `relationship` の属性として持つ。
+- 続柄は `member` 本体の属性ではなく、関係ごとの属性として持つ。
+- 例として、ある人が A 君の `mother` であり、B さんの `aunt` であることを表現できる。
+- 続柄は子ども視点の意味で扱う。
+- `relationship` 初期候補は `father` / `mother` / `aunt` / `uncle` / `grandfather` / `grandmother` / `guardian` / `other` とする。
+- 管理画面では続柄を日本語表示できるようにしてよい。
+- `family` が異なる `member` 同士でも relation を張れるようにする。
+
+#### 30.9.6 未紐付けと不整合
+- Windoms に存在するが Auth 未紐付けの `member` を可視化する。
+- Auth に存在するが `member` 未紐付けのユーザーを可視化する。
+- `memberRelation` や Auth 紐付けの不整合も可視化できるようにする。
+- 不整合の例:
+  - `members.authUid` はあるが対象 Auth が存在しない。
+  - `memberRelation` が片方向のみ存在する。
+  - relation の対になる情報が揃っていない。
+- Phase 2 ではまず一覧で分かることを優先し、複雑な自動修復は行わない。
+
+#### 30.9.7 Phase 2 の位置づけ
+- Phase 2 は `family` / `member` / `memberRelation` の基盤導入、管理者画面、Auth 紐付け、不整合可視化を目的とする。
+- 車両管理の本実装は将来フェーズとする。
+- スケジュール / Today / カレンダー / 日誌 / シフトの Firestore 永続化は後続フェーズとする。
+
+#### 30.9.8 Firestore コレクション
+- `families/{familyId}`
+  - `name`
+  - `status`
+  - `notes`
+  - `createdAt`
+  - `updatedAt`
+- `members/{memberId}`
+  - `familyId`
+  - `name`
+  - `nameKana`
+  - `role`
+  - `permissions`
+  - `status`
+  - `loginId`
+  - `authUid`
+  - `authEmail`
+  - `createdAt`
+  - `updatedAt`
+- `memberRelations/{relationId}`
+  - `fromMemberId`
+  - `toMemberId`
+  - `relationship`
+  - `status`
+  - `createdAt`
+  - `updatedAt`
+- Firestore ドキュメント ID を `familyId` / `memberId` / `relationId` として扱ってよい。
+- `status` は当面 `active` / `inactive` とする。
+
+#### 30.9.9 loginId / authEmail の制約
+- `loginId` は `member` に保持する。
+- `loginId` は trim + 小文字化して扱う。
+- 内部用メールアドレス生成は既存の共通関数を再利用する。
+- `authEmail` は内部用メールアドレスまたは Auth 側 email を保持する。
+- `loginId` の一意性は Phase 2 では管理画面での保存時バリデーションで担保する。
+- Firestore の厳密な一意制約は今回未実装とし、将来必要であれば Functions / transaction で強化する。
+
+#### 30.9.10 管理者画面
+- `minamigaoka` 側に管理者専用のメンバー管理画面を追加する。
+- 最低限以下を扱えるようにする。
+  - `family` 一覧
+  - `family` 追加 / 編集
+  - `member` 一覧
+  - `member` 追加 / 編集
+  - `member` の `family` 所属設定
+  - Auth 紐付け状況の一覧表示
+  - `memberRelation` 一覧
+  - relation 追加 / 編集 / 無効化
+  - 未紐付け / 不整合の可視化
+- アクセス制御は `admin` のみとし、UI 非表示だけでなくルート遷移時もガードする。
+- `admin` 判定は Firestore `members.role === "admin"` を正とする。
+- 軽微な結果通知はローカルトーストでよい。
+- 一覧は分かりやすさ優先とし、過剰な作り込みは行わない。
+
+#### 30.9.10.1 minamigaoka のメニュー / アカウント操作
+- 上部タスクバー右端はハンバーガーメニューとする。
+- ログアウトボタンは上部タスクバーに常設しない。
+- ログインユーザー情報とログアウト導線はハンバーガーメニュー内に配置する。
+- メニュー内では、画面遷移系メニューとアカウント操作系 UI を分けて見せる。
+- ログアウトは独自の共通確認モーダルを経由する。
+- ログアウト確認文言はシンプルでよい。
+- ログアウト後はログイン画面へ戻す。
+- ログインユーザー情報は `member.name` を優先表示し、補助情報として `loginId` と `role` を表示する。
+- `member` 未紐付けなどで `name` が取れない場合は fallback として `loginId` を表示してよい。
+- スマホ / タブレットでも見切れず操作しやすい位置に配置する。
+
+#### 30.9.11 Auth 一覧取得
+- 管理画面から Firebase Auth のユーザー一覧を参照できるようにする。
+- フロントエンドから直接 Auth 一覧を取得しない。
+- Admin SDK を使う安全なサーバー側処理を経由する。
+- Phase 2 では Cloud Functions を追加し、Auth 一覧取得 API を提供する。
+- API は認証済みかつ `admin` 権限のある利用者のみ呼び出せるようにする。
+- 管理画面では各 `member` に対して Auth ユーザーを手動で紐付けできるようにする。
+- 紐付け時は `members.authUid` と `members.authEmail` を更新する。
+- `member.loginId` がある場合は `[loginId]@minamigaoka.windoms.club` との一致候補を見つけやすくする。
+- 完全自動紐付けは行わず、最終判断は管理者の手動とする。
+
+#### 30.9.11.1 Functions デプロイ
+- Auth 一覧取得と Auth 紐付け更新は Cloud Functions 経由で行う。
+- `functions/` ディレクトリで `npm install` を行う。
+- `functions/` ディレクトリで `npm run build` を行う。
+- リポジトリルートで `firebase deploy --only functions` を実行する。
+- Firestore / Hosting とまとめて反映する場合はリポジトリルートで `firebase deploy` を実行してよい。
+
+#### 30.9.12 不整合チェック
+- 最低限次を管理画面で可視化する。
+  - `authUid` が空の `member`
+  - どの `member` にも使われていない Auth ユーザー
+  - `fromMemberId` または `toMemberId` が存在しない relation
+  - `status === "active"` なのに参照先が無い relation
+- 同一ペア・同一 `relationship` の重複 relation も一覧で分かるとなおよい。
+
+#### 30.9.13 今回未実装でよいもの
+- 車両管理 UI 本実装
+- 会計権限の細分化
+- シフト作成権限の細分化
+- Auth ユーザー作成 UI
+- パスワード再発行 UI
+- スケジュール / Today / カレンダー / 日誌 / シフト / TODO / イベント の本格 Firestore 永続化
+- `family` 単位の当番集計や会費集計

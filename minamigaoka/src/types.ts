@@ -1,0 +1,268 @@
+export type SessionType = "normal" | "self" | "event";
+export type RsvpStatus = "yes" | "maybe" | "no" | "unknown";
+export type DutyRequirement = "duty" | "watch";
+
+export type DemoRsvp = {
+  uid: string;
+  displayName: string;
+  status: RsvpStatus;
+};
+
+export type DemoMember = {
+  uid: string;
+  grade: number;
+  instrumentOrder: number;
+  kana: string;
+};
+
+export type HouseholdRole = "guardian" | "child";
+export type RelationshipToChild = "father" | "mother" | "grandmother" | "aunt" | "other";
+
+export type HouseholdMembership = {
+  uid: string;
+  role: HouseholdRole;
+  relationshipToChild?: RelationshipToChild;
+};
+
+export type Household = {
+  householdId: string;
+  label: string;
+  members: HouseholdMembership[];
+};
+
+export type DemoUser = {
+  uid: string;
+  displayName: string;
+  householdId?: string;
+};
+
+export type SessionDoc = {
+  order: number;
+  startTime: string;
+  endTime: string;
+  type: SessionType;
+  eventName?: string;
+  dutyRequirement: DutyRequirement;
+  // compatibility: dutyRequirement === "duty" の旧フラグ
+  requiresShift?: boolean;
+  location?: string;
+  assignees: string[];
+  assigneeNameSnapshot?: string;
+  plannedInstructors?: string[];
+  plannedSeniors?: string[];
+  // demo-only: 本番想定の subcollection(rsvps/{uid}) の代替として画面表示に使う
+  demoRsvps?: DemoRsvp[];
+};
+
+export type ScheduleDayDoc = {
+  defaultLocation?: string;
+  notice?: string;
+  plannedInstructors?: string[];
+  plannedSeniors?: string[];
+  sessions: SessionDoc[];
+};
+
+export type Activity = {
+  startTime: string;
+  type: string;
+  title?: string;
+  songIds?: string[];
+};
+
+export type DayLog = {
+  notes: string;
+  weather?: string;
+  activities: Activity[];
+  actualInstructors: string[];
+  actualSeniors: string[];
+  mainInstructorAttendance?: Record<string, boolean>;
+  dutyStamps?: Record<
+    string,
+    {
+      stampedByUid: string;
+      stampedByName: string;
+      stampedAt: string;
+    }
+  >;
+};
+
+export type RelatedType = "event" | "session";
+
+export type RelatedRef = {
+  type: RelatedType;
+  id: string;
+};
+
+export type Todo = {
+  id: string;
+  title: string;
+  completed: boolean;
+  createdAt: string;
+  assigneeUid: string | null;
+  dueDate?: string;
+  related?: RelatedRef | null;
+};
+
+export type PurchaseRequestStatus = "OPEN" | "BOUGHT";
+export type PaymentMethod = "reimbursement" | "quo";
+export type ReceiptFileMeta = {
+  name: string;
+  size: number;
+  type: string;
+};
+export type LunchPaymentSplit =
+  | {
+      type: "quo";
+      cardId: string;
+      amount: number;
+    }
+  | {
+      type: "reimbursement";
+      amount: number;
+    };
+
+export type PurchaseRequest = {
+  id: string;
+  title: string;
+  createdAt?: string;
+  category?: string;
+  memo?: string;
+  quantity?: string | number;
+  estimatedAmount?: number;
+  createdBy: string;
+  purchaseAssignees?: string[];
+  status: PurchaseRequestStatus;
+  boughtBy?: string;
+  boughtAt?: string;
+  purchaseResult?: {
+    itemName: string;
+    quantity?: string | number;
+    amount?: number;
+    purchasedAt: string;
+    receiptFilesMeta?: ReceiptFileMeta[];
+    accountingRecordRequested?: boolean;
+    reimbursementRecordRequested?: boolean;
+  };
+};
+
+export type ReimbursementStatus =
+  | "OPEN"
+  | "PAID_BY_TREASURER"
+  | "RECEIVED_BY_BUYER"
+  | "DONE";
+
+export type Reimbursement = {
+  id: string;
+  title: string;
+  amount: number;
+  purchasedAt: string;
+  buyer: string;
+  memo?: string;
+  receipt?: string;
+  receiptFilesMeta?: ReceiptFileMeta[];
+  source?: "purchase" | "lunch";
+  relatedPurchaseRequestId?: string;
+  paidByTreasurerAt?: string;
+  receivedByBuyerAt?: string;
+};
+
+export type LunchRecord = {
+  id: string;
+  title: string;
+  amount: number;
+  purchasedAt: string;
+  date: string;
+  buyer: string;
+  dutyMemberId?: string;
+  dutyHouseholdId?: string;
+  memo?: string;
+  paymentSplits: LunchPaymentSplit[];
+  imageUrls?: string[];
+  receiptFilesMeta?: ReceiptFileMeta[];
+};
+
+export type LunchDutySlotType = "WEEKEND_PM";
+
+export type LunchDuty = {
+  date: string;
+  slotType: LunchDutySlotType;
+  assigneeHouseholdId: string;
+};
+
+export type QuoCard = {
+  id: string;
+  purchaseDate: string;
+  balance: number;
+  active: boolean;
+  archived?: boolean;
+  memo?: string;
+};
+
+export type DemoEventSummary = {
+  id: string;
+  title: string;
+};
+
+export type Score = {
+  id: string;
+  no: number;
+  title: string;
+  publisher?: string;
+  productCode?: string;
+  duration?: string;
+  note?: string;
+};
+
+export type InstrumentStatus = "良好" | "要調整" | "修理中" | "貸出中";
+
+export type Instrument = {
+  id: string;
+  code: string;
+  name: string;
+  category: string;
+  status: InstrumentStatus;
+  location: string;
+  assignees: string[];
+  note: string;
+};
+
+export type DocCategory =
+  | "運営"
+  | "会計"
+  | "シフト"
+  | "楽器"
+  | "楽譜"
+  | "イベント"
+  | "その他";
+
+export type DocMemo = {
+  id: string;
+  title: string;
+  body: string;
+  category?: DocCategory;
+  tags?: string[];
+  pinned?: boolean;
+  updatedAt: string;
+};
+
+export type DemoData = {
+  scheduleDays: Record<string, ScheduleDayDoc>;
+  dayLogs: Record<string, DayLog>;
+  members: Record<string, DemoMember>;
+  users: Record<string, DemoUser>;
+  households: Record<string, Household>;
+  events: DemoEventSummary[];
+  todos: Todo[];
+  purchaseRequests: PurchaseRequest[];
+  reimbursements: Reimbursement[];
+  instruments: Instrument[];
+  scores: Score[];
+  docs: DocMemo[];
+  lunchRecords: LunchRecord[];
+  lunchDuties: LunchDuty[];
+  quoCards: QuoCard[];
+  demoDictionaries: {
+    instructors: string[];
+    seniors: string[];
+  };
+};

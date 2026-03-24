@@ -1,0 +1,18 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+  <rect width="640" height="640" fill="#f3f4f6"/>
+  <rect x="146" y="56" width="348" height="528" rx="18" fill="#ffffff"/>
+  <rect x="174" y="88" width="292" height="28" rx="6" fill="#1f2937"/>
+  <g fill="#4b5563">
+    <rect x="174" y="146" width="250" height="8" rx="4"/>
+    <rect x="174" y="172" width="214" height="8" rx="4"/>
+    <rect x="174" y="198" width="232" height="8" rx="4"/>
+    <rect x="174" y="242" width="236" height="8" rx="4"/>
+    <rect x="174" y="268" width="260" height="8" rx="4"/>
+    <rect x="174" y="294" width="202" height="8" rx="4"/>
+    <rect x="174" y="338" width="248" height="8" rx="4"/>
+    <rect x="174" y="364" width="228" height="8" rx="4"/>
+  </g>
+  <rect x="174" y="418" width="292" height="60" rx="8" fill="#dbeafe"/>
+  <text x="320" y="458" text-anchor="middle" font-size="24" fill="#1e3a8a" font-family="sans-serif">お弁当 10食 / 6,800円</text>
+  <text x="320" y="542" text-anchor="middle" font-size="24" fill="#6b7280" font-family="sans-serif">PURCHASE LOG</text>
+</svg>

@@ -1,0 +1,17 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+  <rect width="640" height="640" fill="#f5f3ff"/>
+  <rect x="154" y="64" width="332" height="512" rx="16" fill="#ffffff"/>
+  <rect x="180" y="96" width="280" height="26" rx="6" fill="#312e81"/>
+  <g fill="#4338ca">
+    <rect x="180" y="150" width="230" height="8" rx="4"/>
+    <rect x="180" y="176" width="254" height="8" rx="4"/>
+    <rect x="180" y="202" width="186" height="8" rx="4"/>
+    <rect x="180" y="246" width="264" height="8" rx="4"/>
+    <rect x="180" y="272" width="218" height="8" rx="4"/>
+    <rect x="180" y="298" width="246" height="8" rx="4"/>
+    <rect x="180" y="342" width="204" height="8" rx="4"/>
+  </g>
+  <rect x="180" y="398" width="280" height="72" rx="8" fill="#ede9fe"/>
+  <text x="320" y="438" text-anchor="middle" font-size="24" fill="#4338ca" font-family="sans-serif">決済内訳: QUO + 立替</text>
+  <text x="320" y="530" text-anchor="middle" font-size="24" fill="#6b7280" font-family="sans-serif">RECEIPT IMAGE</text>
+</svg>

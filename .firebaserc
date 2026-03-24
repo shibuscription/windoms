@@ -7,6 +7,9 @@
       "hosting": {
         "demo": [
           "windoms-demo"
+        ],
+        "minamigaoka": [
+          "windoms-minamigaoka"
         ]
       }
     }
