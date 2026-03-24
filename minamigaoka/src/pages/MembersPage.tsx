@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { isValidLoginId, normalizeLoginId, toInternalAuthEmail } from "../auth/loginId";
+import { auth, firebaseFunctionsRegion, firebaseProjectId } from "../config/firebase";
 import {
   findAuthCandidate,
   findAuthUsersWithoutMember,
@@ -9,7 +10,16 @@ import {
   findRelationOrphans,
 } from "../members/integrity";
 import {
-  deactivateMemberRelation,
+  hasDuplicateRelationPair,
+  isSameFamilyRelation,
+  relationHelpText,
+  relationTypeLabel,
+  relationTypeOptions,
+} from "../members/relation";
+import {
+  deleteFamily,
+  deleteMember,
+  deleteMemberRelation,
   linkMemberToAuthUser,
   listAuthUsers,
   saveFamily,
@@ -48,24 +58,37 @@ type MemberFormState = {
 
 type RelationFormState = {
   id: string | null;
-  fromMemberId: string;
-  toMemberId: string;
-  relationship: RelationshipType;
+  childMemberId: string;
+  guardianMemberId: string;
+  relationType: RelationshipType;
   status: "active" | "inactive";
 };
 
 type FieldErrors = Record<string, string | undefined>;
+type AuthUsersState = "idle" | "loading" | "success" | "error";
 
-const relationshipLabel: Record<RelationshipType, string> = {
-  father: "父",
-  mother: "母",
-  aunt: "叔母/伯母",
-  uncle: "叔父/伯父",
-  grandfather: "祖父",
-  grandmother: "祖母",
-  guardian: "保護者",
-  other: "その他",
+type AuthUsersDebugState = {
+  serverProjectId: string;
+  serverFunctionsRegion: string;
+  fetchedAt: string;
+  errorCode: string;
+  errorMessage: string;
 };
+
+type ClaimState = {
+  admin: boolean;
+  fetchedAt: string;
+  message: string;
+};
+
+type DeleteDialogState =
+  | {
+      kind: "family" | "member" | "relation";
+      id: string;
+      title: string;
+      message: string;
+    }
+  | null;
 
 const roleLabel: Record<MemberRole, string> = {
   admin: "admin",
@@ -95,9 +118,9 @@ const emptyMemberForm = (): MemberFormState => ({
 
 const emptyRelationForm = (): RelationFormState => ({
   id: null,
-  fromMemberId: "",
-  toMemberId: "",
-  relationship: "guardian",
+  childMemberId: "",
+  guardianMemberId: "",
+  relationType: "guardian_other",
   status: "active",
 });
 
@@ -107,28 +130,44 @@ const splitPermissions = (value: string): string[] =>
     .map((item) => item.trim())
     .filter(Boolean);
 
-export function MembersPage() {
+const formatMemberLabel = (member: MemberRecord) => member.name || member.loginId || member.id;
+
+export function MembersManagementPage() {
   const [families, setFamilies] = useState<FamilyRecord[]>([]);
   const [members, setMembers] = useState<MemberRecord[]>([]);
   const [relations, setRelations] = useState<MemberRelationRecord[]>([]);
   const [authUsers, setAuthUsers] = useState<AuthUserSummary[]>([]);
   const [isFirestoreLoading, setIsFirestoreLoading] = useState(true);
-  const [isAuthUsersLoading, setIsAuthUsersLoading] = useState(false);
+  const [authUsersState, setAuthUsersState] = useState<AuthUsersState>("idle");
+  const [authUsersDebug, setAuthUsersDebug] = useState<AuthUsersDebugState>({
+    serverProjectId: "",
+    serverFunctionsRegion: "",
+    fetchedAt: "",
+    errorCode: "",
+    errorMessage: "",
+  });
+  const [claimState, setClaimState] = useState<ClaimState>({
+    admin: false,
+    fetchedAt: "",
+    message: "",
+  });
+  const [isRefreshingClaims, setIsRefreshingClaims] = useState(false);
   const [pageError, setPageError] = useState("");
   const [toastMessage, setToastMessage] = useState("");
-
   const [familyForm, setFamilyForm] = useState<FamilyFormState>(emptyFamilyForm);
   const [memberForm, setMemberForm] = useState<MemberFormState>(emptyMemberForm);
   const [relationForm, setRelationForm] = useState<RelationFormState>(emptyRelationForm);
   const [familyErrors, setFamilyErrors] = useState<FieldErrors>({});
   const [memberErrors, setMemberErrors] = useState<FieldErrors>({});
   const [relationErrors, setRelationErrors] = useState<FieldErrors>({});
-
   const [isFamilyModalOpen, setIsFamilyModalOpen] = useState(false);
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
   const [isRelationModalOpen, setIsRelationModalOpen] = useState(false);
   const [linkTargetMemberId, setLinkTargetMemberId] = useState<string | null>(null);
   const [selectedAuthUid, setSelectedAuthUid] = useState("");
+  const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const familyNameById = useMemo(
     () =>
@@ -148,6 +187,30 @@ export function MembersPage() {
     [members],
   );
 
+  const familyMemberCountById = useMemo(
+    () =>
+      members.reduce<Record<string, number>>((result, member) => {
+        result[member.familyId] = (result[member.familyId] ?? 0) + 1;
+        return result;
+      }, {}),
+    [members],
+  );
+
+  const guardianCandidates = useMemo(
+    () => members.filter((member) => member.role !== "child" && member.status === "active"),
+    [members],
+  );
+  const childRelationsByChildId = useMemo(
+    () =>
+      relations.reduce<Record<string, MemberRelationRecord[]>>((result, relation) => {
+        const bucket = result[relation.childMemberId] ?? [];
+        bucket.push(relation);
+        result[relation.childMemberId] = bucket;
+        return result;
+      }, {}),
+    [relations],
+  );
+
   const membersWithoutAuth = useMemo(() => findMembersWithoutAuth(members), [members]);
   const authUsersWithoutMember = useMemo(
     () => findAuthUsersWithoutMember(authUsers, members),
@@ -157,25 +220,103 @@ export function MembersPage() {
     () => findMembersWithMissingAuth(members, authUsers),
     [authUsers, members],
   );
-  const orphanRelations = useMemo(
-    () => findRelationOrphans(relations, members),
-    [relations, members],
-  );
+  const orphanRelations = useMemo(() => findRelationOrphans(relations, members), [relations, members]);
   const duplicateRelations = useMemo(() => findDuplicateRelations(relations), [relations]);
 
   const linkTargetMember = linkTargetMemberId
     ? members.find((member) => member.id === linkTargetMemberId) ?? null
     : null;
 
-  const refreshAuthUsers = async () => {
-    setIsAuthUsersLoading(true);
-    setPageError("");
+  const refreshClaims = async (forceRefresh = false) => {
+    if (!auth?.currentUser) {
+      setClaimState({
+        admin: false,
+        fetchedAt: "",
+        message: "ログインユーザーが取得できません。",
+      });
+      return;
+    }
+
+    setIsRefreshingClaims(true);
     try {
-      setAuthUsers(await listAuthUsers());
+      const tokenResult = await auth.currentUser.getIdTokenResult(forceRefresh);
+      setClaimState({
+        admin: tokenResult.claims.admin === true,
+        fetchedAt: new Date().toISOString(),
+        message:
+          tokenResult.claims.admin === true
+            ? "admin claim を確認できました。"
+            : "admin claim はまだ反映されていません。権限付与後は再ログインまたは再取得を行ってください。",
+      });
     } catch (error) {
-      setPageError(error instanceof Error ? error.message : "Auth 一覧の取得に失敗しました。");
+      setClaimState({
+        admin: false,
+        fetchedAt: "",
+        message: error instanceof Error ? error.message : "claims の取得に失敗しました。",
+      });
     } finally {
-      setIsAuthUsersLoading(false);
+      setIsRefreshingClaims(false);
+    }
+  };
+
+  const refreshAuthUsers = async () => {
+    setAuthUsersState("loading");
+    setPageError("");
+    setAuthUsersDebug({
+      serverProjectId: "",
+      serverFunctionsRegion: "",
+      fetchedAt: "",
+      errorCode: "",
+      errorMessage: "",
+    });
+
+    try {
+      await refreshClaims(true);
+      const result = await listAuthUsers();
+      setAuthUsers(result.users);
+      setAuthUsersState("success");
+      setAuthUsersDebug({
+        serverProjectId: result.projectId,
+        serverFunctionsRegion: result.functionsRegion || "",
+        fetchedAt: result.fetchedAt,
+        errorCode: "",
+        errorMessage: "",
+      });
+    } catch (error) {
+      const nextMessage = error instanceof Error ? error.message : "Auth 一覧の取得に失敗しました。";
+      const nextCode =
+        typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        typeof error.code === "string"
+          ? error.code
+          : "";
+      const nextDetails =
+        typeof error === "object" && error !== null && "details" in error && typeof error.details === "object"
+          ? (error.details as Record<string, unknown>)
+          : null;
+
+      setAuthUsers([]);
+      setAuthUsersState("error");
+      setAuthUsersDebug({
+        serverProjectId:
+          nextDetails && typeof nextDetails.projectId === "string" ? nextDetails.projectId : "",
+        serverFunctionsRegion:
+          nextDetails && typeof nextDetails.functionsRegion === "string"
+            ? nextDetails.functionsRegion
+            : "",
+        fetchedAt: "",
+        errorCode: nextCode,
+        errorMessage:
+          nextDetails && typeof nextDetails.errorMessage === "string"
+            ? nextDetails.errorMessage
+            : nextMessage,
+      });
+      setPageError(
+        nextCode === "functions/permission-denied"
+          ? "Auth 一覧の取得権限がありません。admin claim 付与後は再ログイン、または権限再取得を行ってください。"
+          : nextMessage,
+      );
     }
   };
 
@@ -202,6 +343,7 @@ export function MembersPage() {
         markLoaded();
       });
 
+      void refreshClaims(false);
       void refreshAuthUsers();
 
       return () => {
@@ -211,7 +353,7 @@ export function MembersPage() {
       };
     } catch (error) {
       setIsFirestoreLoading(false);
-      setPageError(error instanceof Error ? error.message : "メンバー管理データの読込に失敗しました。");
+      setPageError(error instanceof Error ? error.message : "メンバー管理データの読み込みに失敗しました。");
     }
 
     return undefined;
@@ -264,8 +406,12 @@ export function MembersPage() {
     setIsMemberModalOpen(true);
   };
 
-  const openRelationCreate = () => {
-    setRelationForm(emptyRelationForm());
+  const openRelationCreate = (childMemberId: string) => {
+    setRelationForm({
+      ...emptyRelationForm(),
+      childMemberId,
+      guardianMemberId: guardianCandidates[0]?.id ?? "",
+    });
     setRelationErrors({});
     setIsRelationModalOpen(true);
   };
@@ -273,9 +419,9 @@ export function MembersPage() {
   const openRelationEdit = (relation: MemberRelationRecord) => {
     setRelationForm({
       id: relation.id,
-      fromMemberId: relation.fromMemberId,
-      toMemberId: relation.toMemberId,
-      relationship: relation.relationship,
+      childMemberId: relation.childMemberId,
+      guardianMemberId: relation.guardianMemberId,
+      relationType: relation.relationType,
       status: relation.status,
     });
     setRelationErrors({});
@@ -286,6 +432,22 @@ export function MembersPage() {
     const candidate = findAuthCandidate(member, authUsers);
     setLinkTargetMemberId(member.id);
     setSelectedAuthUid(candidate?.uid ?? "");
+  };
+
+  const openDeleteDialog = (
+    kind: "family" | "member" | "relation",
+    id: string,
+    title: string,
+    message: string,
+  ) => {
+    setDeleteError("");
+    setDeleteDialog({ kind, id, title, message });
+  };
+
+  const closeDeleteDialog = () => {
+    if (isDeleting) return;
+    setDeleteError("");
+    setDeleteDialog(null);
   };
 
   const submitFamily = async () => {
@@ -314,9 +476,9 @@ export function MembersPage() {
     const normalizedLoginId = memberForm.loginId ? normalizeLoginId(memberForm.loginId) : "";
 
     if (!memberForm.familyId) nextErrors.familyId = "family を選択してください。";
-    if (!memberForm.name.trim()) nextErrors.name = "名前を入力してください。";
+    if (!memberForm.name.trim()) nextErrors.name = "member 名を入力してください。";
     if (normalizedLoginId && !isValidLoginId(normalizedLoginId)) {
-      nextErrors.loginId = "loginId は英小文字・数字・.-_ のみ利用できます。";
+      nextErrors.loginId = "loginId は英小文字・数字・.-_ のみ使用できます。";
     }
 
     const duplicateLoginId = members.find(
@@ -348,10 +510,29 @@ export function MembersPage() {
 
   const submitRelation = async () => {
     const nextErrors: FieldErrors = {};
-    if (!relationForm.fromMemberId) nextErrors.fromMemberId = "fromMember を選択してください。";
-    if (!relationForm.toMemberId) nextErrors.toMemberId = "toMember を選択してください。";
-    if (relationForm.fromMemberId && relationForm.fromMemberId === relationForm.toMemberId) {
-      nextErrors.toMemberId = "同一 member 同士は設定できません。";
+    if (!relationForm.childMemberId) nextErrors.childMemberId = "子どもを選択してください。";
+    if (!relationForm.guardianMemberId) nextErrors.guardianMemberId = "保護者を選択してください。";
+    if (relationForm.childMemberId && relationForm.childMemberId === relationForm.guardianMemberId) {
+      nextErrors.guardianMemberId = "同じ member 同士の relation は登録できません。";
+    }
+    if (
+      relationForm.childMemberId &&
+      relationForm.guardianMemberId &&
+      hasDuplicateRelationPair(
+        relations,
+        relationForm.childMemberId,
+        relationForm.guardianMemberId,
+        relationForm.id,
+      )
+    ) {
+      nextErrors.guardianMemberId = "同じ子どもと保護者の relation は既に登録されています。";
+    }
+    if (
+      relationForm.childMemberId &&
+      relationForm.guardianMemberId &&
+      !isSameFamilyRelation(members, relationForm.childMemberId, relationForm.guardianMemberId)
+    ) {
+      nextErrors.guardianMemberId = "当面は同一 family 内の relation のみ登録できます。";
     }
     setRelationErrors(nextErrors);
     if (Object.values(nextErrors).some(Boolean)) return;
@@ -367,7 +548,7 @@ export function MembersPage() {
 
   const submitLink = async () => {
     if (!linkTargetMember || !selectedAuthUid) {
-      setPageError("紐付ける Auth ユーザーを選択してください。");
+      setPageError("紐付ける Auth user を選択してください。");
       return;
     }
 
@@ -382,11 +563,46 @@ export function MembersPage() {
     }
   };
 
+  const runDelete = async () => {
+    if (!deleteDialog) return;
+
+    setIsDeleting(true);
+    setDeleteError("");
+
+    try {
+      if (deleteDialog.kind === "family") {
+        await deleteFamily(deleteDialog.id);
+        setToastMessage("family を削除しました。");
+      } else if (deleteDialog.kind === "member") {
+        await deleteMember(deleteDialog.id);
+        setToastMessage("member と関連 relation を削除しました。");
+      } else {
+        await deleteMemberRelation(deleteDialog.id);
+        setToastMessage("relation を削除しました。");
+      }
+      setDeleteDialog(null);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "削除に失敗しました。");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const authStatusText =
+    authUsersState === "loading"
+      ? "読み込み中"
+      : authUsersState === "error"
+        ? "取得失敗"
+        : authUsers.length === 0
+          ? "取得成功: 0件"
+          : `取得成功: ${authUsers.length}件`;
+
   return (
     <section className="card members-page members-admin-page">
       <div className="members-admin-header">
         <div>
           <h1>メンバー管理</h1>
+          <p className="muted">メンバー画面や他モジュールで使う人物情報を管理します。</p>
           <p className="muted">families / members / memberRelations / Auth 紐付けを管理します。</p>
         </div>
         <div className="members-admin-actions">
@@ -396,18 +612,20 @@ export function MembersPage() {
           <button type="button" className="button button-small" onClick={openMemberCreate}>
             member 追加
           </button>
-          <button type="button" className="button button-small" onClick={openRelationCreate}>
-            relation 追加
-          </button>
-          <button type="button" className="button button-small button-secondary" onClick={() => void refreshAuthUsers()}>
-            Auth 再取得
+          <button
+            type="button"
+            className="button button-small button-secondary"
+            onClick={() => void refreshAuthUsers()}
+            disabled={authUsersState === "loading"}
+          >
+            {authUsersState === "loading" ? "Auth 再取得中..." : "Auth 再取得"}
           </button>
         </div>
       </div>
 
       {toastMessage && <div className="inline-toast">{toastMessage}</div>}
       {pageError && <p className="field-error">{pageError}</p>}
-      {(isFirestoreLoading || isAuthUsersLoading) && <p className="muted">読み込み中...</p>}
+      {(isFirestoreLoading || authUsersState === "loading") && <p className="muted">読み込み中...</p>}
 
       <div className="members-admin-summary">
         <article className="member-admin-stat">
@@ -447,11 +665,12 @@ export function MembersPage() {
             <h3>Auth 側の未紐付け</h3>
             <ul className="members-admin-list">
               {authUsersWithoutMember.map((authUser) => (
-                <li key={authUser.uid}>
-                  {authUser.email || authUser.uid}
-                </li>
+                <li key={authUser.uid}>{authUser.email || authUser.uid}</li>
               ))}
-              {authUsersWithoutMember.length === 0 && <li>未紐付け Auth はありません。</li>}
+              {authUsersWithoutMember.length === 0 && authUsersState === "success" && (
+                <li>未紐付け Auth はありません。</li>
+              )}
+              {authUsersState === "error" && <li>Auth 一覧の取得失敗中は判定できません。</li>}
             </ul>
           </article>
           <article className="members-admin-card">
@@ -471,7 +690,7 @@ export function MembersPage() {
             <ul className="members-admin-list">
               {orphanRelations.map((relation) => (
                 <li key={relation.id}>
-                  {relation.fromMemberId} → {relation.toMemberId} / {relationshipLabel[relation.relationship]}
+                  {relation.childMemberId} → {relation.guardianMemberId} / {relationTypeLabel[relation.relationType]}
                 </li>
               ))}
               {orphanRelations.length === 0 && <li>参照切れ relation はありません。</li>}
@@ -497,21 +716,46 @@ export function MembersPage() {
           <h2>families</h2>
         </div>
         <div className="members-admin-grid">
-          {families.map((family) => (
-            <article key={family.id} className="members-admin-card">
-              <div className="members-admin-card-header">
-                <strong>{family.name}</strong>
-                <button type="button" className="button button-small button-secondary" onClick={() => openFamilyEdit(family)}>
-                  編集
-                </button>
-              </div>
-              <p className="muted">status: {family.status}</p>
-              <p className="muted">{family.notes || "notes なし"}</p>
-              <p className="muted">
-                所属 member: {members.filter((member) => member.familyId === family.id).length} 名
-              </p>
-            </article>
-          ))}
+          {families.map((family) => {
+            const memberCount = familyMemberCountById[family.id] ?? 0;
+
+            return (
+              <article key={family.id} className="members-admin-card">
+                <div className="members-admin-card-header">
+                  <strong>{family.name}</strong>
+                  <div className="members-admin-row-actions">
+                    <button
+                      type="button"
+                      className="button button-small button-secondary"
+                      onClick={() => openFamilyEdit(family)}
+                    >
+                      編集
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-small button-danger"
+                      onClick={() =>
+                        openDeleteDialog(
+                          "family",
+                          family.id,
+                          "family を削除",
+                          memberCount > 0
+                            ? "所属 member が残っているため削除できません。先に member を移動または削除してください。"
+                            : `${family.name} を削除しますか？`,
+                        )
+                      }
+                    >
+                      削除
+                    </button>
+                  </div>
+                </div>
+                <p className="muted">status: {family.status}</p>
+                <p className="muted">{family.notes || "notes なし"}</p>
+                <p className="muted">所属 member: {memberCount}件</p>
+                {memberCount > 0 && <p className="field-error-inline">所属 member がある間は削除できません。</p>}
+              </article>
+            );
+          })}
           {families.length === 0 && <p className="muted">family はまだありません。</p>}
         </div>
       </section>
@@ -523,6 +767,7 @@ export function MembersPage() {
         <div className="members-admin-list-panel">
           {members.map((member) => {
             const candidate = findAuthCandidate(member, authUsers);
+            const childRelations = member.role === "child" ? childRelationsByChildId[member.id] ?? [] : [];
             return (
               <article key={member.id} className="members-admin-row">
                 <div>
@@ -535,15 +780,85 @@ export function MembersPage() {
                   </p>
                   <p className="muted">
                     authUid: {member.authUid || "未紐付け"}
-                    {candidate && !member.authUid && ` / 候補あり: ${candidate.email}`}
+                    {candidate && !member.authUid && ` / 候補あり: ${candidate.email || candidate.uid}`}
                   </p>
+                  {member.role === "child" && (
+                    <div className="members-child-relations">
+                      <p className="members-child-relations-title">保護者 relation</p>
+                      <p className="muted">{relationHelpText}</p>
+                      {childRelations.length === 0 ? (
+                        <p className="muted">未設定</p>
+                      ) : (
+                        <ul className="members-admin-list members-child-relations-list">
+                          {childRelations.map((relation) => (
+                            <li key={relation.id} className="members-child-relations-item">
+                              <span>
+                                {relationTypeLabel[relation.relationType]}：
+                                {memberNameById[relation.guardianMemberId] || relation.guardianMemberId}
+                              </span>
+                              <span className="members-admin-row-actions">
+                                <button
+                                  type="button"
+                                  className="button button-small button-secondary"
+                                  onClick={() => openRelationEdit(relation)}
+                                >
+                                  編集
+                                </button>
+                                <button
+                                  type="button"
+                                  className="button button-small button-danger"
+                                  onClick={() =>
+                                    openDeleteDialog(
+                                      "relation",
+                                      relation.id,
+                                      "relation を削除",
+                                      `${relationTypeLabel[relation.relationType]}：${memberNameById[relation.guardianMemberId] || relation.guardianMemberId} を削除しますか？`,
+                                    )
+                                  }
+                                >
+                                  削除
+                                </button>
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="members-admin-row-actions">
-                  <button type="button" className="button button-small button-secondary" onClick={() => openMemberEdit(member)}>
+                  <button
+                    type="button"
+                    className="button button-small button-secondary"
+                    onClick={() => openMemberEdit(member)}
+                  >
                     編集
                   </button>
                   <button type="button" className="button button-small" onClick={() => openLinkModal(member)}>
                     Auth 紐付け
+                  </button>
+                  {member.role === "child" && (
+                    <button
+                      type="button"
+                      className="button button-small"
+                      onClick={() => openRelationCreate(member.id)}
+                    >
+                      relation 追加
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="button button-small button-danger"
+                    onClick={() =>
+                      openDeleteDialog(
+                        "member",
+                        member.id,
+                        "member を削除",
+                        `${formatMemberLabel(member)} を削除しますか？ 関連する memberRelations も削除されます。Firebase Authentication のユーザーは削除されません。`,
+                      )
+                    }
+                  >
+                    削除
                   </button>
                 </div>
               </article>
@@ -555,46 +870,48 @@ export function MembersPage() {
 
       <section className="members-admin-section">
         <div className="members-section-heading">
-          <h2>memberRelations</h2>
-        </div>
-        <div className="members-admin-list-panel">
-          {relations.map((relation) => (
-            <article key={relation.id} className="members-admin-row">
-              <div>
-                <strong>{memberNameById[relation.fromMemberId] || relation.fromMemberId}</strong>
-                <p className="muted">
-                  → {memberNameById[relation.toMemberId] || relation.toMemberId} / {relationshipLabel[relation.relationship]} / {relation.status}
-                </p>
-              </div>
-              <div className="members-admin-row-actions">
-                <button type="button" className="button button-small button-secondary" onClick={() => openRelationEdit(relation)}>
-                  編集
-                </button>
-                {relation.status === "active" && (
-                  <button
-                    type="button"
-                    className="button button-small"
-                    onClick={() => {
-                      void deactivateMemberRelation(relation.id)
-                        .then(() => setToastMessage("relation を inactive にしました。"))
-                        .catch((error) =>
-                          setPageError(error instanceof Error ? error.message : "relation の無効化に失敗しました。"),
-                        );
-                    }}
-                  >
-                    無効化
-                  </button>
-                )}
-              </div>
-            </article>
-          ))}
-          {relations.length === 0 && <p className="muted">relation はまだありません。</p>}
-        </div>
-      </section>
-
-      <section className="members-admin-section">
-        <div className="members-section-heading">
           <h2>Auth 一覧</h2>
+          <span className="members-auth-status">{authStatusText}</span>
+        </div>
+        <div className="members-admin-card members-auth-debug-card">
+          <h3>現在の admin claim</h3>
+          <p className="muted">admin: {claimState.admin ? "true" : "false"}</p>
+          <p className="muted">checkedAt: {claimState.fetchedAt || "-"}</p>
+          <p className="muted">{claimState.message || "権限状態を確認します。"}</p>
+          <div className="members-admin-row-actions">
+            <button
+              type="button"
+              className="button button-small button-secondary"
+              onClick={() => void refreshClaims(true)}
+              disabled={isRefreshingClaims}
+            >
+              {isRefreshingClaims ? "権限再取得中..." : "権限再取得"}
+            </button>
+          </div>
+        </div>
+        <div className="members-admin-card members-auth-debug-card">
+          <h3>取得状態</h3>
+          <p className="muted">client projectId: {firebaseProjectId || "(empty)"}</p>
+          <p className="muted">functions region: {firebaseFunctionsRegion}</p>
+          <p className="muted">server projectId: {authUsersDebug.serverProjectId || "(unknown)"}</p>
+          <p className="muted">server functions region: {authUsersDebug.serverFunctionsRegion || "(unknown)"}</p>
+          <p className="muted">fetchedAt: {authUsersDebug.fetchedAt || "-"}</p>
+          {authUsersState === "error" && (
+            <div className="members-auth-error">
+              <p className="field-error">
+                {authUsersDebug.errorCode === "functions/permission-denied"
+                  ? "Auth 一覧の取得権限がありません。admin claim を確認してください。"
+                  : "Auth 一覧の取得に失敗しました。"}
+              </p>
+              {authUsersDebug.errorCode && <p className="muted">errorCode: {authUsersDebug.errorCode}</p>}
+              {authUsersDebug.errorMessage && <p className="muted">message: {authUsersDebug.errorMessage}</p>}
+            </div>
+          )}
+          {authUsersState === "success" && authUsers.length === 0 && (
+            <p className="muted">
+              取得自体は成功しています。Firebase Console と件数が違う場合は projectId と Functions の向き先を確認してください。
+            </p>
+          )}
         </div>
         <div className="members-admin-list-panel">
           {authUsers.map((authUser) => (
@@ -604,35 +921,57 @@ export function MembersPage() {
                 <p className="muted">
                   uid: {authUser.uid} / disabled: {authUser.disabled ? "yes" : "no"}
                 </p>
+                <p className="muted">
+                  created: {authUser.creationTime || "-"} / lastSignIn: {authUser.lastSignInTime || "-"}
+                </p>
               </div>
             </article>
           ))}
-          {authUsers.length === 0 && !isAuthUsersLoading && <p className="muted">Auth ユーザーは取得されていません。</p>}
+          {authUsersState === "success" && authUsers.length === 0 && (
+            <p className="muted">Auth ユーザーは 0 件です。</p>
+          )}
         </div>
       </section>
 
       {isFamilyModalOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="modal-panel">
-            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsFamilyModalOpen(false)}>
+            <button
+              type="button"
+              className="modal-close"
+              aria-label="閉じる"
+              title="閉じる"
+              onClick={() => setIsFamilyModalOpen(false)}
+            >
               ×
             </button>
             <h3>{familyForm.id ? "family を編集" : "family を追加"}</h3>
             <label>
               name
-              <input value={familyForm.name} onChange={(event) => setFamilyForm((current) => ({ ...current, name: event.target.value }))} />
+              <input
+                value={familyForm.name}
+                onChange={(event) => setFamilyForm((current) => ({ ...current, name: event.target.value }))}
+              />
               {familyErrors.name && <span className="field-error">{familyErrors.name}</span>}
             </label>
             <label>
               status
-              <select value={familyForm.status} onChange={(event) => setFamilyForm((current) => ({ ...current, status: event.target.value as "active" | "inactive" }))}>
+              <select
+                value={familyForm.status}
+                onChange={(event) =>
+                  setFamilyForm((current) => ({ ...current, status: event.target.value as "active" | "inactive" }))
+                }
+              >
                 <option value="active">active</option>
                 <option value="inactive">inactive</option>
               </select>
             </label>
             <label>
               notes
-              <textarea value={familyForm.notes} onChange={(event) => setFamilyForm((current) => ({ ...current, notes: event.target.value }))} />
+              <textarea
+                value={familyForm.notes}
+                onChange={(event) => setFamilyForm((current) => ({ ...current, notes: event.target.value }))}
+              />
             </label>
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={() => setIsFamilyModalOpen(false)}>
@@ -649,13 +988,22 @@ export function MembersPage() {
       {isMemberModalOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="modal-panel">
-            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsMemberModalOpen(false)}>
+            <button
+              type="button"
+              className="modal-close"
+              aria-label="閉じる"
+              title="閉じる"
+              onClick={() => setIsMemberModalOpen(false)}
+            >
               ×
             </button>
             <h3>{memberForm.id ? "member を編集" : "member を追加"}</h3>
             <label>
               family
-              <select value={memberForm.familyId} onChange={(event) => setMemberForm((current) => ({ ...current, familyId: event.target.value }))}>
+              <select
+                value={memberForm.familyId}
+                onChange={(event) => setMemberForm((current) => ({ ...current, familyId: event.target.value }))}
+              >
                 <option value="">選択してください</option>
                 {families.map((family) => (
                   <option key={family.id} value={family.id}>
@@ -667,16 +1015,25 @@ export function MembersPage() {
             </label>
             <label>
               name
-              <input value={memberForm.name} onChange={(event) => setMemberForm((current) => ({ ...current, name: event.target.value }))} />
+              <input
+                value={memberForm.name}
+                onChange={(event) => setMemberForm((current) => ({ ...current, name: event.target.value }))}
+              />
               {memberErrors.name && <span className="field-error">{memberErrors.name}</span>}
             </label>
             <label>
               nameKana
-              <input value={memberForm.nameKana} onChange={(event) => setMemberForm((current) => ({ ...current, nameKana: event.target.value }))} />
+              <input
+                value={memberForm.nameKana}
+                onChange={(event) => setMemberForm((current) => ({ ...current, nameKana: event.target.value }))}
+              />
             </label>
             <label>
               role
-              <select value={memberForm.role} onChange={(event) => setMemberForm((current) => ({ ...current, role: event.target.value as MemberRole }))}>
+              <select
+                value={memberForm.role}
+                onChange={(event) => setMemberForm((current) => ({ ...current, role: event.target.value as MemberRole }))}
+              >
                 <option value="admin">admin</option>
                 <option value="officer">officer</option>
                 <option value="parent">parent</option>
@@ -688,20 +1045,30 @@ export function MembersPage() {
               permissions
               <input
                 value={memberForm.permissionsText}
-                onChange={(event) => setMemberForm((current) => ({ ...current, permissionsText: event.target.value }))}
+                onChange={(event) =>
+                  setMemberForm((current) => ({ ...current, permissionsText: event.target.value }))
+                }
                 placeholder="member.read, member.write"
               />
             </label>
             <label>
               status
-              <select value={memberForm.status} onChange={(event) => setMemberForm((current) => ({ ...current, status: event.target.value as "active" | "inactive" }))}>
+              <select
+                value={memberForm.status}
+                onChange={(event) =>
+                  setMemberForm((current) => ({ ...current, status: event.target.value as "active" | "inactive" }))
+                }
+              >
                 <option value="active">active</option>
                 <option value="inactive">inactive</option>
               </select>
             </label>
             <label>
               loginId
-              <input value={memberForm.loginId} onChange={(event) => setMemberForm((current) => ({ ...current, loginId: event.target.value }))} />
+              <input
+                value={memberForm.loginId}
+                onChange={(event) => setMemberForm((current) => ({ ...current, loginId: event.target.value }))}
+              />
               {memberErrors.loginId && <span className="field-error">{memberErrors.loginId}</span>}
             </label>
             {memberForm.loginId.trim() && (
@@ -722,38 +1089,52 @@ export function MembersPage() {
       {isRelationModalOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="modal-panel">
-            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsRelationModalOpen(false)}>
+            <button
+              type="button"
+              className="modal-close"
+              aria-label="閉じる"
+              title="閉じる"
+              onClick={() => setIsRelationModalOpen(false)}
+            >
               ×
             </button>
             <h3>{relationForm.id ? "relation を編集" : "relation を追加"}</h3>
+            <p className="muted">{relationHelpText}</p>
+            <p className="modal-summary">
+              子ども: {memberNameById[relationForm.childMemberId] || "未選択"}
+            </p>
+            {relationErrors.childMemberId && <p className="field-error">{relationErrors.childMemberId}</p>}
             <label>
-              fromMember
-              <select value={relationForm.fromMemberId} onChange={(event) => setRelationForm((current) => ({ ...current, fromMemberId: event.target.value }))}>
+              保護者
+              <select
+                value={relationForm.guardianMemberId}
+                onChange={(event) =>
+                  setRelationForm((current) => ({ ...current, guardianMemberId: event.target.value }))
+                }
+              >
                 <option value="">選択してください</option>
-                {members.map((member) => (
+                {guardianCandidates.map((member) => (
                   <option key={member.id} value={member.id}>
                     {member.name}
                   </option>
                 ))}
               </select>
-              {relationErrors.fromMemberId && <span className="field-error">{relationErrors.fromMemberId}</span>}
+              {relationErrors.guardianMemberId && (
+                <span className="field-error">{relationErrors.guardianMemberId}</span>
+              )}
             </label>
             <label>
-              toMember
-              <select value={relationForm.toMemberId} onChange={(event) => setRelationForm((current) => ({ ...current, toMemberId: event.target.value }))}>
-                <option value="">選択してください</option>
-                {members.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.name}
-                  </option>
-                ))}
-              </select>
-              {relationErrors.toMemberId && <span className="field-error">{relationErrors.toMemberId}</span>}
-            </label>
-            <label>
-              relationship
-              <select value={relationForm.relationship} onChange={(event) => setRelationForm((current) => ({ ...current, relationship: event.target.value as RelationshipType }))}>
-                {Object.entries(relationshipLabel).map(([value, label]) => (
+              続柄
+              <select
+                value={relationForm.relationType}
+                onChange={(event) =>
+                  setRelationForm((current) => ({
+                    ...current,
+                    relationType: event.target.value as RelationshipType,
+                  }))
+                }
+              >
+                {relationTypeOptions.map(([value, label]) => (
                   <option key={value} value={value}>
                     {label}
                   </option>
@@ -762,7 +1143,12 @@ export function MembersPage() {
             </label>
             <label>
               status
-              <select value={relationForm.status} onChange={(event) => setRelationForm((current) => ({ ...current, status: event.target.value as "active" | "inactive" }))}>
+              <select
+                value={relationForm.status}
+                onChange={(event) =>
+                  setRelationForm((current) => ({ ...current, status: event.target.value as "active" | "inactive" }))
+                }
+              >
                 <option value="active">active</option>
                 <option value="inactive">inactive</option>
               </select>
@@ -782,14 +1168,20 @@ export function MembersPage() {
       {linkTargetMember && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="modal-panel">
-            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setLinkTargetMemberId(null)}>
+            <button
+              type="button"
+              className="modal-close"
+              aria-label="閉じる"
+              title="閉じる"
+              onClick={() => setLinkTargetMemberId(null)}
+            >
               ×
             </button>
             <h3>Auth 紐付け</h3>
             <p className="modal-summary">{linkTargetMember.name}</p>
             <p className="muted">
               loginId: {linkTargetMember.loginId || "-"}
-              {linkTargetMember.loginId && ` / 候補メール: ${toInternalAuthEmail(linkTargetMember.loginId)}`}
+              {linkTargetMember.loginId && ` / 内部メール候補: ${toInternalAuthEmail(linkTargetMember.loginId)}`}
             </p>
             <label>
               Auth user
@@ -808,6 +1200,34 @@ export function MembersPage() {
               </button>
               <button type="button" className="button" onClick={() => void submitLink()}>
                 紐付け
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {deleteDialog && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <section className="modal-panel events-delete-modal">
+            <button
+              type="button"
+              className="modal-close"
+              aria-label="閉じる"
+              title="閉じる"
+              onClick={closeDeleteDialog}
+              disabled={isDeleting}
+            >
+              ×
+            </button>
+            <h3>{deleteDialog.title}</h3>
+            <p className="modal-summary">{deleteDialog.message}</p>
+            {deleteError && <p className="modal-error">{deleteError}</p>}
+            <div className="modal-actions">
+              <button type="button" className="button button-secondary" onClick={closeDeleteDialog} disabled={isDeleting}>
+                キャンセル
+              </button>
+              <button type="button" className="button button-danger" onClick={() => void runDelete()} disabled={isDeleting}>
+                {isDeleting ? "削除中..." : "削除する"}
               </button>
             </div>
           </section>

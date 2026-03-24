@@ -1,6 +1,7 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -10,13 +11,20 @@ import {
   query,
   serverTimestamp,
   setDoc,
+  writeBatch,
   where,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { db, functions, hasFirebaseAppConfig } from "../config/firebase";
+import {
+  db,
+  firebaseFunctionsRegion,
+  firebaseProjectId,
+  functions,
+  hasFirebaseAppConfig,
+} from "../config/firebase";
 import { normalizeLoginId, toInternalAuthEmail } from "../auth/loginId";
 import type {
-  AuthUserSummary,
+  AuthUsersResponse,
   FamilyRecord,
   MemberRecord,
   MemberRelationRecord,
@@ -63,18 +71,35 @@ const toMemberRecord = (id: string, value: Record<string, unknown>): MemberRecor
 
 const toRelationRecord = (id: string, value: Record<string, unknown>): MemberRelationRecord => ({
   id,
-  fromMemberId: typeof value.fromMemberId === "string" ? value.fromMemberId : "",
-  toMemberId: typeof value.toMemberId === "string" ? value.toMemberId : "",
-  relationship:
-    value.relationship === "father" ||
-    value.relationship === "mother" ||
-    value.relationship === "aunt" ||
-    value.relationship === "uncle" ||
-    value.relationship === "grandfather" ||
-    value.relationship === "grandmother" ||
-    value.relationship === "guardian"
-      ? value.relationship
-      : "other",
+  childMemberId:
+    typeof value.childMemberId === "string"
+      ? value.childMemberId
+      : typeof value.fromMemberId === "string"
+        ? value.fromMemberId
+        : "",
+  guardianMemberId:
+    typeof value.guardianMemberId === "string"
+      ? value.guardianMemberId
+      : typeof value.toMemberId === "string"
+        ? value.toMemberId
+        : "",
+  relationType:
+    value.relationType === "father" ||
+    value.relationType === "mother" ||
+    value.relationType === "grandfather" ||
+    value.relationType === "grandmother" ||
+    value.relationType === "uncle" ||
+    value.relationType === "aunt" ||
+    value.relationType === "guardian_other"
+      ? value.relationType
+      : value.relationship === "father" ||
+          value.relationship === "mother" ||
+          value.relationship === "grandfather" ||
+          value.relationship === "grandmother" ||
+          value.relationship === "uncle" ||
+          value.relationship === "aunt"
+        ? value.relationship
+        : "guardian_other",
   status: value.status === "inactive" ? "inactive" : "active",
   createdAt: value.createdAt ?? null,
   updatedAt: value.updatedAt ?? null,
@@ -83,6 +108,14 @@ const toRelationRecord = (id: string, value: Record<string, unknown>): MemberRel
 const ensureDb = () => {
   if (!db || !hasFirebaseAppConfig) {
     throw new Error("Firebase 設定が不足しているため Firestore を利用できません。");
+  }
+};
+
+const ensureFunctions = () => {
+  if (!functions) {
+    throw new Error(
+      `Cloud Functions 設定が不足しています。projectId=${firebaseProjectId || "(empty)"} region=${firebaseFunctionsRegion}`,
+    );
   }
 };
 
@@ -104,7 +137,7 @@ export const subscribeMemberRelations = (
   callback: (rows: MemberRelationRecord[]) => void,
 ): (() => void) => {
   ensureDb();
-  return onSnapshot(query(relationsCollection!, orderBy("fromMemberId", "asc")), (snapshot) => {
+  return onSnapshot(query(relationsCollection!, orderBy("updatedAt", "desc")), (snapshot) => {
     callback(snapshot.docs.map((item) => toRelationRecord(item.id, item.data() as Record<string, unknown>)));
   });
 };
@@ -168,6 +201,7 @@ export const saveMember = async (memberId: string | null, input: SaveMemberInput
   await addDoc(membersCollection!, {
     ...payload,
     authUid: "",
+    authEmail: normalizedLoginId ? toInternalAuthEmail(normalizedLoginId) : "",
     createdAt: serverTimestamp(),
   });
 };
@@ -178,9 +212,9 @@ export const saveMemberRelation = async (
 ): Promise<void> => {
   ensureDb();
   const payload = {
-    fromMemberId: input.fromMemberId,
-    toMemberId: input.toMemberId,
-    relationship: input.relationship,
+    childMemberId: input.childMemberId,
+    guardianMemberId: input.guardianMemberId,
+    relationType: input.relationType,
     status: input.status,
     updatedAt: serverTimestamp(),
   };
@@ -208,6 +242,39 @@ export const deactivateMemberRelation = async (relationId: string): Promise<void
   );
 };
 
+export const deleteMemberRelation = async (relationId: string): Promise<void> => {
+  ensureDb();
+  await deleteDoc(doc(relationsCollection!, relationId));
+};
+
+export const deleteMember = async (memberId: string): Promise<void> => {
+  ensureDb();
+
+  const batch = writeBatch(db!);
+  batch.delete(doc(membersCollection!, memberId));
+
+  const relatedRelations = await getDocs(query(relationsCollection!, where("childMemberId", "==", memberId)));
+  relatedRelations.docs.forEach((item) => batch.delete(item.ref));
+
+  const inverseRelations = await getDocs(
+    query(relationsCollection!, where("guardianMemberId", "==", memberId)),
+  );
+  inverseRelations.docs.forEach((item) => batch.delete(item.ref));
+
+  await batch.commit();
+};
+
+export const deleteFamily = async (familyId: string): Promise<void> => {
+  ensureDb();
+
+  const linkedMembers = await getDocs(query(membersCollection!, where("familyId", "==", familyId), limit(1)));
+  if (!linkedMembers.empty) {
+    throw new Error("所属 member が残っているため、この family は削除できません。");
+  }
+
+  await deleteDoc(doc(familiesCollection!, familyId));
+};
+
 export const getMemberByAuthUid = async (authUid: string): Promise<MemberRecord | null> => {
   ensureDb();
   const snapshot = await getDocs(query(membersCollection!, where("authUid", "==", authUid), limit(1)));
@@ -215,26 +282,30 @@ export const getMemberByAuthUid = async (authUid: string): Promise<MemberRecord 
   return match ? toMemberRecord(match.id, match.data() as Record<string, unknown>) : null;
 };
 
-export const listAuthUsers = async (): Promise<AuthUserSummary[]> => {
-  if (!functions) {
-    throw new Error("Cloud Functions 設定が不足しています。");
-  }
-  const callable = httpsCallable<undefined, { users: AuthUserSummary[] }>(functions, "listAuthUsers");
+export const listAuthUsers = async (): Promise<AuthUsersResponse> => {
+  ensureFunctions();
+  const callable = httpsCallable<undefined, AuthUsersResponse>(functions!, "listAuthUsers");
   const result = await callable();
-  return result.data.users;
+  return {
+    users: Array.isArray(result.data.users) ? result.data.users : [],
+    projectId: typeof result.data.projectId === "string" ? result.data.projectId : "",
+    fetchedAt: typeof result.data.fetchedAt === "string" ? result.data.fetchedAt : "",
+    functionsRegion:
+      typeof result.data.functionsRegion === "string" ? result.data.functionsRegion : firebaseFunctionsRegion,
+    errorCode: typeof result.data.errorCode === "string" ? result.data.errorCode : "",
+    errorMessage: typeof result.data.errorMessage === "string" ? result.data.errorMessage : "",
+  };
 };
 
 export const linkMemberToAuthUser = async (
   memberId: string,
   authUid: string,
 ): Promise<{ authUid: string; authEmail: string }> => {
-  if (!functions) {
-    throw new Error("Cloud Functions 設定が不足しています。");
-  }
+  ensureFunctions();
   const callable = httpsCallable<
     { memberId: string; authUid: string },
     { authUid: string; authEmail: string }
-  >(functions, "linkMemberAuth");
+  >(functions!, "linkMemberAuth");
   const result = await callable({ memberId, authUid });
   return result.data;
 };

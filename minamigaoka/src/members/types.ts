@@ -5,12 +5,11 @@ export type MemberPermission = string;
 export type RelationshipType =
   | "father"
   | "mother"
-  | "aunt"
-  | "uncle"
   | "grandfather"
   | "grandmother"
-  | "guardian"
-  | "other";
+  | "uncle"
+  | "aunt"
+  | "guardian_other";
 export type RelationStatus = "active" | "inactive";
 
 export type FamilyRecord = {
@@ -39,9 +38,9 @@ export type MemberRecord = {
 
 export type MemberRelationRecord = {
   id: string;
-  fromMemberId: string;
-  toMemberId: string;
-  relationship: RelationshipType;
+  childMemberId: string;
+  guardianMemberId: string;
+  relationType: RelationshipType;
   status: RelationStatus;
   createdAt: unknown;
   updatedAt: unknown;
@@ -56,6 +55,15 @@ export type AuthUserSummary = {
   lastSignInTime: string;
 };
 
+export type AuthUsersResponse = {
+  users: AuthUserSummary[];
+  projectId: string;
+  fetchedAt: string;
+  functionsRegion?: string;
+  errorCode?: string;
+  errorMessage?: string;
+};
+
 export type SaveFamilyInput = Pick<FamilyRecord, "name" | "status" | "notes">;
 
 export type SaveMemberInput = Pick<
@@ -65,5 +73,5 @@ export type SaveMemberInput = Pick<
 
 export type SaveRelationInput = Pick<
   MemberRelationRecord,
-  "fromMemberId" | "toMemberId" | "relationship" | "status"
+  "childMemberId" | "guardianMemberId" | "relationType" | "status"
 >;

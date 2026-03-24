@@ -4984,11 +4984,57 @@ textarea {
   gap: 6px;
 }
 
+.members-child-relations {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line, #d7e0e8);
+  display: grid;
+  gap: 6px;
+}
+
+.members-child-relations-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.members-child-relations-list {
+  padding-left: 0;
+  list-style: none;
+}
+
+.members-child-relations-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.members-auth-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: #eef4ff;
+  color: #1d4ed8;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.members-auth-debug-card {
+  display: grid;
+  gap: 4px;
+}
+
+.members-auth-error {
+  margin-top: 8px;
+}
+
 @media (max-width: 767px) {
   .members-admin-header,
   .members-section-heading,
   .members-admin-row,
-  .members-admin-card-header {
+  .members-admin-card-header,
+  .members-child-relations-item {
     align-items: flex-start;
     flex-direction: column;
   }

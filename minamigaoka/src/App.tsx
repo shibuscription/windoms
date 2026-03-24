@@ -10,7 +10,8 @@ import { WatchPage } from "./pages/WatchPage";
 import { ShiftSurveyPage } from "./pages/ShiftSurveyPage";
 import { LunchPage } from "./pages/LunchPage";
 import { LinksPage } from "./pages/LinksPage";
-import { MembersPage } from "./pages/MembersPage";
+import { MemberDirectoryPage } from "./pages/MemberDirectoryPage";
+import { MembersManagementPage } from "./pages/MembersPage";
 import { EventsPage } from "./pages/EventsPage";
 import { TodosPage } from "./pages/TodosPage";
 import { DocsDetailPage, DocsEditorPage, DocsListPage } from "./pages/DocsPage";
@@ -115,6 +116,7 @@ const resolvePageLabel = (pathname: string, search: string): string | null => {
   if (pathname === "/scores") return "楽譜";
   if (pathname === "/docs" || pathname.startsWith("/docs/")) return "資料";
   if (pathname === "/members") return "メンバー";
+  if (pathname === "/settings/members") return "メンバー管理";
   if (pathname === "/links") return "リンク集";
   return null;
 };
@@ -268,7 +270,7 @@ const menuSections = (
           label: "メンバー",
           icon: "👥",
           to: "/members",
-          allowedRoles: ["admin"],
+          allowedRoles: ["child", "parent", "admin"],
           isActive: (location) => location.pathname === "/members",
         },
         {
@@ -292,6 +294,14 @@ const menuSections = (
           to: "/today?view=settings",
           allowedRoles: ["child", "parent", "admin"],
           isActive: (location) => viewIsActive(location, "settings"),
+        },
+        {
+          id: "members-management",
+          label: "メンバー管理",
+          icon: "🛠️",
+          to: "/settings/members",
+          allowedRoles: ["admin"],
+          isActive: (location) => location.pathname === "/settings/members",
         },
       ],
     },
@@ -768,7 +778,11 @@ export function App() {
             }
           />
           <Route path="/links" element={<LinksPage menuRole={currentRole} />} />
-          <Route path="/members" element={isAdmin ? <MembersPage /> : <Navigate to="/today" replace />} />
+          <Route path="/members" element={<MemberDirectoryPage />} />
+          <Route
+            path="/settings/members"
+            element={isAdmin ? <MembersManagementPage /> : <Navigate to="/today" replace />}
+          />
           <Route path="/accounting" element={isAdmin ? <AccountingHome /> : <Navigate to="/today" replace />} />
           <Route path="/accounting/ledger" element={isAdmin ? <AccountLedger /> : <Navigate to="/today" replace />} />
           <Route path="/accounting/report" element={isAdmin ? <AccountingReport /> : <Navigate to="/today" replace />} />

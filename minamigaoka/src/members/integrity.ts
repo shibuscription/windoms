@@ -33,14 +33,14 @@ export const findRelationOrphans = (
   return relations.filter(
     (relation) =>
       relation.status === "active" &&
-      (!memberIds.has(relation.fromMemberId) || !memberIds.has(relation.toMemberId)),
+      (!memberIds.has(relation.childMemberId) || !memberIds.has(relation.guardianMemberId)),
   );
 };
 
 export const findDuplicateRelations = (relations: MemberRelationRecord[]): DuplicateRelation[] => {
   const activeRelations = relations.filter((relation) => relation.status === "active");
   const map = activeRelations.reduce<Map<string, MemberRelationRecord[]>>((result, relation) => {
-    const key = `${relation.fromMemberId}:${relation.toMemberId}:${relation.relationship}`;
+    const key = `${relation.childMemberId}:${relation.guardianMemberId}`;
     const bucket = result.get(key) ?? [];
     bucket.push(relation);
     result.set(key, bucket);

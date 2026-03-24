@@ -3,31 +3,46 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { setGlobalOptions } from "firebase-functions/v2";
+import * as logger from "firebase-functions/logger";
 
-initializeApp();
-setGlobalOptions({ region: "asia-northeast1", maxInstances: 10 });
+const functionsRegion = "asia-northeast1";
+const adminApp = initializeApp({
+  projectId: process.env.GCLOUD_PROJECT,
+});
+setGlobalOptions({ region: functionsRegion, maxInstances: 10 });
 
 const firestore = getFirestore();
 const adminAuth = getAuth();
+const serverProjectId =
+  adminApp.options.projectId ??
+  process.env.GCLOUD_PROJECT ??
+  process.env.FIREBASE_CONFIG?.match(/"projectId":"([^"]+)"/)?.[1] ??
+  "";
 
-type MemberDoc = {
-  role?: string;
-};
-
-const assertAdmin = async (authUid: string | undefined) => {
-  if (!authUid) {
+const assertAdmin = async (
+  auth:
+    | {
+        uid?: string;
+        token?: Record<string, unknown>;
+      }
+    | undefined,
+) => {
+  if (!auth?.uid) {
     throw new HttpsError("unauthenticated", "Authentication required.");
   }
 
-  const snapshot = await firestore
-    .collection("members")
-    .where("authUid", "==", authUid)
-    .limit(1)
-    .get();
-
-  const member = snapshot.docs[0]?.data() as MemberDoc | undefined;
-  if (!member || member.role !== "admin") {
-    throw new HttpsError("permission-denied", "Admin access required.");
+  if (auth.token?.admin !== true) {
+    logger.warn("admin claim required", {
+      projectId: serverProjectId || "(unknown)",
+      functionsRegion,
+      authUid: auth.uid,
+    });
+    throw new HttpsError("permission-denied", "Admin claim is required.", {
+      projectId: serverProjectId,
+      functionsRegion,
+      errorCode: "auth/admin-claim-required",
+      errorMessage: "Firebase Auth custom claims admin:true が必要です。",
+    });
   }
 };
 
@@ -62,14 +77,37 @@ const listAllAuthUsers = async () => {
 };
 
 export const listAuthUsers = onCall(async (request) => {
-  await assertAdmin(request.auth?.uid);
-  return {
-    users: await listAllAuthUsers(),
-  };
+  await assertAdmin(request.auth);
+
+  try {
+    const users = await listAllAuthUsers();
+    return {
+      users,
+      projectId: serverProjectId,
+      fetchedAt: new Date().toISOString(),
+      functionsRegion,
+      errorCode: "",
+      errorMessage: "",
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown internal error.";
+    logger.error("listAuthUsers failed", {
+      projectId: serverProjectId || "(unknown)",
+      functionsRegion,
+      message,
+      authUid: request.auth?.uid ?? "",
+    });
+    throw new HttpsError("internal", "Auth 一覧の取得に失敗しました。", {
+      projectId: serverProjectId,
+      functionsRegion,
+      errorCode: "auth/list-users-failed",
+      errorMessage: message,
+    });
+  }
 });
 
 export const linkMemberAuth = onCall(async (request) => {
-  await assertAdmin(request.auth?.uid);
+  await assertAdmin(request.auth);
 
   const memberId = typeof request.data?.memberId === "string" ? request.data.memberId.trim() : "";
   const authUid = typeof request.data?.authUid === "string" ? request.data.authUid.trim() : "";

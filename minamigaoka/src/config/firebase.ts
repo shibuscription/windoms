@@ -14,6 +14,9 @@ const firebaseConfig = {
   appId: env.VITE_FIREBASE_APP_ID,
 };
 
+export const firebaseProjectId = firebaseConfig.projectId ?? "";
+export const firebaseFunctionsRegion = env.VITE_FIREBASE_FUNCTIONS_REGION ?? "asia-northeast1";
+
 export const hasFirebaseAppConfig = Object.values(firebaseConfig).every(
   (value) => typeof value === "string" && value.trim().length > 0,
 );
@@ -29,7 +32,7 @@ const firebaseApp = hasFirebaseAppConfig
 export const auth = firebaseApp ? getAuth(firebaseApp) : null;
 export const db = firebaseApp ? getFirestore(firebaseApp) : null;
 export const functions = firebaseApp
-  ? getFunctions(firebaseApp, env.VITE_FIREBASE_FUNCTIONS_REGION ?? "asia-northeast1")
+  ? getFunctions(firebaseApp, firebaseFunctionsRegion)
   : null;
 
 let persistenceReady: Promise<void> | null = null;

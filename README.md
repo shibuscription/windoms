@@ -1890,14 +1890,16 @@ TODO：
 
 #### 30.9.5 memberRelation
 - `memberRelation` は個人同士の関係を表す。
-- 親子関係は N 対 N を許容する。
-- 続柄は `relationship` の属性として持つ。
+- 1 人の子どもに対して複数の保護者 relation を持てる。
+- 続柄は `relationType` の属性として持つ。
 - 続柄は `member` 本体の属性ではなく、関係ごとの属性として持つ。
 - 例として、ある人が A 君の `mother` であり、B さんの `aunt` であることを表現できる。
 - 続柄は子ども視点の意味で扱う。
-- `relationship` 初期候補は `father` / `mother` / `aunt` / `uncle` / `grandfather` / `grandmother` / `guardian` / `other` とする。
+- 向きは `childMemberId -> guardianMemberId` に統一する。
+- 逆方向 relation は保存しない。
+- `relationType` 初期候補は `father` / `mother` / `grandfather` / `grandmother` / `uncle` / `aunt` / `guardian_other` とする。
 - 管理画面では続柄を日本語表示できるようにしてよい。
-- `family` が異なる `member` 同士でも relation を張れるようにする。
+- 当面は同一 `family` 内の relation のみ扱う。
 
 #### 30.9.6 未紐付けと不整合
 - Windoms に存在するが Auth 未紐付けの `member` を可視化する。
@@ -1905,8 +1907,8 @@ TODO：
 - `memberRelation` や Auth 紐付けの不整合も可視化できるようにする。
 - 不整合の例:
   - `members.authUid` はあるが対象 Auth が存在しない。
-  - `memberRelation` が片方向のみ存在する。
-  - relation の対になる情報が揃っていない。
+  - `memberRelation.childMemberId` または `memberRelation.guardianMemberId` の参照先が存在しない。
+  - 同じ `childMemberId + guardianMemberId` の重複 relation がある。
 - Phase 2 ではまず一覧で分かることを優先し、複雑な自動修復は行わない。
 
 #### 30.9.7 Phase 2 の位置づけ
@@ -1934,9 +1936,9 @@ TODO：
   - `createdAt`
   - `updatedAt`
 - `memberRelations/{relationId}`
-  - `fromMemberId`
-  - `toMemberId`
-  - `relationship`
+  - `childMemberId`
+  - `guardianMemberId`
+  - `relationType`
   - `status`
   - `createdAt`
   - `updatedAt`
@@ -1968,6 +1970,30 @@ TODO：
 - 軽微な結果通知はローカルトーストでよい。
 - 一覧は分かりやすさ優先とし、過剰な作り込みは行わない。
 
+#### 30.9.10.2 メンバー管理の削除ルール
+- `memberRelation` は削除可能とする。
+- `member` は削除可能とする。
+- `member` 削除時は、その `member` を参照している `memberRelations` も一緒に削除する。
+- `family` は所属 `member` が 0 件のときのみ削除可能とする。
+- Firebase Authentication のユーザー削除は今回の管理 UI の対象外とする。
+- 削除操作はすべて確認モーダル経由とする。
+- 削除失敗時は対象カード付近またはモーダル内に理由を表示する。
+- 削除処理中は無反応に見えないよう、処理中状態を表示する。
+
+#### 30.9.10.3 「メンバー」と「メンバー管理」の役割分担
+- 「メンバー」は一般利用者向けの閲覧モジュールとする。
+- 「メンバー管理」は設定配下の管理者専用モジュールとする。
+- 両者は同じ member 系データを参照するが、責務と UI は分ける。
+- 「メンバー」は見る画面、「メンバー管理」は整える画面として扱う。
+- 「メンバー」は DEMO にある一般利用者向けの完成形イメージを基準とする。
+- 「メンバー」は family / Auth / relation 不整合チェックなどの管理機能を持たない。
+- 「メンバー管理」では `members` / `families` / `memberRelations` / Auth 紐付け / role / permission / 有効無効 など、member 系基礎データを扱う。
+- 管理画面で整備した情報は、「メンバー」画面だけでなく他モジュールの人物参照にも利用される。
+- 一般向けメニューには「メンバー」を置き、「メンバー管理」は設定配下に置く。
+- 一般ユーザーには「メンバー管理」を表示しない。
+- 管理者のみ設定内で「メンバー管理」に到達できるようにする。
+- 画面名やタイトルもこの責務に合わせて整理する。
+
 #### 30.9.10.1 minamigaoka のメニュー / アカウント操作
 - 上部タスクバー右端はハンバーガーメニューとする。
 - ログアウトボタンは上部タスクバーに常設しない。
@@ -1986,12 +2012,36 @@ TODO：
 - Admin SDK を使う安全なサーバー側処理を経由する。
 - Phase 2 では Cloud Functions を追加し、Auth 一覧取得 API を提供する。
 - API は認証済みかつ `admin` 権限のある利用者のみ呼び出せるようにする。
+- `admin` 判定は Firebase Auth の custom claims を用いて行い、当面の判定キーは `admin: true` とする。
+- `admin` 権限がない場合は `permission-denied` を返す。
 - 管理画面では各 `member` に対して Auth ユーザーを手動で紐付けできるようにする。
 - 紐付け時は `members.authUid` と `members.authEmail` を更新する。
 - `member.loginId` がある場合は `[loginId]@minamigaoka.windoms.club` との一致候補を見つけやすくする。
 - 完全自動紐付けは行わず、最終判断は管理者の手動とする。
+- Auth 一覧は Firebase Console 上の存在有無と区別して、画面上で `読み込み中` / `取得成功で 0 件` / `取得失敗` を分けて表示する。
+- 取得失敗時は、開発者が原因切り分けに使えるメッセージを確認できるようにする。
+- UI 上でも最低限の失敗表示を出し、`0 件` と `失敗` を握りつぶさない。
+- 取得元の Firebase project / Functions 経路を開発者が確認しやすい状態にする。
+- Auth 一覧取得は Cloud Functions 側で Firebase Admin SDK を用いて行う。
+- Functions 側で内部例外が起きた場合は、Cloud Functions ログで特定しやすいようにログを残す。
+- 返却情報として、秘密情報を含まない範囲で `server projectId` / `functions region` / `errorCode` / `errorMessage` を確認しやすい状態にする。
+- `permission-denied` の場合は、画面上では「取得失敗」として表示しつつ、admin 権限不足だと分かるメッセージを出す。
 
-#### 30.9.11.1 Functions デプロイ
+#### 30.9.11.1 admin 権限付与
+- admin 権限は Firebase Admin SDK 経由で custom claims を設定する。
+- 当面は仮運用のため、CLI もしくは管理用スクリプトで特定ユーザーへ `admin: true` を付与できればよい。
+- まずはしぶやんの minamigaoka ユーザー 1 名を admin にできればよい。
+- 本格的な admin 管理 UI は今回の対象外とする。
+- 運用上は `functions/scripts/set-admin-claim.mjs` を用い、例として `cd functions && npm run claims:set-admin -- --project windoms-minamigaoka --email [loginId]@minamigaoka.windoms.club` のように実行してよい。
+- 実行には Firebase Admin SDK が対象 project を操作できる認証情報が必要である。
+
+#### 30.9.11.2 claims 反映
+- custom claims 更新後は、再ログインまたは ID token の強制更新が必要である。
+- UI 上で、必要なら「権限更新後は再ログインしてください」または同等の補助文を表示してよい。
+- 可能なら権限再取得ボタンや token refresh を用意し、反映確認しやすくする。
+- 開発向けには、現在ログイン中ユーザーの `admin` claim 有無を確認できる表示を持ってよい。
+
+#### 30.9.11.3 Functions デプロイ
 - Auth 一覧取得と Auth 紐付け更新は Cloud Functions 経由で行う。
 - `functions/` ディレクトリで `npm install` を行う。
 - `functions/` ディレクトリで `npm run build` を行う。
@@ -2002,9 +2052,39 @@ TODO：
 - 最低限次を管理画面で可視化する。
   - `authUid` が空の `member`
   - どの `member` にも使われていない Auth ユーザー
-  - `fromMemberId` または `toMemberId` が存在しない relation
+  - `childMemberId` または `guardianMemberId` が存在しない relation
   - `status === "active"` なのに参照先が無い relation
-- 同一ペア・同一 `relationship` の重複 relation も一覧で分かるとなおよい。
+- 同一 `childMemberId + guardianMemberId` の重複 relation も一覧で分かるとなおよい。
+
+#### 30.9.12.1 relation の当面方針
+- `memberRelation` は「子 member から見た保護者 member の続柄」を表す。
+- 向きは常に `childMemberId -> guardianMemberId` とする。
+- 逆方向 relation は保存しない。
+- relation の一覧表示も `子 -> 保護者` で統一する。
+- 親側から子ども一覧を出したい場合は `guardianMemberId` で逆引きして表示する。
+- 現在の relation データは作り直す前提とし、旧 UI 互換や複雑な移行ロジックは持たない。
+- 家系図の完全再現ではなく、クラブ運営に必要な保護者関係の表現を優先する。
+
+#### 30.9.12.2 relationType の当面候補
+- relationType は固定候補ベースとする。
+- 候補は子どもから見た保護者側の属性のみとする。
+- 当面の候補は `father` / `mother` / `grandfather` / `grandmother` / `uncle` / `aunt` / `guardian_other` とする。
+- `child` / `brother` / `sister` など、逆方向解決や兄弟関係を要する候補は今回の対象外とする。
+
+#### 30.9.12.3 relation 入力 UI
+- `memberRelation` は独立した概念ではあるが、操作 UI は child ロールの `member` にぶら下がる形を基本とする。
+- relation の作成・編集・削除は child ロールの `member` カードまたは child 編集導線から行う。
+- 独立した `relation 追加` 導線は廃止してよい。
+- `memberRelations` セクションを残す場合も閲覧補助にとどめ、主導線は `members` セクション配下とする。
+- 入力 UI は `保護者` / `続柄` の 2 項目を基本とし、child は文脈で確定させる。
+- child ロールの `member` に対してのみ relation を追加できる。
+- `parent` / `admin` など child 以外の `member` には relation 追加 UI を表示しない。
+- 補助文として「続柄は子どもから見た保護者との関係です」を表示する。
+- 同じ `childMemberId + guardianMemberId` の重複 relation は防ぐ。
+- 当面は同一 `family` 内の relation を基本とし、`family` をまたぐ relation は許可しない。
+- relationType 候補定義・重複判定・表示整形は関数化し、今後の拡張に備える。
+- child カードでは relation を `続柄: 名前` のように分かりやすく表示し、その child の保護者関係を一目で把握できるようにする。
+- relation が 0 件の child には `未設定` など分かりやすい表示を出す。
 
 #### 30.9.13 今回未実装でよいもの
 - 車両管理 UI 本実装
