@@ -37,6 +37,7 @@ export type DemoUser = {
 };
 
 export type SessionDoc = {
+  id?: string;
   order: number;
   startTime: string;
   endTime: string;
@@ -46,8 +47,10 @@ export type SessionDoc = {
   // compatibility: dutyRequirement === "duty" の旧フラグ
   requiresShift?: boolean;
   location?: string;
+  assigneeFamilyId?: string;
   assignees: string[];
   assigneeNameSnapshot?: string;
+  note?: string;
   plannedInstructors?: string[];
   plannedSeniors?: string[];
   // demo-only: 本番想定の subcollection(rsvps/{uid}) の代替として画面表示に使う

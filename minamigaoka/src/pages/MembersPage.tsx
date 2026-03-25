@@ -1309,9 +1309,13 @@ export function MembersManagementPage() {
             <label>
               name
               <input
+                placeholder="田中"
                 value={familyForm.name}
                 onChange={(event) => setFamilyForm((current) => ({ ...current, name: event.target.value }))}
               />
+              <p className="muted">
+                Family名はカレンダーや当番表示にそのまま使われます。「田中」のように、苗字のみで登録してください。
+              </p>
               {familyErrors.name && <span className="field-error">{familyErrors.name}</span>}
             </label>
             <label>

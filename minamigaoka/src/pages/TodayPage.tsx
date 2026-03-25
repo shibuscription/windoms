@@ -378,6 +378,7 @@ export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: Today
           {sessions.map((session, index) => {
             const counts = countRsvps(session);
             const label = typeLabel[session.type];
+            const eventName = session.type === "event" ? session.eventName?.trim() ?? "" : "";
             return (
               <article key={`${session.order}-${index}`} className={`session-card ${session.type}`}>
                 <span className={`session-type-badge ${session.type}`}>{label}</span>
@@ -385,6 +386,7 @@ export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: Today
                   {formatTimeNoLeadingZero(session.startTime)} -{" "}
                   {formatTimeNoLeadingZero(session.endTime)}
                 </div>
+                {eventName && <div className="session-subtitle">{eventName}</div>}
                 <div className="kv-row">
                   <span className="kv-key">{dutyLabel[session.dutyRequirement]}：</span>
                   <span className="kv-val shift-role">
@@ -433,6 +435,9 @@ export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: Today
               {formatTimeNoLeadingZero(selectedSession.startTime)}–
               {formatTimeNoLeadingZero(selectedSession.endTime)}
             </p>
+            {selectedSession.type === "event" && selectedSession.eventName?.trim() && (
+              <p className="modal-summary">{selectedSession.eventName}</p>
+            )}
             {selectedCounts && (
               <p className="modal-summary">
                 出欠：<span className="count-yes">◯{selectedCounts.yes}</span>{" "}

@@ -46,12 +46,13 @@ import {
   readDemoUnansweredCount,
 } from "./utils/activityPlan";
 import { LoginScreen } from "./components/LoginScreen";
-import { auth, ensureAuthPersistence } from "./config/firebase";
+import { auth, ensureAuthPersistence, hasFirebaseAppConfig } from "./config/firebase";
 import { siteConfig } from "./config/site";
 import { toAuthenticatedUser, type AuthenticatedUser } from "./auth/session";
 import { loadInitialData } from "./data/runtimeData";
 import { getMemberByAuthUid } from "./members/service";
 import type { MemberRecord, MemberRole } from "./members/types";
+import { subscribeScheduleDays } from "./schedule/service";
 
 type MenuItem = {
   id: string;
@@ -318,7 +319,10 @@ const menuSections = (
 };
 
 export function App() {
-  const [data, setData] = useState<DemoData>(loadInitialData);
+  const [data, setData] = useState<DemoData>(() => ({
+    ...loadInitialData(),
+    scheduleDays: {},
+  }));
   const [authUser, setAuthUser] = useState<AuthenticatedUser | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [linkedMember, setLinkedMember] = useState<MemberRecord | null>(null);
@@ -418,6 +422,39 @@ export function App() {
       active = false;
     };
   }, [authUser]);
+
+  useEffect(() => {
+    if (!hasFirebaseAppConfig) {
+      setData((prev) => ({
+        ...prev,
+        scheduleDays: {},
+      }));
+      return undefined;
+    }
+
+    try {
+      return subscribeScheduleDays(
+        (scheduleDays) => {
+          setData((prev) => ({
+            ...prev,
+            scheduleDays,
+          }));
+        },
+        () => {
+          setData((prev) => ({
+            ...prev,
+            scheduleDays: {},
+          }));
+        },
+      );
+    } catch {
+      setData((prev) => ({
+        ...prev,
+        scheduleDays: {},
+      }));
+      return undefined;
+    }
+  }, []);
 
   useEffect(() => {
     if (!isMenuOpen && !activeStatusPanel) return;
@@ -705,7 +742,7 @@ export function App() {
               />
             }
           />
-          <Route path="/calendar" element={<CalendarPage data={context.data} />} />
+          <Route path="/calendar" element={<CalendarPage data={context.data} isAdmin={isAdmin} />} />
           <Route
             path="/activity-plan"
             element={isAdmin ? <ActivityPlanPage /> : <Navigate to="/today" replace />}

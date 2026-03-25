@@ -3291,6 +3291,21 @@ body {
   gap: 8px;
 }
 
+.calendar-session-editor-panel {
+  width: min(520px, calc(100vw - 24px));
+}
+
+.calendar-session-editor-times {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.calendar-session-editor-panel textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
 .calendar-attendance-backdrop {
   z-index: 2200;
 }
@@ -3329,6 +3344,13 @@ body {
   font-size: 1.05rem;
   font-weight: 700;
   padding-right: 96px;
+}
+
+.session-subtitle {
+  margin: -2px 0 2px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #7e1459;
 }
 
 .shift-role {
@@ -5350,6 +5372,10 @@ textarea {
 }
 
 @media (max-width: 767px) {
+  .calendar-session-editor-times {
+    grid-template-columns: 1fr;
+  }
+
   .members-admin-header,
   .members-section-heading,
   .members-admin-row,

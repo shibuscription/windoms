@@ -23,6 +23,9 @@ const serverProjectId =
 
 const normalizeLoginId = (value: string): string => value.trim().toLowerCase();
 const loginIdPattern = /^[a-z0-9_-]{4,20}$/;
+const dateKeyPattern = /^\d{4}-\d{2}-\d{2}$/;
+const timePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
+const calendarSessionTypes = new Set(["normal", "self", "event"]);
 const toInternalAuthEmail = (loginId: string): string =>
   `${normalizeLoginId(loginId)}@${internalEmailDomain}`;
 const getLoginIdValidationMessage = (loginId: string): string =>
@@ -45,6 +48,162 @@ const generateTemporaryPassword = (): string => {
     password += chars[randomInt(0, chars.length)];
   }
   return password;
+};
+
+const normalizeOptionalString = (value: unknown): string =>
+  typeof value === "string" ? value.trim() : "";
+
+const toFamilyDisplayName = (familyName: string): string => {
+  const value = familyName.trim();
+  if (!value) return "";
+  if (value.includes(" ")) return value.split(" ")[0] || "";
+  if (value.includes("　")) return value.split("　")[0] || "";
+  return value.endsWith("家") ? value.slice(0, -1) : value;
+};
+
+const isValidDateKey = (value: string): boolean => {
+  if (!dateKeyPattern.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day
+  );
+};
+
+const assertCalendarDateKey = (value: string) => {
+  if (!isValidDateKey(value)) {
+    throw new HttpsError("invalid-argument", "日付が不正です。");
+  }
+};
+
+const assertCalendarTime = (value: string, fieldLabel: string) => {
+  if (!timePattern.test(value)) {
+    throw new HttpsError("invalid-argument", `${fieldLabel}を正しく入力してください。`);
+  }
+};
+
+const touchScheduleDay = async (dateKey: string) => {
+  await firestore.collection("scheduleDays").doc(dateKey).set(
+    {
+      updatedAt: new Date(),
+    },
+    { merge: true },
+  );
+};
+
+const reorderScheduleSessions = async (dateKey: string) => {
+  const sessionsSnapshot = await firestore
+    .collection("scheduleDays")
+    .doc(dateKey)
+    .collection("sessions")
+    .get();
+
+  const orderedDocs = [...sessionsSnapshot.docs].sort((left, right) => {
+    const leftStart = typeof left.get("startTime") === "string" ? String(left.get("startTime")) : "";
+    const rightStart = typeof right.get("startTime") === "string" ? String(right.get("startTime")) : "";
+    if (leftStart !== rightStart) return leftStart.localeCompare(rightStart);
+
+    const leftEnd = typeof left.get("endTime") === "string" ? String(left.get("endTime")) : "";
+    const rightEnd = typeof right.get("endTime") === "string" ? String(right.get("endTime")) : "";
+    if (leftEnd !== rightEnd) return leftEnd.localeCompare(rightEnd);
+
+    return left.id.localeCompare(right.id);
+  });
+
+  if (orderedDocs.length === 0) {
+    await touchScheduleDay(dateKey);
+    return;
+  }
+
+  const batch = firestore.batch();
+  orderedDocs.forEach((doc, index) => {
+    batch.set(
+      doc.ref,
+      {
+        order: index + 1,
+        updatedAt: new Date(),
+      },
+      { merge: true },
+    );
+  });
+  batch.set(
+    firestore.collection("scheduleDays").doc(dateKey),
+    {
+      updatedAt: new Date(),
+    },
+    { merge: true },
+  );
+  await batch.commit();
+};
+
+type CalendarSessionPayload = {
+  date: string;
+  originalDate: string;
+  sessionId: string;
+  startTime: string;
+  endTime: string;
+  type: "normal" | "self" | "event";
+  eventName: string;
+  location: string;
+  assigneeFamilyId: string;
+  assigneeNameSnapshot: string;
+  note: string;
+};
+
+const parseCalendarSessionPayload = (
+  value: unknown,
+  mode: "create" | "update" | "delete",
+): CalendarSessionPayload => {
+  const data = typeof value === "object" && value ? (value as Record<string, unknown>) : {};
+  const date = normalizeOptionalString(data.date);
+  const originalDate = normalizeOptionalString(data.originalDate) || date;
+  const sessionId = normalizeOptionalString(data.sessionId);
+  const startTime = normalizeOptionalString(data.startTime);
+  const endTime = normalizeOptionalString(data.endTime);
+  const typeValue = normalizeOptionalString(data.type);
+  const type = (calendarSessionTypes.has(typeValue) ? typeValue : "normal") as "normal" | "self" | "event";
+  const eventName = normalizeOptionalString(data.eventName);
+  const location = normalizeOptionalString(data.location);
+  const assigneeFamilyId = normalizeOptionalString(data.assigneeFamilyId);
+  const assigneeNameSnapshot = normalizeOptionalString(data.assigneeNameSnapshot);
+  const note = normalizeOptionalString(data.note);
+
+  assertCalendarDateKey(date);
+  if (mode !== "create") {
+    assertCalendarDateKey(originalDate);
+  }
+  if (mode !== "delete") {
+    assertCalendarTime(startTime, "開始時刻");
+    assertCalendarTime(endTime, "終了時刻");
+    if (startTime >= endTime) {
+      throw new HttpsError("invalid-argument", "終了時刻は開始時刻より後にしてください。");
+    }
+  }
+  if (mode !== "create" && !sessionId) {
+    throw new HttpsError("invalid-argument", "sessionId が必要です。");
+  }
+  if (typeValue && !calendarSessionTypes.has(typeValue)) {
+    throw new HttpsError("invalid-argument", "種別が不正です。");
+  }
+  if (type === "event" && !eventName) {
+    throw new HttpsError("invalid-argument", "イベント名を入力してください。");
+  }
+
+  return {
+    date,
+    originalDate,
+    sessionId,
+    startTime,
+    endTime,
+    type,
+    eventName,
+    location,
+    assigneeFamilyId,
+    assigneeNameSnapshot,
+    note,
+  };
 };
 
 const assertAdmin = async (
@@ -357,5 +516,154 @@ export const bulkRegisterMembers = onCall(async (request) => {
     failureCount: results.filter((item) => item.status === "error").length,
     projectId: serverProjectId,
     functionsRegion,
+  };
+});
+
+export const createCalendarSession = onCall(async (request) => {
+  await assertAdmin(request.auth);
+
+  const payload = parseCalendarSessionPayload(request.data, "create");
+  let assigneeNameSnapshot = "";
+  if (payload.assigneeFamilyId) {
+    const familySnapshot = await firestore.collection("families").doc(payload.assigneeFamilyId).get();
+    if (!familySnapshot.exists) {
+      throw new HttpsError("invalid-argument", "当番 / 見守り担当の family が見つかりません。");
+    }
+    const familyName =
+      typeof familySnapshot.get("name") === "string" ? String(familySnapshot.get("name")) : "";
+    assigneeNameSnapshot = toFamilyDisplayName(familyName);
+  }
+  const scheduleDayRef = firestore.collection("scheduleDays").doc(payload.date);
+  const sessionRef = scheduleDayRef.collection("sessions").doc();
+
+  await scheduleDayRef.set(
+    {
+      updatedAt: new Date(),
+    },
+    { merge: true },
+  );
+
+  await sessionRef.set({
+    order: 999,
+    startTime: payload.startTime,
+    endTime: payload.endTime,
+    type: payload.type,
+    eventName: payload.type === "event" ? payload.eventName : "",
+    dutyRequirement: payload.type === "self" ? "watch" : "duty",
+    requiresShift: payload.type !== "self",
+    location: payload.location,
+    assigneeFamilyId: payload.assigneeFamilyId,
+    assignees: [],
+    assigneeNameSnapshot,
+    note: payload.note,
+    updatedAt: new Date(),
+  });
+
+  await reorderScheduleSessions(payload.date);
+
+  return {
+    date: payload.date,
+    sessionId: sessionRef.id,
+  };
+});
+
+export const updateCalendarSession = onCall(async (request) => {
+  await assertAdmin(request.auth);
+
+  const payload = parseCalendarSessionPayload(request.data, "update");
+  let assigneeNameSnapshot = "";
+  if (payload.assigneeFamilyId) {
+    const familySnapshot = await firestore.collection("families").doc(payload.assigneeFamilyId).get();
+    if (!familySnapshot.exists) {
+      throw new HttpsError("invalid-argument", "当番 / 見守り担当の family が見つかりません。");
+    }
+    const familyName =
+      typeof familySnapshot.get("name") === "string" ? String(familySnapshot.get("name")) : "";
+    assigneeNameSnapshot = toFamilyDisplayName(familyName);
+  }
+  const sourceRef = firestore
+    .collection("scheduleDays")
+    .doc(payload.originalDate)
+    .collection("sessions")
+    .doc(payload.sessionId);
+  const sourceSnapshot = await sourceRef.get();
+
+  if (!sourceSnapshot.exists) {
+    throw new HttpsError("not-found", "編集対象のセッションが見つかりません。");
+  }
+
+  const currentData = sourceSnapshot.data() ?? {};
+  const nextData = {
+    ...currentData,
+    startTime: payload.startTime,
+    endTime: payload.endTime,
+    type: payload.type,
+    eventName: payload.type === "event" ? payload.eventName : "",
+    dutyRequirement: payload.type === "self" ? "watch" : "duty",
+    requiresShift: payload.type !== "self",
+    location: payload.location,
+    assigneeFamilyId: payload.assigneeFamilyId,
+    assigneeNameSnapshot,
+    note: payload.note,
+    updatedAt: new Date(),
+  };
+
+  if (payload.originalDate === payload.date) {
+    await sourceRef.set(nextData, { merge: true });
+    await reorderScheduleSessions(payload.date);
+  } else {
+    const targetDayRef = firestore.collection("scheduleDays").doc(payload.date);
+    const targetRef = targetDayRef.collection("sessions").doc(payload.sessionId);
+    const batch = firestore.batch();
+
+    batch.set(
+      targetDayRef,
+      {
+        updatedAt: new Date(),
+      },
+      { merge: true },
+    );
+    batch.set(targetRef, nextData, { merge: true });
+    batch.delete(sourceRef);
+    batch.set(
+      firestore.collection("scheduleDays").doc(payload.originalDate),
+      {
+        updatedAt: new Date(),
+      },
+      { merge: true },
+    );
+
+    await batch.commit();
+    await reorderScheduleSessions(payload.originalDate);
+    await reorderScheduleSessions(payload.date);
+  }
+
+  return {
+    date: payload.date,
+    sessionId: payload.sessionId,
+  };
+});
+
+export const deleteCalendarSession = onCall(async (request) => {
+  await assertAdmin(request.auth);
+
+  const payload = parseCalendarSessionPayload(request.data, "delete");
+  const sessionRef = firestore
+    .collection("scheduleDays")
+    .doc(payload.date)
+    .collection("sessions")
+    .doc(payload.sessionId);
+  const sessionSnapshot = await sessionRef.get();
+
+  if (!sessionSnapshot.exists) {
+    throw new HttpsError("not-found", "削除対象のセッションが見つかりません。");
+  }
+
+  await sessionRef.delete();
+  await reorderScheduleSessions(payload.date);
+
+  return {
+    date: payload.date,
+    sessionId: payload.sessionId,
   };
 });
