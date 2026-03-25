@@ -20,8 +20,11 @@ import {
   buildMemberSummaryBadges,
   canSelectMemberType,
   isChildMember,
+  memberMatchesTypeFilter,
   memberStatusOptions,
+  memberTypeFilterOptions,
   memberTypeOptions,
+  type MemberTypeFilter,
   staffPermissionOptions,
   validateMemberTypes,
 } from "../members/permissions";
@@ -242,6 +245,7 @@ export function MembersManagementPage() {
   const [deleteError, setDeleteError] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState<ManagementTab>("member");
+  const [activeMemberTypeFilter, setActiveMemberTypeFilter] = useState<MemberTypeFilter>("all");
   const [csvImportErrors, setCsvImportErrors] = useState<string[]>([]);
   const [csvImportPreview, setCsvImportPreview] = useState<CsvImportPreviewRow[]>([]);
   const [csvImportCount, setCsvImportCount] = useState(0);
@@ -314,6 +318,10 @@ export function MembersManagementPage() {
   const membersWithoutFamily = useMemo(
     () => members.filter((member) => !member.familyId || !familyNameById[member.familyId]),
     [familyNameById, members],
+  );
+  const filteredMembers = useMemo(
+    () => members.filter((member) => memberMatchesTypeFilter(member, activeMemberTypeFilter)),
+    [activeMemberTypeFilter, members],
   );
 
   const linkTargetMember = linkTargetMemberId
@@ -653,7 +661,7 @@ export function MembersManagementPage() {
 
   const submitRelation = async () => {
     const nextErrors: FieldErrors = {};
-    if (!relationForm.childMemberId) nextErrors.childMemberId = "子どもを選択してください。";
+    if (!relationForm.childMemberId) nextErrors.childMemberId = "部員を選択してください。";
     if (!relationForm.guardianMemberId) nextErrors.guardianMemberId = "保護者を選択してください。";
     if (relationForm.childMemberId && relationForm.childMemberId === relationForm.guardianMemberId) {
       nextErrors.guardianMemberId = "同じ member 同士の relation は登録できません。";
@@ -668,7 +676,7 @@ export function MembersManagementPage() {
         relationForm.id,
       )
     ) {
-      nextErrors.guardianMemberId = "同じ子どもと保護者の relation は既に登録されています。";
+      nextErrors.guardianMemberId = "同じ部員と保護者の relation は既に登録されています。";
     }
     if (
       relationForm.childMemberId &&
@@ -997,8 +1005,20 @@ export function MembersManagementPage() {
               />
             </div>
           </div>
+          <div className="members-tabs" role="tablist" aria-label="メンバー種別">
+            {memberTypeFilterOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`members-tab ${activeMemberTypeFilter === option.value ? "active" : ""}`}
+                onClick={() => setActiveMemberTypeFilter(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
           <div className="members-admin-list-panel">
-            {members.map((member) => {
+            {filteredMembers.map((member) => {
               const childMember = isChildMember(member);
               const childRelations = childMember ? childRelationsByChildId[member.id] ?? [] : [];
               const summaryBadges = buildMemberSummaryBadges(member);
@@ -1095,7 +1115,7 @@ export function MembersManagementPage() {
                 </article>
               );
             })}
-            {members.length === 0 && <p className="muted">member はまだありません。</p>}
+            {filteredMembers.length === 0 && <p className="muted">該当する member はありません。</p>}
           </div>
         </section>
       )}
@@ -1419,7 +1439,7 @@ export function MembersManagementPage() {
               <div className="permission-form-grid">
                 <PermissionSection
                   title="利用者区分"
-                  description="子どもは他の利用者区分と同時に設定できません。OBOG は保護者・先生と併用できます。"
+                  description="部員は他の利用者区分と同時に設定できません。先輩は保護者・先生と併用できます。"
                   error={memberErrors.memberTypes}
                 >
                   {memberTypeOptions.map((option) => {
@@ -1521,7 +1541,7 @@ export function MembersManagementPage() {
             <h3>{relationForm.id ? "relation を編集" : "relation を追加"}</h3>
             <p className="muted">{relationHelpText}</p>
             <p className="modal-summary">
-              子ども: {memberNameById[relationForm.childMemberId] || "未選択"}
+              部員: {memberNameById[relationForm.childMemberId] || "未選択"}
             </p>
             {relationErrors.childMemberId && <p className="field-error">{relationErrors.childMemberId}</p>}
             <label>

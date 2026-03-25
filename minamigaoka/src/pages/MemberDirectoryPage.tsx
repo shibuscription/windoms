@@ -1,31 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
-import { subscribeMemberRelations, subscribeMembers } from "../members/service";
+import {
+  getPrimaryMemberTypeLabel,
+  memberMatchesTypeFilter,
+  memberTypeFilterOptions,
+  type MemberTypeFilter,
+} from "../members/permissions";
 import { relationTypeLabel } from "../members/relation";
+import { subscribeMemberRelations, subscribeMembers } from "../members/service";
 import type { MemberRecord, MemberRelationRecord } from "../members/types";
 
-type MemberTab = "all" | "child" | "parent" | "teacher";
-
-const tabItems: Array<{ id: MemberTab; label: string }> = [
-  { id: "all", label: "すべて" },
-  { id: "child", label: "部員" },
-  { id: "parent", label: "保護者" },
-  { id: "teacher", label: "先生" },
-];
-
-const memberTabOf = (member: MemberRecord): MemberTab =>
-  member.role === "child" ? "child" : member.role === "teacher" ? "teacher" : "parent";
-
-const memberTypeLabel = (member: MemberRecord): string =>
-  member.role === "child" ? "部員" : member.role === "teacher" ? "先生" : "保護者";
-
-const memberTypeIcon = (member: MemberRecord): string =>
-  member.role === "child" ? "🎵" : member.role === "teacher" ? "🧑‍🏫" : "👪";
+const memberTypeIcon = (member: MemberRecord): string => {
+  if (member.memberTypes.includes("child") || member.role === "child") {
+    return "🎵";
+  }
+  if (member.memberTypes.includes("teacher") || member.role === "teacher") {
+    return "🧑‍🏫";
+  }
+  return "👪";
+};
 
 export function MemberDirectoryPage() {
   const [members, setMembers] = useState<MemberRecord[]>([]);
   const [relations, setRelations] = useState<MemberRelationRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<MemberTab>("all");
+  const [activeTab, setActiveTab] = useState<MemberTypeFilter>("all");
   const [relationTargetId, setRelationTargetId] = useState<string | null>(null);
   const [pageError, setPageError] = useState("");
 
@@ -52,9 +50,7 @@ export function MemberDirectoryPage() {
   const visibleMembers = useMemo(
     () =>
       members.filter(
-        (member) =>
-          member.status === "active" &&
-          (activeTab === "all" || memberTabOf(member) === activeTab),
+        (member) => member.memberStatus === "active" && memberMatchesTypeFilter(member, activeTab),
       ),
     [activeTab, members],
   );
@@ -98,17 +94,17 @@ export function MemberDirectoryPage() {
   return (
     <section className="card members-page">
       <h1>メンバー</h1>
-      <p className="muted">クラブ内の人を見るための画面です。管理用の設定変更は含みません。</p>
+      <p className="muted">クラブ内の人を見るための画面です。設定や認証の管理機能は含みません。</p>
       {pageError && <p className="field-error">{pageError}</p>}
       {isLoading && <p className="muted">読み込み中...</p>}
 
       <div className="members-tabs" role="tablist" aria-label="メンバー種別">
-        {tabItems.map((item) => (
+        {memberTypeFilterOptions.map((item) => (
           <button
-            key={item.id}
+            key={item.value}
             type="button"
-            className={`members-tab ${activeTab === item.id ? "active" : ""}`}
-            onClick={() => setActiveTab(item.id)}
+            className={`members-tab ${activeTab === item.value ? "active" : ""}`}
+            onClick={() => setActiveTab(item.value)}
           >
             {item.label}
           </button>
@@ -117,7 +113,10 @@ export function MemberDirectoryPage() {
 
       <div className="members-list">
         {visibleMembers.map((member) => {
-          const childRelations = member.role === "child" ? childRelationsByChildId[member.id] ?? [] : [];
+          const childRelations =
+            member.memberTypes.includes("child") || member.role === "child"
+              ? childRelationsByChildId[member.id] ?? []
+              : [];
 
           return (
             <article key={member.id} className="member-card">
@@ -128,23 +127,25 @@ export function MemberDirectoryPage() {
                 <div className="member-meta">
                   <strong className="member-name">{member.name}</strong>
                   {member.nameKana && <span className="member-kana">{member.nameKana}</span>}
-                  <span className="member-type">{memberTypeLabel(member)}</span>
+                  <span className="member-type">{getPrimaryMemberTypeLabel(member)}</span>
                 </div>
                 <span className="member-card-spacer" />
               </div>
-              {member.role === "child" && (
+              {(member.memberTypes.includes("child") || member.role === "child") && (
                 <button
                   type="button"
                   className="member-relation-link"
                   onClick={() => setRelationTargetId(member.id)}
                 >
-                  保護者: {childRelations.length}
+                  保護者 {childRelations.length}
                 </button>
               )}
             </article>
           );
         })}
-        {!isLoading && visibleMembers.length === 0 && <p className="muted">表示できるメンバーはまだありません。</p>}
+        {!isLoading && visibleMembers.length === 0 && (
+          <p className="muted">表示できるメンバーはまだありません。</p>
+        )}
       </div>
 
       {relationTarget && (
