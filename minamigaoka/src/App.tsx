@@ -12,6 +12,7 @@ import { LunchPage } from "./pages/LunchPage";
 import { LinksPage } from "./pages/LinksPage";
 import { MemberDirectoryPage } from "./pages/MemberDirectoryPage";
 import { MembersManagementPage } from "./pages/MembersPage";
+import { SettingsPage } from "./pages/SettingsPage";
 import { EventsPage } from "./pages/EventsPage";
 import { TodosPage } from "./pages/TodosPage";
 import { DocsDetailPage, DocsEditorPage, DocsListPage } from "./pages/DocsPage";
@@ -94,6 +95,7 @@ const resolveLunchDate = (location: { pathname: string; search: string }, fallba
 };
 
 const resolvePageLabel = (pathname: string, search: string): string | null => {
+  if (pathname === "/settings") return "設定";
   if (pathname === "/today") {
     const view = new URLSearchParams(search).get("view");
     if (view === "practice-log") return "練習日誌";
@@ -291,9 +293,9 @@ const menuSections = (
           id: "settings",
           label: "設定",
           icon: "⚙️",
-          to: "/today?view=settings",
+          to: "/settings",
           allowedRoles: ["child", "parent", "admin"],
-          isActive: (location) => viewIsActive(location, "settings"),
+          isActive: (location) => location.pathname === "/settings",
         },
         {
           id: "members-management",
@@ -779,6 +781,7 @@ export function App() {
           />
           <Route path="/links" element={<LinksPage menuRole={currentRole} />} />
           <Route path="/members" element={<MemberDirectoryPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route
             path="/settings/members"
             element={isAdmin ? <MembersManagementPage /> : <Navigate to="/today" replace />}

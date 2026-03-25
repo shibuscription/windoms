@@ -5137,7 +5137,7 @@ textarea {
 
 .member-instruments-field {
   display: grid;
-  gap: 8px;
+  gap: 10px;
   padding: 10px 12px;
   border: 1px solid var(--line, #d7e0e8);
   border-radius: 12px;
@@ -5147,23 +5147,50 @@ textarea {
 .member-instruments-header {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   gap: 12px;
   font-weight: 600;
+  min-width: 0;
+}
+
+.member-instruments-help {
+  font-size: 0.78rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.member-instruments-list {
+  max-height: 220px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-width: 0;
+  padding-right: 4px;
 }
 
 .member-instruments-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 10px;
+  gap: 8px 12px;
+  min-width: 0;
 }
 
 .member-instrument-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 34px;
-  padding: 4px 2px;
+  min-width: 0;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.member-instrument-option-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.4;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: normal;
+}
+
+.member-instruments-summary {
+  margin: 0;
 }
 
 .member-csv-modal {
@@ -5177,6 +5204,41 @@ textarea {
   display: grid;
   gap: 8px;
   margin-top: 10px;
+}
+
+.settings-page {
+  display: grid;
+  gap: 16px;
+}
+
+.settings-page-header,
+.settings-section-head {
+  display: grid;
+  gap: 6px;
+}
+
+.settings-section {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line, #d7e0e8);
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.settings-section h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.settings-form-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .permission-form-area {
@@ -5304,6 +5366,12 @@ textarea {
 
   .permission-option-row {
     min-height: 38px;
+  }
+
+  .member-instruments-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
   }
 
   .member-instruments-grid {

@@ -34,6 +34,8 @@ import {
 } from "./permissions";
 import type {
   AuthUsersResponse,
+  BulkRegisterMemberRow,
+  BulkRegisterMembersResponse,
   FamilyRecord,
   MemberRecord,
   MemberRelationRecord,
@@ -348,5 +350,17 @@ export const linkMemberToAuthUser = async (
     { authUid: string; authEmail: string }
   >(functions!, "linkMemberAuth");
   const result = await callable({ memberId, authUid });
+  return result.data;
+};
+
+export const bulkRegisterMembers = async (
+  rows: BulkRegisterMemberRow[],
+): Promise<BulkRegisterMembersResponse> => {
+  ensureFunctions();
+  const callable = httpsCallable<{ rows: BulkRegisterMemberRow[] }, BulkRegisterMembersResponse>(
+    functions!,
+    "bulkRegisterMembers",
+  );
+  const result = await callable({ rows });
   return result.data;
 };

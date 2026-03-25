@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
-import { isValidLoginId, normalizeLoginId, toInternalAuthEmail } from "../auth/loginId";
+import {
+  isValidLoginId,
+  loginIdValidationMessages,
+  normalizeLoginId,
+  toInternalAuthEmail,
+} from "../auth/loginId";
 import { auth, firebaseFunctionsRegion, firebaseProjectId } from "../config/firebase";
 import { memberCsvTemplateHeader, parseMemberCsv } from "../members/csv";
 import {
@@ -29,6 +34,7 @@ import {
   relationTypeOptions,
 } from "../members/relation";
 import {
+  bulkRegisterMembers,
   deleteFamily,
   deleteMember,
   deleteMemberRelation,
@@ -44,6 +50,7 @@ import {
 import type {
   AdminRole,
   AuthUserSummary,
+  BulkRegisterMemberResult,
   FamilyRecord,
   InstrumentCode,
   MemberRecord,
@@ -238,6 +245,7 @@ export function MembersManagementPage() {
   const [csvImportErrors, setCsvImportErrors] = useState<string[]>([]);
   const [csvImportPreview, setCsvImportPreview] = useState<CsvImportPreviewRow[]>([]);
   const [csvImportCount, setCsvImportCount] = useState(0);
+  const [csvImportResults, setCsvImportResults] = useState<BulkRegisterMemberResult[]>([]);
   const [isCsvImportModalOpen, setIsCsvImportModalOpen] = useState(false);
   const [isCsvImporting, setIsCsvImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -603,7 +611,10 @@ export function MembersManagementPage() {
       nextErrors.memberStatus = "利用状態を選択してください。";
     }
     if (normalizedLoginId && !isValidLoginId(normalizedLoginId)) {
-      nextErrors.loginId = "loginId は英小文字・数字・.-_ のみ使用できます。";
+      nextErrors.loginId =
+        normalizedLoginId.length < 4 || normalizedLoginId.length > 20
+          ? loginIdValidationMessages.length
+          : loginIdValidationMessages.charset;
     }
     if (normalizedEnrollmentYear && !/^\d{4}$/.test(normalizedEnrollmentYear)) {
       nextErrors.enrollmentYear = "入学年度は西暦4桁で入力してください。";
@@ -734,6 +745,7 @@ export function MembersManagementPage() {
     setCsvImportErrors([]);
     setCsvImportPreview([]);
     setCsvImportCount(0);
+    setCsvImportResults([]);
     setIsCsvImportModalOpen(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -751,6 +763,7 @@ export function MembersManagementPage() {
         setCsvImportErrors(result.errors.map((item) => `${item.rowNumber}行目: ${item.message}`));
         setCsvImportPreview([]);
         setCsvImportCount(0);
+        setCsvImportResults([]);
         setIsCsvImportModalOpen(true);
         return;
       }
@@ -765,11 +778,13 @@ export function MembersManagementPage() {
         })),
       );
       setCsvImportCount(result.rows.length);
+      setCsvImportResults([]);
       setIsCsvImportModalOpen(true);
     } catch (error) {
       setCsvImportErrors([error instanceof Error ? error.message : "CSV の読み込みに失敗しました。"]);
       setCsvImportPreview([]);
       setCsvImportCount(0);
+      setCsvImportResults([]);
       setIsCsvImportModalOpen(true);
     }
   };
@@ -790,17 +805,54 @@ export function MembersManagementPage() {
         return;
       }
 
-      for (const row of result.rows) {
-        await saveMember(null, row.input);
+      const response = await bulkRegisterMembers(
+        result.rows.map((row) => ({
+          rowNumber: row.rowNumber,
+          input: row.input,
+        })),
+      );
+      setCsvImportResults(response.results);
+      setToastMessage(
+        `一括登録が完了しました。成功 ${response.successCount} 件 / 失敗 ${response.failureCount} 件`,
+      );
+      if (response.successCount > 0) {
+        try {
+          await refreshAuthUsers();
+        } catch {
+          // 一括登録結果の表示を優先し、Auth 一覧再取得失敗では処理全体を失敗にしない。
+        }
       }
-
-      setToastMessage(`${result.rows.length}件の member を取り込みました。`);
-      resetCsvImportState();
     } catch (error) {
-      setCsvImportErrors([error instanceof Error ? error.message : "CSV インポートに失敗しました。"]);
+      setCsvImportErrors([error instanceof Error ? error.message : "CSV 一括登録に失敗しました。"]);
     } finally {
       setIsCsvImporting(false);
     }
+  };
+
+  const downloadCsvImportResults = () => {
+    if (csvImportResults.length === 0) return;
+    const escapeCell = (value: string) => `"${value.replace(/"/g, '""')}"`;
+    const lines = [
+      ["rowNumber", "userId", "displayName", "generatedEmail", "temporaryPassword", "status", "errorMessage"].join(","),
+      ...csvImportResults.map((item) =>
+        [
+          String(item.rowNumber),
+          escapeCell(item.userId),
+          escapeCell(item.displayName),
+          escapeCell(item.generatedEmail),
+          escapeCell(item.temporaryPassword),
+          escapeCell(item.status),
+          escapeCell(item.errorMessage),
+        ].join(","),
+      ),
+    ];
+    const blob = new Blob([`${lines.join("\n")}\n`], { type: "text/csv;charset=utf-8;" });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "windoms-bulk-register-results.csv";
+    anchor.click();
+    window.URL.revokeObjectURL(url);
   };
 
   const authStatusText =
@@ -931,7 +983,7 @@ export function MembersManagementPage() {
                 Member追加
               </button>
               <button type="button" className="button button-small button-secondary" onClick={() => fileInputRef.current?.click()}>
-                CSVインポート
+                CSV一括登録
               </button>
               <button type="button" className="button button-small button-secondary" onClick={downloadMemberCsvTemplate}>
                 CSVテンプレートDL
@@ -1334,21 +1386,30 @@ export function MembersManagementPage() {
             <div className="member-instruments-field">
               <div className="member-instruments-header">
                 <span>担当楽器</span>
-                <span className="muted">複数選択可</span>
+                <span className="member-instruments-help muted">複数選択可</span>
               </div>
-              <div className="member-instruments-grid">
-                {activeInstrumentMaster.map((instrument) => (
-                  <label key={instrument.code} className="member-instrument-option">
-                    <input
-                      type="checkbox"
-                      checked={memberForm.instrumentCodes.includes(instrument.code)}
-                      onChange={() => toggleInstrumentCode(instrument.code)}
-                    />
-                    <span>{instrument.label}</span>
-                  </label>
-                ))}
+              <div className="member-instruments-list" role="group" aria-label="担当楽器">
+                <div className="member-instruments-grid">
+                  {activeInstrumentMaster.map((instrument) => (
+                    <label
+                      key={instrument.code}
+                      className={`permission-option-row member-instrument-option ${
+                        memberForm.instrumentCodes.includes(instrument.code) ? "is-selected" : ""
+                      }`}
+                    >
+                      <span className="permission-option-control">
+                        <input
+                          type="checkbox"
+                          checked={memberForm.instrumentCodes.includes(instrument.code)}
+                          onChange={() => toggleInstrumentCode(instrument.code)}
+                        />
+                      </span>
+                      <span className="permission-option-label member-instrument-option-label">{instrument.label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
-              <p className="muted">
+              <p className="member-instruments-summary muted">
                 {memberForm.instrumentCodes.length > 0
                   ? `選択中: ${formatInstrumentLabels(memberForm.instrumentCodes)}`
                   : "担当楽器未設定"}
@@ -1578,22 +1639,44 @@ export function MembersManagementPage() {
             >
               ×
             </button>
-            <h3>CSVインポート</h3>
+            <h3>CSV一括登録</h3>
             <p className="muted">
-              1行目はヘッダとしてスキップし、2行目以降を Windoms 専用の固定列順で取り込みます。
+              1行目はヘッダとしてスキップし、2行目以降を Windoms 専用の固定列順で一括登録します。
             </p>
             {csvImportErrors.length > 0 ? (
               <div className="member-csv-errors">
-                <p className="field-error">取り込み前チェックでエラーが見つかりました。</p>
+                <p className="field-error">一括登録前チェックでエラーが見つかりました。</p>
                 <ul className="members-admin-list">
                   {csvImportErrors.map((error) => (
                     <li key={error}>{error}</li>
                   ))}
                 </ul>
               </div>
+            ) : csvImportResults.length > 0 ? (
+              <div className="member-csv-preview">
+                <p className="modal-summary">
+                  成功 {csvImportResults.filter((item) => item.status === "success").length} 件 / 失敗{" "}
+                  {csvImportResults.filter((item) => item.status === "error").length} 件
+                </p>
+                <ul className="members-admin-list">
+                  {csvImportResults.map((item) => (
+                    <li key={`${item.rowNumber}-${item.userId || item.displayName}`}>
+                      {item.rowNumber}行目: {item.displayName || "-"} / {item.userId || "-"} /{" "}
+                      {item.status === "success"
+                        ? `${item.generatedEmail} / 仮PW: ${item.temporaryPassword}`
+                        : item.errorMessage}
+                    </li>
+                  ))}
+                </ul>
+                <div className="members-admin-actions">
+                  <button type="button" className="button button-small button-secondary" onClick={downloadCsvImportResults}>
+                    結果CSVダウンロード
+                  </button>
+                </div>
+              </div>
             ) : (
               <div className="member-csv-preview">
-                <p className="modal-summary">{csvImportCount}件を取り込む予定です。</p>
+                <p className="modal-summary">{csvImportCount}件を一括登録する予定です。</p>
                 <ul className="members-admin-list">
                   {csvImportPreview.map((item) => (
                     <li key={`${item.rowNumber}-${item.loginId}`}>
@@ -1615,9 +1698,9 @@ export function MembersManagementPage() {
               >
                 キャンセル
               </button>
-              {csvImportErrors.length === 0 && (
+              {csvImportErrors.length === 0 && csvImportResults.length === 0 && (
                 <button type="button" className="button" onClick={() => void runCsvImport()} disabled={isCsvImporting}>
-                  {isCsvImporting ? "取り込み中..." : "この内容で取り込む"}
+                  {isCsvImporting ? "一括登録中..." : "この内容で一括登録する"}
                 </button>
               )}
             </div>

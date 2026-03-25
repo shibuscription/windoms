@@ -1,4 +1,5 @@
 import { isValidLoginId, normalizeLoginId } from "../auth/loginId";
+import { loginIdValidationMessages } from "../auth/loginId";
 import { instrumentCodeSet } from "./instruments";
 import {
   normalizeAdminRole,
@@ -152,7 +153,13 @@ export const parseMemberCsv = (
 
     const loginId = normalizeLoginId(rawLoginId);
     if (!isValidLoginId(loginId)) {
-      errors.push({ rowNumber, message: "loginId は英小文字・数字・.-_ のみ使用できます。" });
+      errors.push({
+        rowNumber,
+        message:
+          loginId.length < 4 || loginId.length > 20
+            ? loginIdValidationMessages.length
+            : loginIdValidationMessages.charset,
+      });
       return;
     }
 

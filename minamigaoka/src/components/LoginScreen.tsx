@@ -1,7 +1,12 @@
 import { useState, type FormEvent } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth, hasFirebaseAuthConfig } from "../config/firebase";
-import { isValidLoginId, normalizeLoginId, toInternalAuthEmail } from "../auth/loginId";
+import {
+  isValidLoginId,
+  loginIdValidationMessages,
+  normalizeLoginId,
+  toInternalAuthEmail,
+} from "../auth/loginId";
 import { siteConfig } from "../config/site";
 
 type FieldErrors = {
@@ -25,7 +30,10 @@ export function LoginScreen() {
     if (!normalizedLoginId) {
       nextErrors.loginId = "ログイン ID を入力してください。";
     } else if (!isValidLoginId(normalizedLoginId)) {
-      nextErrors.loginId = "ログイン ID は英小文字・数字・.-_ のみ使用できます。";
+      nextErrors.loginId =
+        normalizedLoginId.length < 4 || normalizedLoginId.length > 20
+          ? loginIdValidationMessages.length
+          : loginIdValidationMessages.charset;
     }
 
     if (!password) {

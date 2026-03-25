@@ -91,6 +91,29 @@ export type AuthUsersResponse = {
   errorMessage?: string;
 };
 
+export type BulkRegisterMemberRow = {
+  rowNumber: number;
+  input: SaveMemberInput;
+};
+
+export type BulkRegisterMemberResult = {
+  rowNumber: number;
+  userId: string;
+  displayName: string;
+  generatedEmail: string;
+  temporaryPassword: string;
+  status: "success" | "error";
+  errorMessage: string;
+};
+
+export type BulkRegisterMembersResponse = {
+  results: BulkRegisterMemberResult[];
+  successCount: number;
+  failureCount: number;
+  projectId: string;
+  functionsRegion?: string;
+};
+
 export type SaveFamilyInput = Pick<FamilyRecord, "name" | "status" | "notes">;
 
 export type SaveMemberInput = Pick<
