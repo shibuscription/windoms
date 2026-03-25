@@ -46,8 +46,8 @@ import {
 } from "./utils/activityPlan";
 import { LoginScreen } from "./components/LoginScreen";
 import { auth, ensureAuthPersistence } from "./config/firebase";
+import { siteConfig } from "./config/site";
 import { toAuthenticatedUser, type AuthenticatedUser } from "./auth/session";
-import { appRuntimeConfig } from "./config/runtime";
 import { loadInitialData } from "./data/runtimeData";
 import { getMemberByAuthUid } from "./members/service";
 import type { MemberRecord, MemberRole } from "./members/types";
@@ -448,7 +448,7 @@ export function App() {
       const pathname = pathPart || "/";
       const search = queryPart ? `?${queryPart}` : "";
       const label = resolvePageLabel(pathname, search);
-      document.title = label ? `${appRuntimeConfig.appName} | ${label}` : appRuntimeConfig.appName;
+      document.title = label ? `${label} | ${siteConfig.documentTitle}` : siteConfig.documentTitle;
     };
 
     updateDocumentTitle();
@@ -601,7 +601,7 @@ export function App() {
     return (
       <div className="auth-screen">
         <section className="auth-card">
-          <p className="auth-eyebrow">{appRuntimeConfig.appName}</p>
+          <p className="auth-eyebrow">{siteConfig.fullDisplayName}</p>
           <h1>認証を確認しています</h1>
           <p className="muted">ログイン状態を読み込んでいます。</p>
         </section>
@@ -617,7 +617,7 @@ export function App() {
     return (
       <div className="auth-screen">
         <section className="auth-card">
-          <p className="auth-eyebrow">{appRuntimeConfig.appName}</p>
+          <p className="auth-eyebrow">{siteConfig.fullDisplayName}</p>
           <h1>メンバー情報を確認しています</h1>
           <p className="muted">Firestore 上の members との紐付けを確認しています。</p>
         </section>

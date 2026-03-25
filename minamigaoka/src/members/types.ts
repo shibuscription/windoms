@@ -1,7 +1,27 @@
 export type FamilyStatus = "active" | "inactive";
 export type MemberRole = "admin" | "officer" | "parent" | "child" | "teacher";
+export type MemberType = "parent" | "child" | "teacher" | "obog";
+export type AdminRole = "none" | "officer" | "admin";
+export type StaffPermission = "accounting" | "shift_management";
 export type MemberStatus = "active" | "inactive";
 export type MemberPermission = string;
+export type InstrumentCode =
+  | "piccolo"
+  | "flute"
+  | "clarinet"
+  | "oboe"
+  | "bassoon"
+  | "soprano_sax"
+  | "alto_sax"
+  | "tenor_sax"
+  | "baritone_sax"
+  | "trumpet"
+  | "horn"
+  | "trombone"
+  | "euphonium"
+  | "tuba"
+  | "bass"
+  | "percussion";
 export type RelationshipType =
   | "father"
   | "mother"
@@ -26,12 +46,19 @@ export type MemberRecord = {
   familyId: string;
   name: string;
   nameKana: string;
+  enrollmentYear: number | null;
+  instrumentCodes: InstrumentCode[];
+  memberTypes: MemberType[];
+  adminRole: AdminRole;
+  staffPermissions: StaffPermission[];
+  memberStatus: MemberStatus;
   role: MemberRole;
   permissions: MemberPermission[];
   status: MemberStatus;
   loginId: string;
   authUid: string;
   authEmail: string;
+  notes: string;
   createdAt: unknown;
   updatedAt: unknown;
 };
@@ -68,10 +95,28 @@ export type SaveFamilyInput = Pick<FamilyRecord, "name" | "status" | "notes">;
 
 export type SaveMemberInput = Pick<
   MemberRecord,
-  "familyId" | "name" | "nameKana" | "role" | "permissions" | "status" | "loginId"
+  | "familyId"
+  | "name"
+  | "nameKana"
+  | "enrollmentYear"
+  | "instrumentCodes"
+  | "memberTypes"
+  | "adminRole"
+  | "staffPermissions"
+  | "memberStatus"
+  | "loginId"
+  | "notes"
 >;
 
 export type SaveRelationInput = Pick<
   MemberRelationRecord,
   "childMemberId" | "guardianMemberId" | "relationType" | "status"
 >;
+
+export type InstrumentMasterItem = {
+  code: InstrumentCode;
+  label: string;
+  sortOrder: number;
+  isActive: boolean;
+  group?: string;
+};

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth, hasFirebaseAuthConfig } from "../config/firebase";
 import { isValidLoginId, normalizeLoginId, toInternalAuthEmail } from "../auth/loginId";
-import { appRuntimeConfig } from "../config/runtime";
+import { siteConfig } from "../config/site";
 
 type FieldErrors = {
   loginId?: string;
@@ -25,7 +25,7 @@ export function LoginScreen() {
     if (!normalizedLoginId) {
       nextErrors.loginId = "ログイン ID を入力してください。";
     } else if (!isValidLoginId(normalizedLoginId)) {
-      nextErrors.loginId = "ログイン ID は英小文字・数字・.-_ のみ利用できます。";
+      nextErrors.loginId = "ログイン ID は英小文字・数字・.-_ のみ使用できます。";
     }
 
     if (!password) {
@@ -55,7 +55,7 @@ export function LoginScreen() {
   return (
     <div className="auth-screen">
       <section className="auth-card">
-        <p className="auth-eyebrow">{appRuntimeConfig.appName}</p>
+        <p className="auth-eyebrow">{siteConfig.organizationName}</p>
         <h1>ログイン</h1>
         <p className="muted">配布されたログイン ID とパスワードを入力してください。</p>
         <form className="auth-form" onSubmit={handleSubmit}>
@@ -88,7 +88,7 @@ export function LoginScreen() {
           {formError && <p className="field-error auth-form-error">{formError}</p>}
           {!hasFirebaseAuthConfig && (
             <p className="field-error auth-form-error">
-              Firebase 設定が未入力のためログインできません。`.env` を設定してください。
+              Firebase 設定が未入力のためログインできません。.env を設定してください。
             </p>
           )}
           <button type="submit" className="button" disabled={isSubmitting}>
@@ -96,6 +96,12 @@ export function LoginScreen() {
           </button>
         </form>
         <p className="muted auth-help">パスワードを忘れた場合は管理者へ連絡してください。</p>
+        <div className="auth-powered-by" aria-label="Powered by Windoms">
+          <span className="auth-powered-by-icon-wrap" aria-hidden="true">
+            <img src="/assets/logo/windoms-icon.svg" alt="" className="auth-powered-by-icon" />
+          </span>
+          <span>Powered by {siteConfig.productName}</span>
+        </div>
       </section>
     </div>
   );

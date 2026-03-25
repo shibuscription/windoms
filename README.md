@@ -1861,6 +1861,54 @@ TODO：
 - 血縁や関係性が複雑でも、`family` の複数所属ではなく `memberRelation` で表現する。
 
 #### 30.9.2 ロールと権限
+- 正式仕様の権限モデルは単一 `role` ではなく、`memberTypes` / `adminRole` / `staffPermissions` / `memberStatus` を基準にする。
+- 既存の単一 `role` は暫定互換のために残り得るが、新規設定・今後の判断基準は本節の新構造を優先する。
+
+#### 30.9.2.1 正式仕様の権限モデル
+- `memberTypes: string[]`
+  - 利用者の立場を表す
+  - 複数保持可
+  - 当面の候補値は `parent` / `child` / `teacher` / `obog`
+- `adminRole: string`
+  - クラブ全体に対する管理・運営権限を表す
+  - 単一値
+  - 候補値は `none` / `officer` / `admin`
+- `staffPermissions: string[]`
+  - 特定業務の担当権限を表す
+  - 複数保持可
+  - 当面の候補値は `accounting` / `shift_management`
+- `memberStatus: string`
+  - 現在利用対象かどうかを表す
+  - 単一値
+  - 候補値は `active` / `inactive`
+- `memberTypes` は「その人が誰か、どんな立場を持つか」を表す。
+- `adminRole` は「クラブ全体に対する管理・運営権限」を表す。
+- `staffPermissions` は「会計担当やシフト作成担当など、特定業務の担当」を表す。
+- `memberStatus` は「現在利用対象かどうか」を表す。
+- `admin` は原則すべて利用可能な最上位管理者とする。
+- `officer` は運営系の追加権限とする。
+- `accounting` は会計モジュール利用、購入依頼に対する購入、立替に対する支払いなど、会計担当として通常必要な業務を一通り含む。
+- `shift_management` はシフト作成や調整に必要な通常業務を含む。
+- 今回は `accounting` / `shift_management` をさらに細分化しない。
+
+#### 30.9.2.2 memberTypes の組み合わせルール
+- `memberTypes` は複数可だが、当面は以下の組み合わせ制約を設ける。
+- `parent + obog` は可。
+- `teacher + obog` は可。
+- `child` は当面単独運用寄りとし、他の `memberTypes` と併用不可。
+- `child + parent` / `child + teacher` / `child + obog` は不可。
+- UI 上で禁止組み合わせは選択できないようにする。
+- 保存時にも同じルールでバリデーションする。
+- エラーは該当セクション内に表示し、無反応に見える状態を作らない。
+
+#### 30.9.2.3 旧 role からの暫定読み替え
+- 旧 `role` 実装が残っている場合は、互換運用のために以下の読み替えを行う。
+- `admin` -> `memberTypes=[parent]`, `adminRole=admin`, `staffPermissions=[]`
+- `officer` -> `memberTypes=[parent]`, `adminRole=officer`, `staffPermissions=[]`
+- `parent` -> `memberTypes=[parent]`, `adminRole=none`, `staffPermissions=[]`
+- `child` -> `memberTypes=[child]`, `adminRole=none`, `staffPermissions=[]`
+- `teacher` -> `memberTypes=[teacher]`, `adminRole=none`, `staffPermissions=[]`
+- この読み替えは暫定互換のためのものであり、今後の正式仕様は新構造を基準にする。
 - `role` は人の立場や属性を表す。
 - `permission` は画面や操作の可否を表す。
 - `role` と `permission` は分離する。
@@ -1994,6 +2042,18 @@ TODO：
 - 管理者のみ設定内で「メンバー管理」に到達できるようにする。
 - 画面名やタイトルもこの責務に合わせて整理する。
 
+#### 30.9.10.4 表示名設定
+- クラブ名やサイト表示名は JSX 内でハードコードせず、フロント側の設定値で一元管理する。
+- 画面内表示と `document.title` は同じ設定値を参照する。
+- 文言変更のたびに JSX を直接探して直さなくてよい構成にする。
+- 表示名は env ではなく、`src/config` 配下の公開設定ファイルで管理する。
+- 設定ファイルには少なくとも `productName` / `organizationName` / `fullDisplayName` / `documentTitle` 相当を持たせる。
+- minamigaoka の今回の表示名は `Windoms 南ヶ丘中学校吹奏楽クラブ` とする。
+- `productName` は `Windoms`、`organizationName` は `南ヶ丘中学校吹奏楽クラブ` としてよい。
+- `document.title` の基本形式は `{ページ名} | {fullDisplayName}` とし、ページ名を持たないトップ相当のみ `fullDisplayName` 単独表示としてよい。
+- 例: `ログイン | Windoms 南ヶ丘中学校吹奏楽クラブ` / `メンバー管理 | Windoms 南ヶ丘中学校吹奏楽クラブ`
+- `documentTitle` も原則としてこの表示名を基準に構成する。
+
 #### 30.9.10.1 minamigaoka のメニュー / アカウント操作
 - 上部タスクバー右端はハンバーガーメニューとする。
 - ログアウトボタンは上部タスクバーに常設しない。
@@ -2005,6 +2065,168 @@ TODO：
 - ログインユーザー情報は `member.name` を優先表示し、補助情報として `loginId` と `role` を表示する。
 - `member` 未紐付けなどで `name` が取れない場合は fallback として `loginId` を表示してよい。
 - スマホ / タブレットでも見切れず操作しやすい位置に配置する。
+
+#### 30.9.10.5 メンバー管理画面の権限設定 UI
+- メンバー管理画面では、以下を設定できるようにする。
+  - 利用者区分
+  - 管理権限
+  - 担当業務
+  - 利用状態
+- UI は次の 4 ブロックを基本とする。
+  - 利用者区分: `memberTypes`
+  - 管理権限: `adminRole`
+  - 担当業務: `staffPermissions`
+  - 利用状態: `memberStatus`
+- 利用者区分はチェックボックスで設定し、禁止組み合わせは UI 上で選べないようにする。
+- 管理権限は `none` / `officer` / `admin` の単一選択とする。
+- 担当業務は `accounting` / `shift_management` の複数選択とする。
+- 利用状態は `active` / `inactive` の単一選択とする。
+- 保存時にも UI と同じルールで再検証する。
+- `memberTypes` は 1 つ以上必須とする。
+- `child` を含む場合に他の `memberTypes` が同時に選ばれていたら保存エラーとする。
+- エラーは alert や browser confirm ではなく、該当セクション内に表示する。
+- 一覧や詳細では、利用者区分 / 管理権限 / 担当業務 / 無効状態が軽く分かる表示を許可する。
+
+#### 30.9.10.6 メンバー管理画面のタブ構成
+- メンバー管理画面は、以下の 4 タブで構成する。
+  - `Family`
+  - `Member`
+  - `Auth`
+  - `未紐付け / 不整合`
+- 各タブは、そのデータ種別や用途に応じた一覧と操作を持つ。
+- 管理画面では「通常操作」と「点検・不整合確認」を分離し、迷いにくい構成を優先する。
+- ページ上部にタイトル、その下にタブを配置する。
+- 各タブ内では、見出し・簡単な説明・主操作ボタン・一覧本体を基本構成とする。
+- 追加ボタンや再取得ボタンは、関係するタブの中に置く。
+- 通常利用の一覧と、点検用の一覧を同じタブに混在させない。
+- `Family` タブ:
+  - family の一覧、追加、編集、削除を扱う。
+  - 主操作は `Family追加` とする。
+- `Member` タブ:
+  - member の一覧、追加、編集、削除、relation の通常操作を扱う。
+  - 主操作は `Member追加` とする。
+  - relation の追加や編集・削除は `Member` タブ側で扱う。
+- `Auth` タブ:
+  - auth の確認、紐付け、再取得など、認証情報関連を扱う。
+  - 主操作は `Auth再取得` とする。
+  - loginId / authEmail / authUid の確認や Auth 紐付けもこのタブで扱う。
+- `未紐付け / 不整合` タブ:
+  - family 未所属、auth 未紐付け、member/auth 不整合、relation 不整合などの点検対象を扱う。
+  - このタブは通常操作よりも確認・修正対象の把握を優先する。
+  - relation の不整合確認はこのタブで扱う。
+
+#### 30.9.10.7 Member の追加項目
+- `members` には既存の権限系項目に加えて、以下の項目を持てるようにする。
+  - `enrollmentYear`
+    - 入学年度
+    - 西暦 4 桁の数値
+    - 例: `2024`
+    - `child` では必須寄りだが、当面は空欄保存可とする
+    - `obog` にも設定可
+    - `parent` / `teacher` は通常空欄可
+    - 未設定時は `学年未設定` など、未設定であることが分かる表示を許可する
+  - `instrumentCodes`
+    - 担当楽器
+    - `string[]`
+    - 複数担当可
+    - 楽器候補はマスタ定義から選択する
+    - 将来、候補追加や細分化ができる構造にする
+- `member` は原則として `family` に所属するが、仮運用では `familyId` 空欄の未所属 member を許容する。
+- `familyId` 空欄の member は管理画面の点検対象として把握できるようにする。
+
+#### 30.9.10.8 担当楽器マスタ
+- 担当楽器は厳密な楽器学的分類ではなく、現在のクラブ運用に合う実用的なパート区分として扱う。
+- 一覧表示・並び替え・絞り込みに使いやすい粒度を優先する。
+- 持ち替え楽器があっても、当面は主担当パート側の区分で扱ってよい。
+- 楽器候補はマスタ管理し、あとから追加・無効化・並び替えしやすい構造にする。
+- マスタは少なくとも `code` / `label` / `sortOrder` / `isActive` を持つ。
+- 初期候補は以下とする。
+  - `piccolo` / ピッコロ
+  - `flute` / フルート
+  - `clarinet` / クラリネット
+  - `oboe` / オーボエ
+  - `bassoon` / ファゴット
+  - `soprano_sax` / ソプラノサックス
+  - `alto_sax` / アルトサックス
+  - `tenor_sax` / テナーサックス
+  - `baritone_sax` / バリトンサックス
+  - `trumpet` / トランペット
+  - `horn` / ホルン
+  - `trombone` / トロンボーン
+  - `euphonium` / ユーフォニアム
+  - `tuba` / チューバ
+  - `bass` / ベース
+  - `percussion` / パーカッション
+- 並び順は、概ね木管 -> 金管 -> その他の順を初期値とする。
+
+#### 30.9.10.9 Member 管理画面での扱い
+- Member 設定モーダルでは、既存の権限設定に加えて以下を設定できるようにする。
+  - `enrollmentYear`
+  - `instrumentCodes`
+- `enrollmentYear` は西暦 4 桁を想定した数値入力とする。
+- `instrumentCodes` はマスタからの複数選択 UI とする。
+- 一覧表示では、情報過多にならない範囲で `入学年度` と `担当楽器` を軽く確認できる表示を許可する。
+- `enrollmentYear` 未設定で学年表示相当が必要な場面では、`学年未設定` と分かる表示を許可する。
+
+#### 30.9.10.10 Member CSV インポート / テンプレート
+- CSV インポートは Windoms 専用の整形済みフォーマットを対象とする。
+- Google フォームの生データを直接読む機能は持たない。
+- 管理者が Windoms 用に整えた CSV を取り込む前提とする。
+- CSV はヘッダ行ありとする。
+- 取り込み時はヘッダ名を参照しない。
+- 1 行目は無条件でヘッダとしてスキップし、2 行目以降を列順固定で解釈する。
+- まずは Member 新規登録向けの一括取り込みを対象とする。
+- 管理画面からテンプレート CSV をダウンロードできるようにする。
+- テンプレート CSV はヘッダ行のみでよい。
+- ヘッダは以下とする。
+  - `familyName,name,nameKana,loginId,memberTypes,adminRole,staffPermissions,memberStatus,enrollmentYear,instrumentCodes,notes`
+- 列順は以下とする。
+  - 1 列目: `familyName`
+  - 2 列目: `name`
+  - 3 列目: `nameKana`
+  - 4 列目: `loginId`
+  - 5 列目: `memberTypes`
+  - 6 列目: `adminRole`
+  - 7 列目: `staffPermissions`
+  - 8 列目: `memberStatus`
+  - 9 列目: `enrollmentYear`
+  - 10 列目: `instrumentCodes`
+  - 11 列目: `notes`
+- 値ルールは以下とする。
+  - `familyName`
+    - 空欄可
+    - 空欄時は未所属 member として扱ってよい
+    - 値が入っている場合は既存 `family.name` と完全一致する family にのみ紐付ける
+    - 一致しない場合は取り込みエラーとする
+  - `name`
+    - 必須
+  - `nameKana`
+    - 空欄可
+  - `loginId`
+    - 必須
+  - `memberTypes`
+    - カンマ区切り
+    - 例: `child` / `parent,obog`
+  - `adminRole`
+    - 空欄時は `none`
+  - `staffPermissions`
+    - カンマ区切り
+    - 空欄時は空配列
+  - `memberStatus`
+    - 空欄時は `active`
+  - `enrollmentYear`
+    - 空欄可
+    - 入っていれば西暦 4 桁数値
+  - `instrumentCodes`
+    - カンマ区切り
+    - 空欄可
+    - 値は楽器マスタの `code` を使う
+  - `notes`
+    - 空欄可
+- CSV 取り込み時も、既存の `memberTypes` 組み合わせ制約を適用する。
+- `instrumentCodes` は楽器マスタに存在する `code` のみ許可する。
+- `loginId` 重複はエラーとして取り込みを止める。
+- エラーは可能な範囲で行番号つきで表示し、無反応に見える状態を作らない。
 
 #### 30.9.11 Auth 一覧取得
 - 管理画面から Firebase Auth のユーザー一覧を参照できるようにする。

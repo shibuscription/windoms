@@ -1,3 +1,5 @@
+import { siteConfig } from "./site";
+
 export type AppRole = "admin" | "parent";
 
 const parseCsv = (value: string | undefined): string[] =>
@@ -25,7 +27,7 @@ const defaultRole = env.VITE_MINAMIGAOKA_DEFAULT_ROLE === "admin" ? "admin" : "p
 
 export const appRuntimeConfig = {
   appId: "minamigaoka",
-  appName: "Windoms 南ヶ丘",
+  appName: siteConfig.fullDisplayName,
   authEmailDomain: env.VITE_MINAMIGAOKA_AUTH_EMAIL_DOMAIN ?? "minamigaoka.windoms.club",
   defaultRole,
   adminLoginIds: new Set(parseCsv(env.VITE_MINAMIGAOKA_ADMIN_LOGIN_IDS)),

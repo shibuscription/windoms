@@ -23,6 +23,15 @@ import {
   hasFirebaseAppConfig,
 } from "../config/firebase";
 import { normalizeLoginId, toInternalAuthEmail } from "../auth/loginId";
+import { normalizeInstrumentCodes } from "./instruments";
+import {
+  deriveLegacyPermissions,
+  deriveLegacyRole,
+  normalizeAdminRole,
+  normalizeMemberStatus,
+  normalizeMemberTypes,
+  normalizeStaffPermissions,
+} from "./permissions";
 import type {
   AuthUsersResponse,
   FamilyRecord,
@@ -46,28 +55,47 @@ const toFamilyRecord = (id: string, value: Record<string, unknown>): FamilyRecor
   updatedAt: value.updatedAt ?? null,
 });
 
-const toMemberRecord = (id: string, value: Record<string, unknown>): MemberRecord => ({
-  id,
-  familyId: typeof value.familyId === "string" ? value.familyId : "",
-  name: typeof value.name === "string" ? value.name : "",
-  nameKana: typeof value.nameKana === "string" ? value.nameKana : "",
-  role:
+const toMemberRecord = (id: string, value: Record<string, unknown>): MemberRecord => {
+  const legacyRole =
     value.role === "admin" ||
     value.role === "officer" ||
     value.role === "child" ||
     value.role === "teacher"
       ? value.role
-      : "parent",
-  permissions: Array.isArray(value.permissions)
-    ? value.permissions.filter((item): item is string => typeof item === "string")
-    : [],
-  status: value.status === "inactive" ? "inactive" : "active",
-  loginId: typeof value.loginId === "string" ? value.loginId : "",
-  authUid: typeof value.authUid === "string" ? value.authUid : "",
-  authEmail: typeof value.authEmail === "string" ? value.authEmail : "",
-  createdAt: value.createdAt ?? null,
-  updatedAt: value.updatedAt ?? null,
-});
+      : "parent";
+  const memberTypes = normalizeMemberTypes(value.memberTypes, legacyRole);
+  const adminRole = normalizeAdminRole(value.adminRole, legacyRole);
+  const staffPermissions = normalizeStaffPermissions(value.staffPermissions, legacyRole);
+  const memberStatus = normalizeMemberStatus(value.memberStatus, value.status);
+  return {
+    id,
+    familyId: typeof value.familyId === "string" ? value.familyId : "",
+    name: typeof value.name === "string" ? value.name : "",
+    nameKana: typeof value.nameKana === "string" ? value.nameKana : "",
+    enrollmentYear:
+      typeof value.enrollmentYear === "number" && Number.isFinite(value.enrollmentYear)
+        ? value.enrollmentYear
+        : typeof value.enrollmentYear === "string" && /^\d{4}$/.test(value.enrollmentYear)
+          ? Number(value.enrollmentYear)
+        : null,
+    instrumentCodes: normalizeInstrumentCodes(value.instrumentCodes),
+    memberTypes,
+    adminRole,
+    staffPermissions,
+    memberStatus,
+    role: legacyRole,
+    permissions: Array.isArray(value.permissions)
+      ? value.permissions.filter((item): item is string => typeof item === "string")
+      : [],
+    status: memberStatus,
+    loginId: typeof value.loginId === "string" ? value.loginId : "",
+    authUid: typeof value.authUid === "string" ? value.authUid : "",
+    authEmail: typeof value.authEmail === "string" ? value.authEmail : "",
+    notes: typeof value.notes === "string" ? value.notes : "",
+    createdAt: value.createdAt ?? null,
+    updatedAt: value.updatedAt ?? null,
+  };
+};
 
 const toRelationRecord = (id: string, value: Record<string, unknown>): MemberRelationRecord => ({
   id,
@@ -165,14 +193,27 @@ export const saveFamily = async (familyId: string | null, input: SaveFamilyInput
 export const saveMember = async (memberId: string | null, input: SaveMemberInput): Promise<void> => {
   ensureDb();
   const normalizedLoginId = input.loginId ? normalizeLoginId(input.loginId) : "";
+  const legacyRole = deriveLegacyRole(input.memberTypes, input.adminRole);
+  const legacyPermissions = deriveLegacyPermissions(input.staffPermissions);
+  const normalizedEnrollmentYear =
+    typeof input.enrollmentYear === "number" && Number.isFinite(input.enrollmentYear)
+      ? input.enrollmentYear
+      : null;
   const payload = {
     familyId: input.familyId,
     name: input.name.trim(),
     nameKana: input.nameKana.trim(),
-    role: input.role,
-    permissions: input.permissions,
-    status: input.status,
+    enrollmentYear: normalizedEnrollmentYear,
+    instrumentCodes: normalizeInstrumentCodes(input.instrumentCodes),
+    memberTypes: input.memberTypes,
+    adminRole: input.adminRole,
+    staffPermissions: input.staffPermissions,
+    memberStatus: input.memberStatus,
+    role: legacyRole,
+    permissions: legacyPermissions,
+    status: input.memberStatus,
     loginId: normalizedLoginId,
+    notes: input.notes.trim(),
     updatedAt: serverTimestamp(),
   };
 
@@ -269,7 +310,7 @@ export const deleteFamily = async (familyId: string): Promise<void> => {
 
   const linkedMembers = await getDocs(query(membersCollection!, where("familyId", "==", familyId), limit(1)));
   if (!linkedMembers.empty) {
-    throw new Error("所属 member が残っているため、この family は削除できません。");
+    throw new Error("所属 member があるため、この family は削除できません。");
   }
 
   await deleteDoc(doc(familiesCollection!, familyId));

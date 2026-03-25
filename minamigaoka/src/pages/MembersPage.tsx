@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { isValidLoginId, normalizeLoginId, toInternalAuthEmail } from "../auth/loginId";
 import { auth, firebaseFunctionsRegion, firebaseProjectId } from "../config/firebase";
+import { memberCsvTemplateHeader, parseMemberCsv } from "../members/csv";
 import {
   findAuthCandidate,
   findAuthUsersWithoutMember,
@@ -9,6 +10,17 @@ import {
   findMembersWithoutAuth,
   findRelationOrphans,
 } from "../members/integrity";
+import {
+  adminRoleOptions,
+  buildMemberSummaryBadges,
+  canSelectMemberType,
+  isChildMember,
+  memberStatusOptions,
+  memberTypeOptions,
+  staffPermissionOptions,
+  validateMemberTypes,
+} from "../members/permissions";
+import { activeInstrumentMaster, formatInstrumentLabels } from "../members/instruments";
 import {
   hasDuplicateRelationPair,
   isSameFamilyRelation,
@@ -30,12 +42,16 @@ import {
   subscribeMembers,
 } from "../members/service";
 import type {
+  AdminRole,
   AuthUserSummary,
   FamilyRecord,
+  InstrumentCode,
   MemberRecord,
   MemberRelationRecord,
-  MemberRole,
+  MemberStatus,
+  MemberType,
   RelationshipType,
+  StaffPermission,
 } from "../members/types";
 
 type FamilyFormState = {
@@ -50,10 +66,14 @@ type MemberFormState = {
   familyId: string;
   name: string;
   nameKana: string;
-  role: MemberRole;
-  permissionsText: string;
-  status: "active" | "inactive";
+  enrollmentYear: string;
+  instrumentCodes: InstrumentCode[];
+  memberTypes: MemberType[];
+  adminRole: AdminRole;
+  staffPermissions: StaffPermission[];
+  memberStatus: MemberStatus;
   loginId: string;
+  notes: string;
 };
 
 type RelationFormState = {
@@ -81,6 +101,13 @@ type ClaimState = {
   message: string;
 };
 
+type CsvImportPreviewRow = {
+  rowNumber: number;
+  familyName: string;
+  name: string;
+  loginId: string;
+};
+
 type DeleteDialogState =
   | {
       kind: "family" | "member" | "relation";
@@ -90,13 +117,7 @@ type DeleteDialogState =
     }
   | null;
 
-const roleLabel: Record<MemberRole, string> = {
-  admin: "admin",
-  officer: "officer",
-  parent: "parent",
-  child: "child",
-  teacher: "teacher",
-};
+type ManagementTab = "family" | "member" | "auth" | "integrity";
 
 const emptyFamilyForm = (): FamilyFormState => ({
   id: null,
@@ -110,10 +131,14 @@ const emptyMemberForm = (): MemberFormState => ({
   familyId: "",
   name: "",
   nameKana: "",
-  role: "parent",
-  permissionsText: "",
-  status: "active",
+  enrollmentYear: "",
+  instrumentCodes: [],
+  memberTypes: ["parent"],
+  adminRole: "none",
+  staffPermissions: [],
+  memberStatus: "active",
   loginId: "",
+  notes: "",
 });
 
 const emptyRelationForm = (): RelationFormState => ({
@@ -124,13 +149,54 @@ const emptyRelationForm = (): RelationFormState => ({
   status: "active",
 });
 
-const splitPermissions = (value: string): string[] =>
-  value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-
 const formatMemberLabel = (member: MemberRecord) => member.name || member.loginId || member.id;
+
+type PermissionSectionProps = {
+  title: string;
+  description?: string;
+  error?: string;
+  children: ReactNode;
+};
+
+const managementTabs: Array<{ id: ManagementTab; label: string }> = [
+  { id: "family", label: "Family" },
+  { id: "member", label: "Member" },
+  { id: "auth", label: "Auth" },
+  { id: "integrity", label: "未紐付け / 不整合" },
+];
+
+function PermissionSection({ title, description, error, children }: PermissionSectionProps) {
+  return (
+    <div className="permission-form-section">
+      <div className="permission-form-section-head">
+        <h4 className="permission-form-title">{title}</h4>
+        {description ? <p className="permission-form-help">{description}</p> : null}
+      </div>
+      <div className="permission-form-options">{children}</div>
+      {error ? <p className="permission-form-error field-error">{error}</p> : null}
+    </div>
+  );
+}
+
+type PermissionOptionRowProps = {
+  type: "checkbox" | "radio";
+  name?: string;
+  checked: boolean;
+  disabled?: boolean;
+  label: string;
+  onChange: () => void;
+};
+
+function PermissionOptionRow({ type, name, checked, disabled = false, label, onChange }: PermissionOptionRowProps) {
+  return (
+    <label className={`permission-option-row ${checked ? "is-selected" : ""} ${disabled ? "is-disabled" : ""}`}>
+      <span className="permission-option-control">
+        <input type={type} name={name} checked={checked} disabled={disabled} onChange={onChange} />
+      </span>
+      <span className="permission-option-label">{label}</span>
+    </label>
+  );
+}
 
 export function MembersManagementPage() {
   const [families, setFamilies] = useState<FamilyRecord[]>([]);
@@ -168,11 +234,26 @@ export function MembersManagementPage() {
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>(null);
   const [deleteError, setDeleteError] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+  const [activeTab, setActiveTab] = useState<ManagementTab>("member");
+  const [csvImportErrors, setCsvImportErrors] = useState<string[]>([]);
+  const [csvImportPreview, setCsvImportPreview] = useState<CsvImportPreviewRow[]>([]);
+  const [csvImportCount, setCsvImportCount] = useState(0);
+  const [isCsvImportModalOpen, setIsCsvImportModalOpen] = useState(false);
+  const [isCsvImporting, setIsCsvImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const familyNameById = useMemo(
     () =>
       families.reduce<Record<string, string>>((result, family) => {
         result[family.id] = family.name;
+        return result;
+      }, {}),
+    [families],
+  );
+  const familyIdByName = useMemo(
+    () =>
+      families.reduce<Record<string, string>>((result, family) => {
+        result[family.name.trim()] = family.id;
         return result;
       }, {}),
     [families],
@@ -197,7 +278,7 @@ export function MembersManagementPage() {
   );
 
   const guardianCandidates = useMemo(
-    () => members.filter((member) => member.role !== "child" && member.status === "active"),
+    () => members.filter((member) => !isChildMember(member) && member.memberStatus === "active"),
     [members],
   );
   const childRelationsByChildId = useMemo(
@@ -222,6 +303,10 @@ export function MembersManagementPage() {
   );
   const orphanRelations = useMemo(() => findRelationOrphans(relations, members), [relations, members]);
   const duplicateRelations = useMemo(() => findDuplicateRelations(relations), [relations]);
+  const membersWithoutFamily = useMemo(
+    () => members.filter((member) => !member.familyId || !familyNameById[member.familyId]),
+    [familyNameById, members],
+  );
 
   const linkTargetMember = linkTargetMemberId
     ? members.find((member) => member.id === linkTargetMemberId) ?? null
@@ -397,10 +482,14 @@ export function MembersManagementPage() {
       familyId: member.familyId,
       name: member.name,
       nameKana: member.nameKana,
-      role: member.role,
-      permissionsText: member.permissions.join(", "),
-      status: member.status,
+      enrollmentYear: member.enrollmentYear ? String(member.enrollmentYear) : "",
+      instrumentCodes: member.instrumentCodes,
+      memberTypes: member.memberTypes,
+      adminRole: member.adminRole,
+      staffPermissions: member.staffPermissions,
+      memberStatus: member.memberStatus,
       loginId: member.loginId,
+      notes: member.notes,
     });
     setMemberErrors({});
     setIsMemberModalOpen(true);
@@ -450,6 +539,34 @@ export function MembersManagementPage() {
     setDeleteDialog(null);
   };
 
+  const toggleMemberType = (memberType: MemberType) => {
+    setMemberForm((current) => ({
+      ...current,
+      memberTypes: current.memberTypes.includes(memberType)
+        ? current.memberTypes.filter((item) => item !== memberType)
+        : [...current.memberTypes, memberType],
+    }));
+    setMemberErrors((current) => ({ ...current, memberTypes: undefined }));
+  };
+
+  const toggleStaffPermission = (permission: StaffPermission) => {
+    setMemberForm((current) => ({
+      ...current,
+      staffPermissions: current.staffPermissions.includes(permission)
+        ? current.staffPermissions.filter((item) => item !== permission)
+        : [...current.staffPermissions, permission],
+    }));
+  };
+
+  const toggleInstrumentCode = (instrumentCode: InstrumentCode) => {
+    setMemberForm((current) => ({
+      ...current,
+      instrumentCodes: current.instrumentCodes.includes(instrumentCode)
+        ? current.instrumentCodes.filter((item) => item !== instrumentCode)
+        : [...current.instrumentCodes, instrumentCode],
+    }));
+  };
+
   const submitFamily = async () => {
     const nextErrors: FieldErrors = {};
     if (!familyForm.name.trim()) {
@@ -474,11 +591,22 @@ export function MembersManagementPage() {
   const submitMember = async () => {
     const nextErrors: FieldErrors = {};
     const normalizedLoginId = memberForm.loginId ? normalizeLoginId(memberForm.loginId) : "";
+    const memberTypesError = validateMemberTypes(memberForm.memberTypes);
+    const normalizedEnrollmentYear = memberForm.enrollmentYear.trim();
 
-    if (!memberForm.familyId) nextErrors.familyId = "family を選択してください。";
     if (!memberForm.name.trim()) nextErrors.name = "member 名を入力してください。";
+    if (memberTypesError) nextErrors.memberTypes = memberTypesError;
+    if (!adminRoleOptions.some((option) => option.value === memberForm.adminRole)) {
+      nextErrors.adminRole = "管理権限を選択してください。";
+    }
+    if (!memberStatusOptions.some((option) => option.value === memberForm.memberStatus)) {
+      nextErrors.memberStatus = "利用状態を選択してください。";
+    }
     if (normalizedLoginId && !isValidLoginId(normalizedLoginId)) {
       nextErrors.loginId = "loginId は英小文字・数字・.-_ のみ使用できます。";
+    }
+    if (normalizedEnrollmentYear && !/^\d{4}$/.test(normalizedEnrollmentYear)) {
+      nextErrors.enrollmentYear = "入学年度は西暦4桁で入力してください。";
     }
 
     const duplicateLoginId = members.find(
@@ -496,10 +624,14 @@ export function MembersManagementPage() {
         familyId: memberForm.familyId,
         name: memberForm.name,
         nameKana: memberForm.nameKana,
-        role: memberForm.role,
-        permissions: splitPermissions(memberForm.permissionsText),
-        status: memberForm.status,
+        enrollmentYear: normalizedEnrollmentYear ? Number(normalizedEnrollmentYear) : null,
+        instrumentCodes: memberForm.instrumentCodes,
+        memberTypes: memberForm.memberTypes,
+        adminRole: memberForm.adminRole,
+        staffPermissions: memberForm.staffPermissions,
+        memberStatus: memberForm.memberStatus,
         loginId: normalizedLoginId,
+        notes: memberForm.notes,
       });
       setIsMemberModalOpen(false);
       setToastMessage(memberForm.id ? "member を更新しました。" : "member を追加しました。");
@@ -588,6 +720,89 @@ export function MembersManagementPage() {
     }
   };
 
+  const downloadMemberCsvTemplate = () => {
+    const blob = new Blob([`${memberCsvTemplateHeader}\n`], { type: "text/csv;charset=utf-8;" });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "windoms-member-template.csv";
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const resetCsvImportState = () => {
+    setCsvImportErrors([]);
+    setCsvImportPreview([]);
+    setCsvImportCount(0);
+    setIsCsvImportModalOpen(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const handleCsvImportSelect = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const csvText = await file.text();
+      const result = parseMemberCsv(csvText, members, familyIdByName);
+      if (result.errors.length > 0) {
+        setCsvImportErrors(result.errors.map((item) => `${item.rowNumber}行目: ${item.message}`));
+        setCsvImportPreview([]);
+        setCsvImportCount(0);
+        setIsCsvImportModalOpen(true);
+        return;
+      }
+
+      setCsvImportErrors([]);
+      setCsvImportPreview(
+        result.rows.slice(0, 8).map((item) => ({
+          rowNumber: item.rowNumber,
+          familyName: item.familyName || "未所属",
+          name: item.input.name,
+          loginId: item.input.loginId,
+        })),
+      );
+      setCsvImportCount(result.rows.length);
+      setIsCsvImportModalOpen(true);
+    } catch (error) {
+      setCsvImportErrors([error instanceof Error ? error.message : "CSV の読み込みに失敗しました。"]);
+      setCsvImportPreview([]);
+      setCsvImportCount(0);
+      setIsCsvImportModalOpen(true);
+    }
+  };
+
+  const runCsvImport = async () => {
+    const file = fileInputRef.current?.files?.[0];
+    if (!file) {
+      setCsvImportErrors(["CSV ファイルを選択してください。"]);
+      return;
+    }
+
+    setIsCsvImporting(true);
+    try {
+      const csvText = await file.text();
+      const result = parseMemberCsv(csvText, members, familyIdByName);
+      if (result.errors.length > 0) {
+        setCsvImportErrors(result.errors.map((item) => `${item.rowNumber}行目: ${item.message}`));
+        return;
+      }
+
+      for (const row of result.rows) {
+        await saveMember(null, row.input);
+      }
+
+      setToastMessage(`${result.rows.length}件の member を取り込みました。`);
+      resetCsvImportState();
+    } catch (error) {
+      setCsvImportErrors([error instanceof Error ? error.message : "CSV インポートに失敗しました。"]);
+    } finally {
+      setIsCsvImporting(false);
+    }
+  };
+
   const authStatusText =
     authUsersState === "loading"
       ? "読み込み中"
@@ -603,23 +818,7 @@ export function MembersManagementPage() {
         <div>
           <h1>メンバー管理</h1>
           <p className="muted">メンバー画面や他モジュールで使う人物情報を管理します。</p>
-          <p className="muted">families / members / memberRelations / Auth 紐付けを管理します。</p>
-        </div>
-        <div className="members-admin-actions">
-          <button type="button" className="button button-small" onClick={openFamilyCreate}>
-            family 追加
-          </button>
-          <button type="button" className="button button-small" onClick={openMemberCreate}>
-            member 追加
-          </button>
-          <button
-            type="button"
-            className="button button-small button-secondary"
-            onClick={() => void refreshAuthUsers()}
-            disabled={authUsersState === "loading"}
-          >
-            {authUsersState === "loading" ? "Auth 再取得中..." : "Auth 再取得"}
-          </button>
+          <p className="muted">通常操作と点検・不整合確認を分けて扱える構成です。</p>
         </div>
       </div>
 
@@ -646,293 +845,382 @@ export function MembersManagementPage() {
         </article>
       </div>
 
-      <section className="members-admin-section">
-        <h2>未紐付け / 不整合</h2>
-        <div className="members-admin-grid">
-          <article className="members-admin-card">
-            <h3>member 側の未紐付け</h3>
-            <ul className="members-admin-list">
-              {membersWithoutAuth.map((member) => (
-                <li key={member.id}>
-                  {member.name}
-                  <span className="muted"> / {member.loginId || "loginId 未設定"}</span>
-                </li>
-              ))}
-              {membersWithoutAuth.length === 0 && <li>未紐付け member はありません。</li>}
-            </ul>
-          </article>
-          <article className="members-admin-card">
-            <h3>Auth 側の未紐付け</h3>
-            <ul className="members-admin-list">
-              {authUsersWithoutMember.map((authUser) => (
-                <li key={authUser.uid}>{authUser.email || authUser.uid}</li>
-              ))}
-              {authUsersWithoutMember.length === 0 && authUsersState === "success" && (
-                <li>未紐付け Auth はありません。</li>
-              )}
-              {authUsersState === "error" && <li>Auth 一覧の取得失敗中は判定できません。</li>}
-            </ul>
-          </article>
-          <article className="members-admin-card">
-            <h3>authUid 参照切れ</h3>
-            <ul className="members-admin-list">
-              {membersWithMissingAuth.map((member) => (
-                <li key={member.id}>
-                  {member.name}
-                  <span className="muted"> / {member.authUid}</span>
-                </li>
-              ))}
-              {membersWithMissingAuth.length === 0 && <li>参照切れはありません。</li>}
-            </ul>
-          </article>
-          <article className="members-admin-card">
-            <h3>relation 不整合</h3>
-            <ul className="members-admin-list">
-              {orphanRelations.map((relation) => (
-                <li key={relation.id}>
-                  {relation.childMemberId} → {relation.guardianMemberId} / {relationTypeLabel[relation.relationType]}
-                </li>
-              ))}
-              {orphanRelations.length === 0 && <li>参照切れ relation はありません。</li>}
-            </ul>
-            {duplicateRelations.length > 0 && (
-              <>
-                <h4>重複 relation</h4>
-                <ul className="members-admin-list">
-                  {duplicateRelations.map((item) => (
-                    <li key={item.key}>
-                      {item.key} / {item.relations.length}件
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </article>
-        </div>
-      </section>
+      <div className="members-admin-tabs" role="tablist" aria-label="メンバー管理タブ">
+        {managementTabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            className={`members-admin-tab ${activeTab === tab.id ? "active" : ""}`}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-      <section className="members-admin-section">
-        <div className="members-section-heading">
-          <h2>families</h2>
-        </div>
-        <div className="members-admin-grid">
-          {families.map((family) => {
-            const memberCount = familyMemberCountById[family.id] ?? 0;
+      {activeTab === "family" && (
+        <section className="members-admin-section">
+          <div className="members-section-heading">
+            <div>
+              <h2>Family</h2>
+              <p className="muted">family の一覧、追加、編集、削除を扱います。</p>
+            </div>
+            <div className="members-admin-actions">
+              <button type="button" className="button button-small" onClick={openFamilyCreate}>
+                Family追加
+              </button>
+            </div>
+          </div>
+          <div className="members-admin-grid">
+            {families.map((family) => {
+              const memberCount = familyMemberCountById[family.id] ?? 0;
 
-            return (
-              <article key={family.id} className="members-admin-card">
-                <div className="members-admin-card-header">
-                  <strong>{family.name}</strong>
+              return (
+                <article key={family.id} className="members-admin-card">
+                  <div className="members-admin-card-header">
+                    <strong>{family.name}</strong>
+                    <div className="members-admin-row-actions">
+                      <button
+                        type="button"
+                        className="button button-small button-secondary"
+                        onClick={() => openFamilyEdit(family)}
+                      >
+                        編集
+                      </button>
+                      <button
+                        type="button"
+                        className="button button-small button-danger"
+                        onClick={() =>
+                          openDeleteDialog(
+                            "family",
+                            family.id,
+                            "family を削除",
+                            memberCount > 0
+                              ? "所属 member があるため削除できません。先に member を整理してください。"
+                              : `${family.name} を削除しますか？`,
+                          )
+                        }
+                      >
+                        削除
+                      </button>
+                    </div>
+                  </div>
+                  <p className="muted">status: {family.status}</p>
+                  <p className="muted">{family.notes || "notes なし"}</p>
+                  <p className="muted">所属member: {memberCount}件</p>
+                  {memberCount > 0 && <p className="field-error-inline">所属 member がある間は削除できません。</p>}
+                </article>
+              );
+            })}
+            {families.length === 0 && <p className="muted">family はまだありません。</p>}
+          </div>
+        </section>
+      )}
+
+      {activeTab === "member" && (
+        <section className="members-admin-section">
+          <div className="members-section-heading">
+            <div>
+              <h2>Member</h2>
+              <p className="muted">member の一覧、追加、編集、削除、relation の通常操作を扱います。</p>
+            </div>
+            <div className="members-admin-actions">
+              <button type="button" className="button button-small" onClick={openMemberCreate}>
+                Member追加
+              </button>
+              <button type="button" className="button button-small button-secondary" onClick={() => fileInputRef.current?.click()}>
+                CSVインポート
+              </button>
+              <button type="button" className="button button-small button-secondary" onClick={downloadMemberCsvTemplate}>
+                CSVテンプレートDL
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="members-file-input"
+                onChange={(event) => void handleCsvImportSelect(event)}
+              />
+            </div>
+          </div>
+          <div className="members-admin-list-panel">
+            {members.map((member) => {
+              const childMember = isChildMember(member);
+              const childRelations = childMember ? childRelationsByChildId[member.id] ?? [] : [];
+              const summaryBadges = buildMemberSummaryBadges(member);
+              const profileDetails: string[] = [];
+              if (member.enrollmentYear) {
+                profileDetails.push(`${member.enrollmentYear}年度入学`);
+              } else if (childMember || member.memberTypes.includes("obog")) {
+                profileDetails.push("学年未設定");
+              }
+              if (member.instrumentCodes.length > 0) {
+                profileDetails.push(formatInstrumentLabels(member.instrumentCodes));
+              }
+              return (
+                <article key={member.id} className="members-admin-row members-member-card">
+                  <div className="members-member-card-body">
+                    <div className="members-admin-card-header members-member-card-header">
+                      <strong>{member.name}</strong>
+                      <div className="members-admin-row-actions">
+                        <button
+                          type="button"
+                          className="button button-small button-secondary"
+                          onClick={() => openMemberEdit(member)}
+                        >
+                          編集
+                        </button>
+                        <button
+                          type="button"
+                          className="button button-small button-danger"
+                          onClick={() =>
+                            openDeleteDialog(
+                              "member",
+                              member.id,
+                              "member を削除",
+                              `${formatMemberLabel(member)} を削除しますか？ 関連する memberRelations もあわせて削除されます。Firebase Authentication のユーザーは削除されません。`,
+                            )
+                          }
+                        >
+                          削除
+                        </button>
+                      </div>
+                    </div>
+                    <p className="muted">
+                      {familyNameById[member.familyId] || "family 未設定"} / {summaryBadges.join(" / ") || "-"}
+                    </p>
+                    {profileDetails.length > 0 && <p className="muted">{profileDetails.join(" / ")}</p>}
+                    {childMember && (
+                      <div className="members-child-relations">
+                        <div className="members-child-relations-header">
+                          <p className="members-child-relations-title">保護者 relation</p>
+                          <button type="button" className="button button-small" onClick={() => openRelationCreate(member.id)}>
+                            追加
+                          </button>
+                        </div>
+                        <p className="muted">{relationHelpText}</p>
+                        {childRelations.length === 0 ? (
+                          <p className="muted">保護者 relation は未設定です。</p>
+                        ) : (
+                          <ul className="members-admin-list members-child-relations-list">
+                            {childRelations.map((relation) => (
+                              <li key={relation.id} className="members-child-relations-item">
+                                <span>
+                                  {relationTypeLabel[relation.relationType]}: {memberNameById[relation.guardianMemberId] || relation.guardianMemberId}
+                                </span>
+                                <span className="members-admin-row-actions">
+                                  <button
+                                    type="button"
+                                    className="button button-small button-secondary"
+                                    onClick={() => openRelationEdit(relation)}
+                                  >
+                                    編集
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="button button-small button-danger"
+                                    onClick={() =>
+                                      openDeleteDialog(
+                                        "relation",
+                                        relation.id,
+                                        "relation を削除",
+                                        `${relationTypeLabel[relation.relationType]}: ${memberNameById[relation.guardianMemberId] || relation.guardianMemberId} を削除しますか？`,
+                                      )
+                                    }
+                                  >
+                                    削除
+                                  </button>
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+            {members.length === 0 && <p className="muted">member はまだありません。</p>}
+          </div>
+        </section>
+      )}
+
+      {activeTab === "auth" && (
+        <section className="members-admin-section">
+          <div className="members-section-heading">
+            <div>
+              <h2>Auth</h2>
+              <p className="muted">認証情報の確認、紐付け、再取得を扱います。</p>
+            </div>
+            <div className="members-admin-actions">
+              <button
+                type="button"
+                className="button button-small button-secondary"
+                onClick={() => void refreshAuthUsers()}
+                disabled={authUsersState === "loading"}
+              >
+                {authUsersState === "loading" ? "Auth再取得中..." : "Auth再取得"}
+              </button>
+              <span className="members-auth-status">{authStatusText}</span>
+            </div>
+          </div>
+          <div className="members-admin-list-panel">
+            {members.map((member) => {
+              const candidate = findAuthCandidate(member, authUsers);
+              return (
+                <article key={member.id} className="members-admin-row">
+                  <div>
+                    <strong>{member.name}</strong>
+                    <p className="muted">loginId: {member.loginId || "-"}</p>
+                    <p className="muted">authEmail: {member.authEmail || "-"}</p>
+                    <p className="muted">
+                      authUid: {member.authUid || "未設定"}
+                      {candidate && !member.authUid && ` / 候補あり: ${candidate.email || candidate.uid}`}
+                    </p>
+                  </div>
                   <div className="members-admin-row-actions">
-                    <button
-                      type="button"
-                      className="button button-small button-secondary"
-                      onClick={() => openFamilyEdit(family)}
-                    >
-                      編集
-                    </button>
-                    <button
-                      type="button"
-                      className="button button-small button-danger"
-                      onClick={() =>
-                        openDeleteDialog(
-                          "family",
-                          family.id,
-                          "family を削除",
-                          memberCount > 0
-                            ? "所属 member が残っているため削除できません。先に member を移動または削除してください。"
-                            : `${family.name} を削除しますか？`,
-                        )
-                      }
-                    >
-                      削除
+                    <button type="button" className="button button-small" onClick={() => openLinkModal(member)}>
+                      Auth紐付け
                     </button>
                   </div>
-                </div>
-                <p className="muted">status: {family.status}</p>
-                <p className="muted">{family.notes || "notes なし"}</p>
-                <p className="muted">所属 member: {memberCount}件</p>
-                {memberCount > 0 && <p className="field-error-inline">所属 member がある間は削除できません。</p>}
-              </article>
-            );
-          })}
-          {families.length === 0 && <p className="muted">family はまだありません。</p>}
-        </div>
-      </section>
-
-      <section className="members-admin-section">
-        <div className="members-section-heading">
-          <h2>members</h2>
-        </div>
-        <div className="members-admin-list-panel">
-          {members.map((member) => {
-            const candidate = findAuthCandidate(member, authUsers);
-            const childRelations = member.role === "child" ? childRelationsByChildId[member.id] ?? [] : [];
-            return (
-              <article key={member.id} className="members-admin-row">
-                <div>
-                  <strong>{member.name}</strong>
-                  <p className="muted">
-                    {familyNameById[member.familyId] || "family 未設定"} / {roleLabel[member.role]} / {member.status}
-                  </p>
-                  <p className="muted">
-                    loginId: {member.loginId || "-"} / authEmail: {member.authEmail || "-"}
-                  </p>
-                  <p className="muted">
-                    authUid: {member.authUid || "未紐付け"}
-                    {candidate && !member.authUid && ` / 候補あり: ${candidate.email || candidate.uid}`}
-                  </p>
-                  {member.role === "child" && (
-                    <div className="members-child-relations">
-                      <p className="members-child-relations-title">保護者 relation</p>
-                      <p className="muted">{relationHelpText}</p>
-                      {childRelations.length === 0 ? (
-                        <p className="muted">未設定</p>
-                      ) : (
-                        <ul className="members-admin-list members-child-relations-list">
-                          {childRelations.map((relation) => (
-                            <li key={relation.id} className="members-child-relations-item">
-                              <span>
-                                {relationTypeLabel[relation.relationType]}：
-                                {memberNameById[relation.guardianMemberId] || relation.guardianMemberId}
-                              </span>
-                              <span className="members-admin-row-actions">
-                                <button
-                                  type="button"
-                                  className="button button-small button-secondary"
-                                  onClick={() => openRelationEdit(relation)}
-                                >
-                                  編集
-                                </button>
-                                <button
-                                  type="button"
-                                  className="button button-small button-danger"
-                                  onClick={() =>
-                                    openDeleteDialog(
-                                      "relation",
-                                      relation.id,
-                                      "relation を削除",
-                                      `${relationTypeLabel[relation.relationType]}：${memberNameById[relation.guardianMemberId] || relation.guardianMemberId} を削除しますか？`,
-                                    )
-                                  }
-                                >
-                                  削除
-                                </button>
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div className="members-admin-row-actions">
-                  <button
-                    type="button"
-                    className="button button-small button-secondary"
-                    onClick={() => openMemberEdit(member)}
-                  >
-                    編集
-                  </button>
-                  <button type="button" className="button button-small" onClick={() => openLinkModal(member)}>
-                    Auth 紐付け
-                  </button>
-                  {member.role === "child" && (
-                    <button
-                      type="button"
-                      className="button button-small"
-                      onClick={() => openRelationCreate(member.id)}
-                    >
-                      relation 追加
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="button button-small button-danger"
-                    onClick={() =>
-                      openDeleteDialog(
-                        "member",
-                        member.id,
-                        "member を削除",
-                        `${formatMemberLabel(member)} を削除しますか？ 関連する memberRelations も削除されます。Firebase Authentication のユーザーは削除されません。`,
-                      )
-                    }
-                  >
-                    削除
-                  </button>
-                </div>
-              </article>
-            );
-          })}
-          {members.length === 0 && <p className="muted">member はまだありません。</p>}
-        </div>
-      </section>
-
-      <section className="members-admin-section">
-        <div className="members-section-heading">
-          <h2>Auth 一覧</h2>
-          <span className="members-auth-status">{authStatusText}</span>
-        </div>
-        <div className="members-admin-card members-auth-debug-card">
-          <h3>現在の admin claim</h3>
-          <p className="muted">admin: {claimState.admin ? "true" : "false"}</p>
-          <p className="muted">checkedAt: {claimState.fetchedAt || "-"}</p>
-          <p className="muted">{claimState.message || "権限状態を確認します。"}</p>
-          <div className="members-admin-row-actions">
-            <button
-              type="button"
-              className="button button-small button-secondary"
-              onClick={() => void refreshClaims(true)}
-              disabled={isRefreshingClaims}
-            >
-              {isRefreshingClaims ? "権限再取得中..." : "権限再取得"}
-            </button>
+                </article>
+              );
+            })}
           </div>
-        </div>
-        <div className="members-admin-card members-auth-debug-card">
-          <h3>取得状態</h3>
-          <p className="muted">client projectId: {firebaseProjectId || "(empty)"}</p>
-          <p className="muted">functions region: {firebaseFunctionsRegion}</p>
-          <p className="muted">server projectId: {authUsersDebug.serverProjectId || "(unknown)"}</p>
-          <p className="muted">server functions region: {authUsersDebug.serverFunctionsRegion || "(unknown)"}</p>
-          <p className="muted">fetchedAt: {authUsersDebug.fetchedAt || "-"}</p>
-          {authUsersState === "error" && (
-            <div className="members-auth-error">
-              <p className="field-error">
-                {authUsersDebug.errorCode === "functions/permission-denied"
-                  ? "Auth 一覧の取得権限がありません。admin claim を確認してください。"
-                  : "Auth 一覧の取得に失敗しました。"}
-              </p>
-              {authUsersDebug.errorCode && <p className="muted">errorCode: {authUsersDebug.errorCode}</p>}
-              {authUsersDebug.errorMessage && <p className="muted">message: {authUsersDebug.errorMessage}</p>}
-            </div>
-          )}
-          {authUsersState === "success" && authUsers.length === 0 && (
-            <p className="muted">
-              取得自体は成功しています。Firebase Console と件数が違う場合は projectId と Functions の向き先を確認してください。
-            </p>
-          )}
-        </div>
-        <div className="members-admin-list-panel">
-          {authUsers.map((authUser) => (
-            <article key={authUser.uid} className="members-admin-row">
-              <div>
-                <strong>{authUser.email || authUser.uid}</strong>
-                <p className="muted">
-                  uid: {authUser.uid} / disabled: {authUser.disabled ? "yes" : "no"}
-                </p>
-                <p className="muted">
-                  created: {authUser.creationTime || "-"} / lastSignIn: {authUser.lastSignInTime || "-"}
-                </p>
+          <div className="members-admin-grid">
+            <div className="members-admin-card members-auth-debug-card">
+              <h3>現在の admin claim</h3>
+              <p className="muted">admin: {claimState.admin ? "true" : "false"}</p>
+              <p className="muted">checkedAt: {claimState.fetchedAt || "-"}</p>
+              <p className="muted">{claimState.message || "権限状態を確認できます。"}</p>
+              <div className="members-admin-row-actions">
+                <button
+                  type="button"
+                  className="button button-small button-secondary"
+                  onClick={() => void refreshClaims(true)}
+                  disabled={isRefreshingClaims}
+                >
+                  {isRefreshingClaims ? "権限再取得中..." : "権限再取得"}
+                </button>
               </div>
-            </article>
-          ))}
-          {authUsersState === "success" && authUsers.length === 0 && (
-            <p className="muted">Auth ユーザーは 0 件です。</p>
-          )}
-        </div>
-      </section>
+            </div>
+            <div className="members-admin-card members-auth-debug-card">
+              <h3>取得経路</h3>
+              <p className="muted">client projectId: {firebaseProjectId || "(empty)"}</p>
+              <p className="muted">functions region: {firebaseFunctionsRegion}</p>
+              <p className="muted">server projectId: {authUsersDebug.serverProjectId || "(unknown)"}</p>
+              <p className="muted">server functions region: {authUsersDebug.serverFunctionsRegion || "(unknown)"}</p>
+              <p className="muted">fetchedAt: {authUsersDebug.fetchedAt || "-"}</p>
+              {authUsersState === "error" && (
+                <div className="members-auth-error">
+                  <p className="field-error">
+                    {authUsersDebug.errorCode === "functions/permission-denied"
+                      ? "Auth 一覧の取得権限がありません。admin claim を確認してください。"
+                      : "Auth 一覧の取得に失敗しました。"}
+                  </p>
+                  {authUsersDebug.errorCode && <p className="muted">errorCode: {authUsersDebug.errorCode}</p>}
+                  {authUsersDebug.errorMessage && <p className="muted">message: {authUsersDebug.errorMessage}</p>}
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="members-admin-list-panel">
+            {authUsers.map((authUser) => (
+              <article key={authUser.uid} className="members-admin-row">
+                <div>
+                  <strong>{authUser.email || authUser.uid}</strong>
+                  <p className="muted">uid: {authUser.uid} / disabled: {authUser.disabled ? "yes" : "no"}</p>
+                  <p className="muted">
+                    created: {authUser.creationTime || "-"} / lastSignIn: {authUser.lastSignInTime || "-"}
+                  </p>
+                </div>
+              </article>
+            ))}
+            {authUsersState === "success" && authUsers.length === 0 && <p className="muted">Auth ユーザーは 0 件です。</p>}
+          </div>
+        </section>
+      )}
 
+      {activeTab === "integrity" && (
+        <section className="members-admin-section">
+          <div className="members-section-heading">
+            <div>
+              <h2>未紐付け / 不整合</h2>
+              <p className="muted">通常操作とは分けて、点検や修正対象の把握に使います。</p>
+            </div>
+          </div>
+          <div className="members-admin-grid">
+            <article className="members-admin-card">
+              <h3>family 未所属</h3>
+              <ul className="members-admin-list">
+                {membersWithoutFamily.map((member) => (
+                  <li key={member.id}>{member.name || member.id}</li>
+                ))}
+                {membersWithoutFamily.length === 0 && <li>未所属 member はありません。</li>}
+              </ul>
+            </article>
+            <article className="members-admin-card">
+              <h3>member 側の未紐付け</h3>
+              <ul className="members-admin-list">
+                {membersWithoutAuth.map((member) => (
+                  <li key={member.id}>
+                    {member.name}
+                    <span className="muted"> / {member.loginId || "loginId 未設定"}</span>
+                  </li>
+                ))}
+                {membersWithoutAuth.length === 0 && <li>未紐付け member はありません。</li>}
+              </ul>
+            </article>
+            <article className="members-admin-card">
+              <h3>Auth 側の未紐付け</h3>
+              <ul className="members-admin-list">
+                {authUsersWithoutMember.map((authUser) => (
+                  <li key={authUser.uid}>{authUser.email || authUser.uid}</li>
+                ))}
+                {authUsersWithoutMember.length === 0 && authUsersState === "success" && <li>未紐付け Auth はありません。</li>}
+                {authUsersState === "error" && <li>Auth 一覧の取得失敗中は点検できません。</li>}
+              </ul>
+            </article>
+            <article className="members-admin-card">
+              <h3>authUid 参照切れ</h3>
+              <ul className="members-admin-list">
+                {membersWithMissingAuth.map((member) => (
+                  <li key={member.id}>
+                    {member.name}
+                    <span className="muted"> / {member.authUid}</span>
+                  </li>
+                ))}
+                {membersWithMissingAuth.length === 0 && <li>参照切れ authUid はありません。</li>}
+              </ul>
+            </article>
+            <article className="members-admin-card">
+              <h3>relation 不整合</h3>
+              <ul className="members-admin-list">
+                {orphanRelations.map((relation) => (
+                  <li key={relation.id}>
+                    {relation.childMemberId} -&gt; {relation.guardianMemberId} / {relationTypeLabel[relation.relationType]}
+                  </li>
+                ))}
+                {orphanRelations.length === 0 && <li>参照切れ relation はありません。</li>}
+              </ul>
+            </article>
+            <article className="members-admin-card">
+              <h3>重複 relation</h3>
+              <ul className="members-admin-list">
+                {duplicateRelations.map((item) => (
+                  <li key={item.key}>
+                    {item.key} / {item.relations.length}?
+                  </li>
+                ))}
+                {duplicateRelations.length === 0 && <li>重複 relation はありません。</li>}
+              </ul>
+            </article>
+          </div>
+        </section>
+      )}
       {isFamilyModalOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="modal-panel">
@@ -987,7 +1275,7 @@ export function MembersManagementPage() {
 
       {isMemberModalOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
-          <section className="modal-panel">
+          <section className="modal-panel member-modal-panel">
             <button
               type="button"
               className="modal-close"
@@ -1004,7 +1292,7 @@ export function MembersManagementPage() {
                 value={memberForm.familyId}
                 onChange={(event) => setMemberForm((current) => ({ ...current, familyId: event.target.value }))}
               >
-                <option value="">選択してください</option>
+                <option value="">未所属</option>
                 {families.map((family) => (
                   <option key={family.id} value={family.id}>
                     {family.name}
@@ -1029,40 +1317,104 @@ export function MembersManagementPage() {
               />
             </label>
             <label>
-              role
-              <select
-                value={memberForm.role}
-                onChange={(event) => setMemberForm((current) => ({ ...current, role: event.target.value as MemberRole }))}
-              >
-                <option value="admin">admin</option>
-                <option value="officer">officer</option>
-                <option value="parent">parent</option>
-                <option value="child">child</option>
-                <option value="teacher">teacher</option>
-              </select>
-            </label>
-            <label>
-              permissions
+              入学年度
               <input
-                value={memberForm.permissionsText}
+                inputMode="numeric"
+                placeholder="例: 2024"
+                value={memberForm.enrollmentYear}
                 onChange={(event) =>
-                  setMemberForm((current) => ({ ...current, permissionsText: event.target.value }))
+                  setMemberForm((current) => ({
+                    ...current,
+                    enrollmentYear: event.target.value.replace(/[^\d]/g, "").slice(0, 4),
+                  }))
                 }
-                placeholder="member.read, member.write"
               />
+              {memberErrors.enrollmentYear && <span className="field-error">{memberErrors.enrollmentYear}</span>}
             </label>
-            <label>
-              status
-              <select
-                value={memberForm.status}
-                onChange={(event) =>
-                  setMemberForm((current) => ({ ...current, status: event.target.value as "active" | "inactive" }))
-                }
-              >
-                <option value="active">active</option>
-                <option value="inactive">inactive</option>
-              </select>
-            </label>
+            <div className="member-instruments-field">
+              <div className="member-instruments-header">
+                <span>担当楽器</span>
+                <span className="muted">複数選択可</span>
+              </div>
+              <div className="member-instruments-grid">
+                {activeInstrumentMaster.map((instrument) => (
+                  <label key={instrument.code} className="member-instrument-option">
+                    <input
+                      type="checkbox"
+                      checked={memberForm.instrumentCodes.includes(instrument.code)}
+                      onChange={() => toggleInstrumentCode(instrument.code)}
+                    />
+                    <span>{instrument.label}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="muted">
+                {memberForm.instrumentCodes.length > 0
+                  ? `選択中: ${formatInstrumentLabels(memberForm.instrumentCodes)}`
+                  : "担当楽器未設定"}
+              </p>
+            </div>
+            <div className="permission-form-area">
+              <div className="permission-form-grid">
+                <PermissionSection
+                  title="利用者区分"
+                  description="子どもは他の利用者区分と同時に設定できません。OBOG は保護者・先生と併用できます。"
+                  error={memberErrors.memberTypes}
+                >
+                  {memberTypeOptions.map((option) => {
+                    const disabled = !canSelectMemberType(memberForm.memberTypes, option.value);
+                    return (
+                      <PermissionOptionRow
+                        key={option.value}
+                        type="checkbox"
+                        checked={memberForm.memberTypes.includes(option.value)}
+                        disabled={disabled}
+                        label={option.label}
+                        onChange={() => toggleMemberType(option.value)}
+                      />
+                    );
+                  })}
+                </PermissionSection>
+
+                <PermissionSection title="管理権限" error={memberErrors.adminRole}>
+                  {adminRoleOptions.map((option) => (
+                    <PermissionOptionRow
+                      key={option.value}
+                      type="radio"
+                      name="member-admin-role"
+                      checked={memberForm.adminRole === option.value}
+                      label={option.label}
+                      onChange={() => setMemberForm((current) => ({ ...current, adminRole: option.value }))}
+                    />
+                  ))}
+                </PermissionSection>
+
+                <PermissionSection title="担当業務">
+                  {staffPermissionOptions.map((option) => (
+                    <PermissionOptionRow
+                      key={option.value}
+                      type="checkbox"
+                      checked={memberForm.staffPermissions.includes(option.value)}
+                      label={option.label}
+                      onChange={() => toggleStaffPermission(option.value)}
+                    />
+                  ))}
+                </PermissionSection>
+
+                <PermissionSection title="利用状態" error={memberErrors.memberStatus}>
+                  {memberStatusOptions.map((option) => (
+                    <PermissionOptionRow
+                      key={option.value}
+                      type="radio"
+                      name="member-status"
+                      checked={memberForm.memberStatus === option.value}
+                      label={option.label}
+                      onChange={() => setMemberForm((current) => ({ ...current, memberStatus: option.value }))}
+                    />
+                  ))}
+                </PermissionSection>
+              </div>
+            </div>
             <label>
               loginId
               <input
@@ -1074,6 +1426,13 @@ export function MembersManagementPage() {
             {memberForm.loginId.trim() && (
               <p className="muted">内部メール候補: {toInternalAuthEmail(memberForm.loginId)}</p>
             )}
+            <label>
+              notes
+              <textarea
+                value={memberForm.notes}
+                onChange={(event) => setMemberForm((current) => ({ ...current, notes: event.target.value }))}
+              />
+            </label>
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={() => setIsMemberModalOpen(false)}>
                 キャンセル
@@ -1201,6 +1560,66 @@ export function MembersManagementPage() {
               <button type="button" className="button" onClick={() => void submitLink()}>
                 紐付け
               </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {isCsvImportModalOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <section className="modal-panel member-csv-modal">
+            <button
+              type="button"
+              className="modal-close"
+              aria-label="閉じる"
+              title="閉じる"
+              onClick={resetCsvImportState}
+              disabled={isCsvImporting}
+            >
+              ×
+            </button>
+            <h3>CSVインポート</h3>
+            <p className="muted">
+              1行目はヘッダとしてスキップし、2行目以降を Windoms 専用の固定列順で取り込みます。
+            </p>
+            {csvImportErrors.length > 0 ? (
+              <div className="member-csv-errors">
+                <p className="field-error">取り込み前チェックでエラーが見つかりました。</p>
+                <ul className="members-admin-list">
+                  {csvImportErrors.map((error) => (
+                    <li key={error}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="member-csv-preview">
+                <p className="modal-summary">{csvImportCount}件を取り込む予定です。</p>
+                <ul className="members-admin-list">
+                  {csvImportPreview.map((item) => (
+                    <li key={`${item.rowNumber}-${item.loginId}`}>
+                      {item.rowNumber}行目: {item.name} / {item.loginId} / {item.familyName}
+                    </li>
+                  ))}
+                </ul>
+                {csvImportCount > csvImportPreview.length && (
+                  <p className="muted">ほか {csvImportCount - csvImportPreview.length} 件</p>
+                )}
+              </div>
+            )}
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={resetCsvImportState}
+                disabled={isCsvImporting}
+              >
+                キャンセル
+              </button>
+              {csvImportErrors.length === 0 && (
+                <button type="button" className="button" onClick={() => void runCsvImport()} disabled={isCsvImporting}>
+                  {isCsvImporting ? "取り込み中..." : "この内容で取り込む"}
+                </button>
+              )}
             </div>
           </section>
         </div>

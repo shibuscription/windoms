@@ -8,6 +8,7 @@ import {
 } from "../../accounting/calc";
 import { formatMoney } from "../../accounting/format";
 import { useAccountingStore } from "../../accounting/useAccountingStore";
+import { siteConfig } from "../../config/site";
 
 export function AccountingReport() {
   const { store } = useAccountingStore();
@@ -59,7 +60,7 @@ export function AccountingReport() {
   return (
     <section className="card accounting-page accounting-report-page">
       <h1>{period.fiscalYear}年度 収支計算書</h1>
-      <p className="muted">団体名: Windoms 南ヶ丘</p>
+      <p className="muted">団体名: {siteConfig.fullDisplayName}</p>
       <p className="muted">
         会計期間: {period.startDate} - {period.endDate}
       </p>
