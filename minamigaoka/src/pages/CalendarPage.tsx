@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { BirthdayCelebrationModal } from "../components/BirthdayCelebrationModal";
+import { getBirthdayCelebrants } from "../members/birthday";
 import {
   createCalendarSession,
   deleteCalendarSession,
   updateCalendarSession,
   type SaveCalendarSessionInput,
 } from "../schedule/service";
-import { subscribeFamilies } from "../members/service";
-import type { FamilyRecord } from "../members/types";
-import type { DemoRsvp, DemoData, RsvpStatus, SessionDoc } from "../types";
+import { isChildMember, sortMembersForDisplay } from "../members/permissions";
+import { subscribeFamilies, subscribeMembers } from "../members/service";
+import type { FamilyRecord, MemberRecord } from "../members/types";
+import type { DemoData, RsvpStatus, SessionDoc, Todo } from "../types";
 import {
   formatDateYmd,
   formatTimeNoLeadingZero,
@@ -16,11 +19,11 @@ import {
   isValidDateKey,
   todayDateKey,
 } from "../utils/date";
-import { toDemoFamilyName } from "../utils/demoName";
+import { makeSessionRelatedId, sortTodosOpenFirst } from "../utils/todoUtils";
 
 type CalendarPageProps = {
   data: DemoData;
-  isAdmin: boolean;
+  canManageSessions: boolean;
 };
 
 type EditableSessionType = "normal" | "self" | "event";
@@ -51,6 +54,12 @@ type SessionFormState = {
 
 type FieldErrors = Partial<Record<keyof SessionFormState, string>>;
 
+type AttendanceRow = {
+  uid: string;
+  displayName: string;
+  status: RsvpStatus;
+};
+
 const weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"] as const;
 
 const typeLabel: Record<SessionDoc["type"], string> = {
@@ -65,6 +74,12 @@ const editableTypeOptions: Array<{ value: EditableSessionType; label: string }> 
   { value: "event", label: "イベント" },
 ];
 
+const BASE_TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
+  const hours = Math.floor(index / 2);
+  const minutes = index % 2 === 0 ? "00" : "30";
+  return `${String(hours).padStart(2, "0")}:${minutes}`;
+});
+
 const assigneeRoleLabel = (session: SessionDoc): string =>
   session.type === "self" ? "見守り" : "当番";
 
@@ -72,7 +87,7 @@ const statusSymbol: Record<RsvpStatus, string> = {
   yes: "○",
   maybe: "△",
   no: "×",
-  unknown: "-",
+  unknown: "ー",
 };
 
 const toFamilyName = (name?: string): string => {
@@ -131,19 +146,49 @@ const sortSessions = (sessions: SessionDoc[]): SessionDoc[] =>
     return (left.id ?? "").localeCompare(right.id ?? "");
   });
 
-const countRsvps = (session: SessionDoc) => {
-  const list = session.demoRsvps ?? [];
-  return {
-    yes: list.filter((item) => item.status === "yes").length,
-    maybe: list.filter((item) => item.status === "maybe").length,
-    no: list.filter((item) => item.status === "no").length,
-  };
+const countAttendanceRows = (rows: AttendanceRow[]) => ({
+  yes: rows.filter((item) => item.status === "yes").length,
+  maybe: rows.filter((item) => item.status === "maybe").length,
+  no: rows.filter((item) => item.status === "no").length,
+  unknown: rows.filter((item) => item.status === "unknown").length,
+});
+
+const isValidClockTime = (value: string): boolean =>
+  /^(?:[01]\d|2[0-3]):(?:00|[0-5]\d)$/.test(value);
+
+const toTimeMinutes = (value: string): number => {
+  if (!isValidClockTime(value)) return -1;
+  const [hours, minutes] = value.split(":").map(Number);
+  return hours * 60 + minutes;
 };
 
-const sortRsvps = (items: DemoRsvp[]): DemoRsvp[] =>
-  [...items].sort((a, b) =>
-    toDemoFamilyName(a.displayName).localeCompare(toDemoFamilyName(b.displayName), "ja"),
-  );
+const formatTimeOption = (minutes: number): string => {
+  const normalized = ((minutes % 1440) + 1440) % 1440;
+  const hours = Math.floor(normalized / 60);
+  const mins = normalized % 60;
+  return `${String(hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`;
+};
+
+const buildTimeOptions = (...extras: Array<string | undefined>): string[] => {
+  const values = new Set(BASE_TIME_OPTIONS);
+  extras.forEach((value) => {
+    if (value && isValidClockTime(value)) {
+      values.add(value);
+    }
+  });
+  return [...values].sort((left, right) => toTimeMinutes(left) - toTimeMinutes(right));
+};
+
+const getNextEndTime = (startTime: string, preferredMinutes = 180): string => {
+  const startMinutes = toTimeMinutes(startTime);
+  if (startMinutes < 0) return "12:00";
+  const preferred = startMinutes + preferredMinutes;
+  if (preferred < 1440) {
+    return formatTimeOption(preferred);
+  }
+  const fallback = BASE_TIME_OPTIONS.find((option) => toTimeMinutes(option) > startMinutes);
+  return fallback ?? "";
+};
 
 const emptySessionForm = (date: string): SessionFormState => ({
   date,
@@ -156,6 +201,26 @@ const emptySessionForm = (date: string): SessionFormState => ({
   assigneeFamilyId: "",
   note: "",
 });
+
+const buildCreateSessionForm = (date: string, sessions: SessionDoc[]): SessionFormState => {
+  const sortedSessions = [...sortSessions(sessions)].sort(
+    (left, right) => toTimeMinutes(right.endTime) - toTimeMinutes(left.endTime),
+  );
+  const lastSession = sortedSessions[0];
+  if (!lastSession || !isValidClockTime(lastSession.endTime)) {
+    return emptySessionForm(date);
+  }
+  const startTime = lastSession.endTime;
+  const endTime = getNextEndTime(startTime);
+  if (!endTime) {
+    return emptySessionForm(date);
+  }
+  return {
+    ...emptySessionForm(date),
+    startTime,
+    endTime,
+  };
+};
 
 const isEditableSession = (session: SessionDoc): session is SessionDoc & { type: EditableSessionType } =>
   session.type === "normal" || session.type === "self" || session.type === "event";
@@ -180,10 +245,10 @@ const validateSessionForm = (form: SessionFormState): FieldErrors => {
     errors.date = "日付を正しく入力してください。";
   }
   if (!/^\d{2}:\d{2}$/.test(form.startTime)) {
-    errors.startTime = "開始時刻を入力してください。";
+    errors.startTime = "開始時刻を選択してください。";
   }
   if (!/^\d{2}:\d{2}$/.test(form.endTime)) {
-    errors.endTime = "終了時刻を入力してください。";
+    errors.endTime = "終了時刻を選択してください。";
   }
   if (!errors.startTime && !errors.endTime && form.startTime >= form.endTime) {
     errors.endTime = "終了時刻は開始時刻より後にしてください。";
@@ -195,17 +260,31 @@ const validateSessionForm = (form: SessionFormState): FieldErrors => {
   return errors;
 };
 
-export function CalendarPage({ data, isAdmin }: CalendarPageProps) {
+const getNextValidEndTime = (startTime: string, currentEndTime?: string): string => {
+  const startMinutes = toTimeMinutes(startTime);
+  const currentMinutes = currentEndTime ? toTimeMinutes(currentEndTime) : -1;
+  if (currentMinutes > startMinutes) {
+    return currentEndTime!;
+  }
+  return getNextEndTime(startTime);
+};
+
+const getSessionDisplayTitle = (session: SessionDoc): string =>
+  session.type === "event" && session.eventName?.trim() ? session.eventName.trim() : typeLabel[session.type];
+
+export function CalendarPage({ data, canManageSessions }: CalendarPageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedDay, setSelectedDay] = useState<DaySelection | null>(null);
   const [dialog, setDialog] = useState<CalendarDialog | null>(null);
   const [attendanceSession, setAttendanceSession] = useState<SessionDoc | null>(null);
+  const [birthdayModalDate, setBirthdayModalDate] = useState<string | null>(null);
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [sessionForm, setSessionForm] = useState<SessionFormState>(emptySessionForm(todayDateKey()));
   const [sessionErrors, setSessionErrors] = useState<FieldErrors>({});
   const [sessionSubmitError, setSessionSubmitError] = useState("");
   const [isSubmittingSession, setIsSubmittingSession] = useState(false);
   const [families, setFamilies] = useState<FamilyRecord[]>([]);
+  const [members, setMembers] = useState<MemberRecord[]>([]);
   const navigate = useNavigate();
   const today = todayDateKey();
   const queryDate = searchParams.get("date") ?? "";
@@ -216,6 +295,7 @@ export function CalendarPage({ data, isAdmin }: CalendarPageProps) {
   const monthKey = derivedYm || (isValidMonthKey(queryYm) ? queryYm : toMonthKey(today));
   const selectedDate = validDate && toMonthKey(validDate) === monthKey ? validDate : "";
   const calendarCells = useMemo(() => buildMonthCells(monthKey), [monthKey]);
+
   const familyOptions = useMemo(
     () =>
       families
@@ -227,6 +307,7 @@ export function CalendarPage({ data, isAdmin }: CalendarPageProps) {
         .sort((left, right) => left.label.localeCompare(right.label, "ja")),
     [families],
   );
+
   const locationOptions = useMemo(() => {
     const values = new Set<string>();
     Object.values(data.scheduleDays).forEach((day) => {
@@ -242,7 +323,17 @@ export function CalendarPage({ data, isAdmin }: CalendarPageProps) {
     return [...values].sort((left, right) => left.localeCompare(right, "ja"));
   }, [data.scheduleDays]);
 
+  const visibleChildMembers = useMemo(
+    () =>
+      sortMembersForDisplay(
+        members.filter((member) => member.memberStatus === "active" && isChildMember(member)),
+        "child",
+      ),
+    [members],
+  );
+
   useEffect(() => subscribeFamilies(setFamilies), []);
+  useEffect(() => subscribeMembers(setMembers), []);
 
   useEffect(() => {
     const next = new URLSearchParams();
@@ -276,6 +367,57 @@ export function CalendarPage({ data, isAdmin }: CalendarPageProps) {
         : current,
     );
   }, [data.scheduleDays, selectedDay]);
+
+  const attendanceRowsByOrder = useMemo(() => {
+    return selectedDay?.sessions.reduce<Record<number, AttendanceRow[]>>((result, session) => {
+      const rows = visibleChildMembers.map((member) => {
+        const matched =
+          session.demoRsvps?.find(
+            (item) =>
+              item.uid === member.authUid ||
+              item.uid === member.id ||
+              item.uid === member.loginId,
+          ) ?? null;
+
+        return {
+          uid: member.id,
+          displayName: member.name,
+          status: matched?.status ?? "unknown",
+        };
+      });
+      result[session.order] = rows;
+      return result;
+    }, {}) ?? {};
+  }, [selectedDay?.sessions, visibleChildMembers]);
+
+  const selectedAttendanceRows = attendanceSession
+    ? attendanceRowsByOrder[attendanceSession.order] ?? []
+    : [];
+  const selectedAttendanceCounts = useMemo(
+    () => countAttendanceRows(selectedAttendanceRows),
+    [selectedAttendanceRows],
+  );
+  const selectedSessionTodos = useMemo(() => {
+    if (!selectedDay || !attendanceSession) return [] as Todo[];
+    const relatedId = makeSessionRelatedId(selectedDay.date, attendanceSession.order);
+    return sortTodosOpenFirst(
+      data.todos.filter((todo) => todo.related?.type === "session" && todo.related.id === relatedId),
+    );
+  }, [attendanceSession, data.todos, selectedDay]);
+  const birthdayCelebrants = useMemo(
+    () => (birthdayModalDate ? getBirthdayCelebrants(members, birthdayModalDate) : []),
+    [birthdayModalDate, members],
+  );
+
+  const timeOptions = useMemo(
+    () => buildTimeOptions(sessionForm.startTime, sessionForm.endTime),
+    [sessionForm.endTime, sessionForm.startTime],
+  );
+  const endTimeOptions = useMemo(() => {
+    const startMinutes = toTimeMinutes(sessionForm.startTime);
+    return timeOptions.filter((option) => toTimeMinutes(option) > startMinutes);
+  }, [sessionForm.startTime, timeOptions]);
+  const endTimeValue = endTimeOptions.includes(sessionForm.endTime) ? sessionForm.endTime : "";
 
   const syncSearchParams = (nextYm: string, nextDate?: string) => {
     const next = new URLSearchParams();
@@ -324,7 +466,7 @@ export function CalendarPage({ data, isAdmin }: CalendarPageProps) {
 
   const openCreateSession = () => {
     if (!selectedDay) return;
-    setSessionForm(emptySessionForm(selectedDay.date));
+    setSessionForm(buildCreateSessionForm(selectedDay.date, selectedDay.sessions));
     setSessionErrors({});
     setSessionSubmitError("");
     setIsSessionModalOpen(true);
@@ -347,15 +489,24 @@ export function CalendarPage({ data, isAdmin }: CalendarPageProps) {
     key: K,
     value: SessionFormState[K],
   ) => {
-    setSessionForm((current) => ({
-      ...current,
-      [key]: value,
-      ...(key === "type" && value !== "event" ? { eventName: "" } : {}),
-    }));
+    setSessionForm((current) => {
+      const next = {
+        ...current,
+        [key]: value,
+        ...(key === "type" && value !== "event" ? { eventName: "" } : {}),
+      };
+
+      if (key === "startTime" && typeof value === "string") {
+        next.endTime = getNextValidEndTime(value, current.endTime);
+      }
+
+      return next;
+    });
     setSessionErrors((current) => ({
       ...current,
       [key]: undefined,
       ...(key === "type" && value !== "event" ? { eventName: undefined } : {}),
+      ...(key === "startTime" ? { endTime: undefined } : {}),
     }));
   };
 
@@ -391,7 +542,7 @@ export function CalendarPage({ data, isAdmin }: CalendarPageProps) {
       setIsSessionModalOpen(false);
     } catch (error) {
       setSessionSubmitError(
-        error instanceof Error ? error.message : "セッションの保存に失敗しました。",
+        error instanceof Error ? error.message : "予定の保存に失敗しました。",
       );
     } finally {
       setIsSubmittingSession(false);
@@ -401,22 +552,16 @@ export function CalendarPage({ data, isAdmin }: CalendarPageProps) {
   const openDeleteConfirm = (session: SessionDoc) => {
     if (!selectedDay || !session.id) return;
     setDialog({
-      title: "セッション削除",
+      title: "予定削除",
       message: `${formatTimeNoLeadingZero(session.startTime)}-${formatTimeNoLeadingZero(
         session.endTime,
-      )} を削除しますか？`,
+      )} の予定を削除しますか。`,
       confirmLabel: "削除",
       onConfirm: async () => {
         await deleteCalendarSession(selectedDay.date, session.id!);
       },
     });
   };
-
-  const selectedAttendanceCounts = attendanceSession ? countRsvps(attendanceSession) : null;
-  const selectedAttendanceRsvps = useMemo(
-    () => (attendanceSession ? sortRsvps(attendanceSession.demoRsvps ?? []) : []),
-    [attendanceSession],
-  );
 
   return (
     <section className="card">
@@ -467,9 +612,23 @@ export function CalendarPage({ data, isAdmin }: CalendarPageProps) {
                     openDay(cell, daySessions);
                   }
                 }}
-                aria-label={`${formatDateYmd(cell)} の詳細を開く`}
+                aria-label={`${formatDateYmd(cell)} の予定を開く`}
               >
                 <span className="month-calendar-day-link">{Number(cell.slice(-2))}</span>
+                {getBirthdayCelebrants(members, cell).length > 0 && (
+                  <button
+                    type="button"
+                    className="calendar-birthday-trigger"
+                    aria-label="お誕生日を開く"
+                    title="お誕生日"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setBirthdayModalDate(cell);
+                    }}
+                  >
+                    🎂
+                  </button>
+                )}
                 <div className="month-calendar-events">
                   {daySessions.map((session) => (
                     <div key={`${cell}-${session.id ?? session.order}`} className={`calendar-event ${session.type}`}>
@@ -480,9 +639,7 @@ export function CalendarPage({ data, isAdmin }: CalendarPageProps) {
                             session.type === "event" ? "event-name" : "session-type"
                           }`}
                         >
-                          {session.type === "event"
-                            ? session.eventName?.trim() || "イベント"
-                            : typeLabel[session.type]}
+                          {getSessionDisplayTitle(session)}
                         </span>
                       </span>
                       <span className="calendar-event-duty">
@@ -525,7 +682,7 @@ export function CalendarPage({ data, isAdmin }: CalendarPageProps) {
                 >
                   日誌へ
                 </button>
-                {isAdmin && (
+                {canManageSessions && (
                   <button
                     type="button"
                     className="button button-small button-secondary"
@@ -538,28 +695,27 @@ export function CalendarPage({ data, isAdmin }: CalendarPageProps) {
             </header>
             <div className="calendar-day-sheet-list">
               {selectedDay.sessions.length === 0 && (
-                <p className="muted">この日のセッションはまだありません。</p>
+                <p className="muted">この日の予定はまだありません。</p>
               )}
               {selectedDay.sessions.map((session) => {
-                const counts = countRsvps(session);
-                const editable = isAdmin && isEditableSession(session) && Boolean(session.id);
+                const attendanceRows = attendanceRowsByOrder[session.order] ?? [];
+                const counts = countAttendanceRows(attendanceRows);
+                const editable = canManageSessions && isEditableSession(session) && Boolean(session.id);
                 return (
                   <article
                     key={`sheet-${selectedDay.date}-${session.id ?? session.order}`}
                     className={`session-card ${session.type}`}
                   >
                     <span className={`session-type-badge ${session.type}`}>
-                      {session.type === "event"
-                        ? session.eventName?.trim() || "イベント"
-                        : typeLabel[session.type]}
+                      {typeLabel[session.type]}
                     </span>
                     {editable && (
                       <div className="session-card-actions-top">
                         <button
                           type="button"
                           className="calendar-day-sheet-icon"
-                          aria-label="編集"
-                          title="編集"
+                          aria-label="予定編集"
+                          title="予定編集"
                           onClick={() => openEditSession(session)}
                         >
                           ✎
@@ -567,8 +723,8 @@ export function CalendarPage({ data, isAdmin }: CalendarPageProps) {
                         <button
                           type="button"
                           className="calendar-day-sheet-icon"
-                          aria-label="削除"
-                          title="削除"
+                          aria-label="予定削除"
+                          title="予定削除"
                           onClick={() => openDeleteConfirm(session)}
                         >
                           🗑
@@ -583,23 +739,23 @@ export function CalendarPage({ data, isAdmin }: CalendarPageProps) {
                         <p className="calendar-day-sheet-meta">{session.eventName}</p>
                       )}
                       <p className="calendar-day-sheet-label kv-row">
-                        <span className="kv-key">{assigneeRoleLabel(session)}：</span>
+                        <span className="kv-key">{assigneeRoleLabel(session)}:</span>
                         <span className="kv-val shift-role">{toFamilyName(session.assigneeNameSnapshot)}</span>
                       </p>
                       {session.location && (
                         <p className="calendar-day-sheet-meta kv-row">
-                          <span className="kv-key">場所：</span>
+                          <span className="kv-key">場所:</span>
                           <span className="kv-val">{session.location}</span>
                         </p>
                       )}
                       {session.note && (
                         <p className="calendar-day-sheet-meta kv-row">
-                          <span className="kv-key">メモ：</span>
+                          <span className="kv-key">メモ:</span>
                           <span className="kv-val">{session.note}</span>
                         </p>
                       )}
                       <p className="calendar-day-sheet-meta kv-row">
-                        <span className="kv-key">出欠：</span>
+                        <span className="kv-key">出欠:</span>
                         <span className="kv-val">
                           <button
                             type="button"
@@ -609,6 +765,7 @@ export function CalendarPage({ data, isAdmin }: CalendarPageProps) {
                             <span className="count-yes">○{counts.yes}</span>
                             <span className="count-maybe">△{counts.maybe}</span>
                             <span className="count-no">×{counts.no}</span>
+                            <span className="count-unknown">ー{counts.unknown}</span>
                           </button>
                         </span>
                       </p>
@@ -665,8 +822,8 @@ export function CalendarPage({ data, isAdmin }: CalendarPageProps) {
             >
               ×
             </button>
-            <h3>{sessionForm.sessionId ? "セッション編集" : "セッション追加"}</h3>
-            <p className="muted">カレンダーでは単発追加と個別調整のみを行います。</p>
+            <h3>{sessionForm.sessionId ? "予定編集" : "予定追加"}</h3>
+            <p className="muted">カレンダーでは単発追加と個別調整のみを行えます。</p>
 
             <label>
               日付
@@ -681,20 +838,35 @@ export function CalendarPage({ data, isAdmin }: CalendarPageProps) {
             <div className="calendar-session-editor-times">
               <label>
                 開始時刻
-                <input
-                  type="time"
+                <select
                   value={sessionForm.startTime}
                   onChange={(event) => handleSessionFieldChange("startTime", event.target.value)}
-                />
+                >
+                  {timeOptions.map((option) => (
+                    <option key={`start-${option}`} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
                 {sessionErrors.startTime && <span className="field-error">{sessionErrors.startTime}</span>}
               </label>
               <label>
                 終了時刻
-                <input
-                  type="time"
-                  value={sessionForm.endTime}
+                <select
+                  value={endTimeValue}
                   onChange={(event) => handleSessionFieldChange("endTime", event.target.value)}
-                />
+                >
+                  {endTimeOptions.length === 0 && (
+                    <option value="" disabled>
+                      終了時刻を選択してください
+                    </option>
+                  )}
+                  {endTimeOptions.map((option) => (
+                    <option key={`end-${option}`} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
                 {sessionErrors.endTime && <span className="field-error">{sessionErrors.endTime}</span>}
               </label>
             </div>
@@ -791,7 +963,7 @@ export function CalendarPage({ data, isAdmin }: CalendarPageProps) {
         </div>
       )}
 
-      {attendanceSession && (
+      {attendanceSession && selectedDay && (
         <div className="modal-backdrop calendar-attendance-backdrop" onClick={closeAttendanceModal}>
           <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
             <button
@@ -804,38 +976,58 @@ export function CalendarPage({ data, isAdmin }: CalendarPageProps) {
               ×
             </button>
             <p className="modal-context">
-              {selectedDay ? `${formatDateYmd(selectedDay.date)}（${formatWeekdayJa(selectedDay.date)}）` : ""}
-              {" "}
+              {formatDateYmd(selectedDay.date)}（{formatWeekdayJa(selectedDay.date)}） /{" "}
               {formatTimeNoLeadingZero(attendanceSession.startTime)}-
-              {formatTimeNoLeadingZero(attendanceSession.endTime)} /{" "}
-              {attendanceSession.type === "event"
-                ? attendanceSession.eventName?.trim() || "イベント"
-                : typeLabel[attendanceSession.type]}
+              {formatTimeNoLeadingZero(attendanceSession.endTime)}
             </p>
-            {selectedAttendanceCounts && (
-              <p className="modal-summary">
-                出欠: <span className="count-yes">○{selectedAttendanceCounts.yes}</span>{" "}
-                <span className="count-maybe">△{selectedAttendanceCounts.maybe}</span>{" "}
-                <span className="count-no">×{selectedAttendanceCounts.no}</span>
-              </p>
+            <h3>{getSessionDisplayTitle(attendanceSession)}</h3>
+            {attendanceSession.location && (
+              <p className="modal-summary muted">場所: {attendanceSession.location}</p>
             )}
+            <p className="modal-summary">
+              出欠: <span className="count-yes">○{selectedAttendanceCounts.yes}</span>{" "}
+              <span className="count-maybe">△{selectedAttendanceCounts.maybe}</span>{" "}
+              <span className="count-no">×{selectedAttendanceCounts.no}</span>{" "}
+              <span className="count-unknown">ー{selectedAttendanceCounts.unknown}</span>
+            </p>
             <div className="rsvp-table">
-              {selectedAttendanceRsvps.length === 0 ? (
+              {selectedAttendanceRows.length === 0 ? (
                 <div className="rsvp-row">
-                  <span>サンプル表示はありません</span>
-                  <span className="rsvp-mark unknown">-</span>
+                  <span>対象の部員はまだいません。</span>
+                  <span className="rsvp-mark unknown">ー</span>
                 </div>
               ) : (
-                selectedAttendanceRsvps.map((rsvp) => (
-                  <div key={rsvp.uid} className="rsvp-row">
-                    <span>{toDemoFamilyName(rsvp.displayName, "-")}</span>
-                    <span className={`rsvp-mark ${rsvp.status}`}>{statusSymbol[rsvp.status]}</span>
+                selectedAttendanceRows.map((row) => (
+                  <div key={row.uid} className="rsvp-row">
+                    <span>{row.displayName}</span>
+                    <span className={`rsvp-mark ${row.status}`}>{statusSymbol[row.status]}</span>
                   </div>
                 ))
               )}
             </div>
+            {selectedSessionTodos.length > 0 && (
+              <div className="related-todos-block">
+                <p className="related-todos-title">関連TODO</p>
+                <div className="related-todos-list">
+                  {selectedSessionTodos.map((todo) => (
+                    <label key={todo.id} className={`todo-check ${todo.completed ? "done" : ""}`}>
+                      <input type="checkbox" checked={todo.completed} readOnly />
+                      <span>{todo.title}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
+      )}
+
+      {birthdayModalDate && birthdayCelebrants.length > 0 && (
+        <BirthdayCelebrationModal
+          date={birthdayModalDate}
+          celebrants={birthdayCelebrants}
+          onClose={() => setBirthdayModalDate(null)}
+        />
       )}
     </section>
   );

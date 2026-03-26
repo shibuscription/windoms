@@ -52,6 +52,7 @@ import { toAuthenticatedUser, type AuthenticatedUser } from "./auth/session";
 import { loadInitialData } from "./data/runtimeData";
 import { getMemberByAuthUid } from "./members/service";
 import type { MemberRecord, MemberRole } from "./members/types";
+import { canManageCalendarSessions as canManageCalendarSessionsByMember } from "./members/permissions";
 import { subscribeScheduleDays } from "./schedule/service";
 
 type MenuItem = {
@@ -346,6 +347,8 @@ export function App() {
   const currentRole = linkedMember ? toMenuRole(linkedMember.role) : authUser?.role ?? "parent";
   const currentOperatorRole: "admin" | "parent" = currentRole === "admin" ? "admin" : "parent";
   const isAdmin = linkedMember?.role === "admin" || (!linkedMember && authUser?.role === "admin");
+  const canManageCalendarSessions =
+    isAdmin || canManageCalendarSessionsByMember(linkedMember);
   const accountPrimaryName = linkedMember?.name?.trim() || authUser?.loginId || "ログイン中ユーザー";
   const accountLoginId = authUser?.loginId ?? "-";
   const accountRoleLabel = linkedMember?.role ?? authUser?.role ?? "-";
@@ -742,7 +745,15 @@ export function App() {
               />
             }
           />
-          <Route path="/calendar" element={<CalendarPage data={context.data} isAdmin={isAdmin} />} />
+          <Route
+            path="/calendar"
+            element={
+              <CalendarPage
+                data={context.data}
+                canManageSessions={canManageCalendarSessions}
+              />
+            }
+          />
           <Route
             path="/activity-plan"
             element={isAdmin ? <ActivityPlanPage /> : <Navigate to="/today" replace />}

@@ -3,6 +3,7 @@ import {
   getPrimaryMemberTypeLabel,
   memberMatchesTypeFilter,
   memberTypeFilterOptions,
+  sortMembersForDisplay,
   type MemberTypeFilter,
 } from "../members/permissions";
 import { relationTypeLabel } from "../members/relation";
@@ -49,8 +50,11 @@ export function MemberDirectoryPage() {
 
   const visibleMembers = useMemo(
     () =>
-      members.filter(
-        (member) => member.memberStatus === "active" && memberMatchesTypeFilter(member, activeTab),
+      sortMembersForDisplay(
+        members.filter(
+          (member) => member.memberStatus === "active" && memberMatchesTypeFilter(member, activeTab),
+        ),
+        activeTab,
       ),
     [activeTab, members],
   );

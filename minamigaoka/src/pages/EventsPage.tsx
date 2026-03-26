@@ -462,7 +462,7 @@ export function EventsPage({ data, currentUid, updateTodos, menuRole }: EventsPa
             </p>
             {selectedEvent.memo && <p className="muted">{selectedEvent.memo}</p>}
             <button type="button" className="events-linked-summary" onClick={() => setIsLinkedSessionsModalOpen(true)}>
-              紐づきセッション: {selectedEvent.sessionIds?.length ?? 0}件
+              紐づき予定: {selectedEvent.sessionIds?.length ?? 0}件
             </button>
             <section className="related-todos-block">
               <h4>関連TODO</h4>
@@ -537,7 +537,7 @@ export function EventsPage({ data, currentUid, updateTodos, menuRole }: EventsPa
               ×
             </button>
             <div className="events-linked-header">
-              <h3>紐づきセッション</h3>
+              <h3>紐づき予定</h3>
               {isManager && (
                 <button
                   type="button"
@@ -584,7 +584,7 @@ export function EventsPage({ data, currentUid, updateTodos, menuRole }: EventsPa
                   </div>
                 </article>
               ))}
-              {linkedSessions.length === 0 && <p className="muted">紐づきセッションはありません。</p>}
+              {linkedSessions.length === 0 && <p className="muted">紐づき予定はありません。</p>}
             </div>
             <div className="modal-actions">
               <button type="button" className="button button-small" onClick={() => setIsLinkedSessionsModalOpen(false)}>
@@ -601,7 +601,7 @@ export function EventsPage({ data, currentUid, updateTodos, menuRole }: EventsPa
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsSessionBindModalOpen(false)}>
               ×
             </button>
-            <h3>イベントセッションを選択</h3>
+            <h3>イベント予定を選択</h3>
             <p className="modal-context">{selectedEvent.title}</p>
             <div className="calendar-day-sheet-list">
               {bindableEventSessions.map((session) => (
@@ -630,7 +630,7 @@ export function EventsPage({ data, currentUid, updateTodos, menuRole }: EventsPa
                   </div>
                 </article>
               ))}
-              {bindableEventSessions.length === 0 && <p className="muted">紐づけ可能なイベントセッションはありません。</p>}
+              {bindableEventSessions.length === 0 && <p className="muted">紐づけ可能なイベント予定はありません。</p>}
             </div>
             <p className="muted">保存処理は Phase 2 で対応予定です。</p>
             <div className="modal-actions">

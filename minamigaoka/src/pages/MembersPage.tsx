@@ -24,11 +24,13 @@ import {
   memberStatusOptions,
   memberTypeFilterOptions,
   memberTypeOptions,
+  sortMembersForDisplay,
   type MemberTypeFilter,
   staffPermissionOptions,
   validateMemberTypes,
 } from "../members/permissions";
 import { activeInstrumentMaster, formatInstrumentLabels } from "../members/instruments";
+import { calculateAge, isValidBirthDate } from "../members/birthday";
 import {
   hasDuplicateRelationPair,
   isSameFamilyRelation,
@@ -49,12 +51,14 @@ import {
   subscribeFamilies,
   subscribeMemberRelations,
   subscribeMembers,
+  updateMemberTypeOrder,
 } from "../members/service";
 import type {
   AdminRole,
   AuthUserSummary,
   BulkRegisterMemberResult,
   FamilyRecord,
+  FamilyVehicleRecord,
   InstrumentCode,
   MemberRecord,
   MemberRelationRecord,
@@ -67,6 +71,8 @@ import type {
 type FamilyFormState = {
   id: string | null;
   name: string;
+  address: string;
+  vehicles: FamilyVehicleRecord[];
   status: "active" | "inactive";
   notes: string;
 };
@@ -74,8 +80,15 @@ type FamilyFormState = {
 type MemberFormState = {
   id: string | null;
   familyId: string;
+  displayName: string;
+  familyName: string;
+  givenName: string;
+  familyNameKana: string;
+  givenNameKana: string;
   name: string;
   nameKana: string;
+  birthDate: string;
+  phoneNumber: string;
   enrollmentYear: string;
   instrumentCodes: InstrumentCode[];
   memberTypes: MemberType[];
@@ -92,6 +105,14 @@ type RelationFormState = {
   guardianMemberId: string;
   relationType: RelationshipType;
   status: "active" | "inactive";
+};
+
+type FamilyVehicleModalState = {
+  index: number | null;
+  maker: string;
+  model: string;
+  capacity: string;
+  notes: string;
 };
 
 type FieldErrors = Record<string, string | undefined>;
@@ -113,8 +134,8 @@ type ClaimState = {
 
 type CsvImportPreviewRow = {
   rowNumber: number;
-  familyName: string;
-  name: string;
+  familyDisplayName: string;
+  displayName: string;
   loginId: string;
 };
 
@@ -132,6 +153,8 @@ type ManagementTab = "family" | "member" | "auth" | "integrity";
 const emptyFamilyForm = (): FamilyFormState => ({
   id: null,
   name: "",
+  address: "",
+  vehicles: [],
   status: "active",
   notes: "",
 });
@@ -139,8 +162,15 @@ const emptyFamilyForm = (): FamilyFormState => ({
 const emptyMemberForm = (): MemberFormState => ({
   id: null,
   familyId: "",
+  displayName: "",
+  familyName: "",
+  givenName: "",
+  familyNameKana: "",
+  givenNameKana: "",
   name: "",
   nameKana: "",
+  birthDate: "",
+  phoneNumber: "",
   enrollmentYear: "",
   instrumentCodes: [],
   memberTypes: ["parent"],
@@ -159,7 +189,18 @@ const emptyRelationForm = (): RelationFormState => ({
   status: "active",
 });
 
-const formatMemberLabel = (member: MemberRecord) => member.name || member.loginId || member.id;
+const buildDisplayName = (familyName: string, givenName: string, fallback = "") =>
+  `${familyName.trim()}${givenName.trim()}`.trim() || fallback.trim();
+
+const emptyFamilyVehicleModal = (): FamilyVehicleModalState => ({
+  index: null,
+  maker: "",
+  model: "",
+  capacity: "",
+  notes: "",
+});
+
+const formatMemberLabel = (member: MemberRecord) => member.displayName || member.name || member.loginId || member.id;
 
 type PermissionSectionProps = {
   title: string;
@@ -233,12 +274,14 @@ export function MembersManagementPage() {
   const [familyForm, setFamilyForm] = useState<FamilyFormState>(emptyFamilyForm);
   const [memberForm, setMemberForm] = useState<MemberFormState>(emptyMemberForm);
   const [relationForm, setRelationForm] = useState<RelationFormState>(emptyRelationForm);
+  const [familyVehicleForm, setFamilyVehicleForm] = useState<FamilyVehicleModalState>(emptyFamilyVehicleModal);
   const [familyErrors, setFamilyErrors] = useState<FieldErrors>({});
   const [memberErrors, setMemberErrors] = useState<FieldErrors>({});
   const [relationErrors, setRelationErrors] = useState<FieldErrors>({});
   const [isFamilyModalOpen, setIsFamilyModalOpen] = useState(false);
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
   const [isRelationModalOpen, setIsRelationModalOpen] = useState(false);
+  const [isFamilyVehicleModalOpen, setIsFamilyVehicleModalOpen] = useState(false);
   const [linkTargetMemberId, setLinkTargetMemberId] = useState<string | null>(null);
   const [selectedAuthUid, setSelectedAuthUid] = useState("");
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>(null);
@@ -274,7 +317,7 @@ export function MembersManagementPage() {
   const memberNameById = useMemo(
     () =>
       members.reduce<Record<string, string>>((result, member) => {
-        result[member.id] = member.name;
+        result[member.id] = member.displayName || member.name;
         return result;
       }, {}),
     [members],
@@ -320,7 +363,11 @@ export function MembersManagementPage() {
     [familyNameById, members],
   );
   const filteredMembers = useMemo(
-    () => members.filter((member) => memberMatchesTypeFilter(member, activeMemberTypeFilter)),
+    () =>
+      sortMembersForDisplay(
+        members.filter((member) => memberMatchesTypeFilter(member, activeMemberTypeFilter)),
+        activeMemberTypeFilter,
+      ),
     [activeMemberTypeFilter, members],
   );
 
@@ -476,6 +523,8 @@ export function MembersManagementPage() {
     setFamilyForm({
       id: family.id,
       name: family.name,
+      address: family.address,
+      vehicles: family.vehicles.map((vehicle) => ({ ...vehicle })),
       status: family.status,
       notes: family.notes,
     });
@@ -493,11 +542,19 @@ export function MembersManagementPage() {
   };
 
   const openMemberEdit = (member: MemberRecord) => {
+    const displayName = member.displayName || member.name;
     setMemberForm({
       id: member.id,
       familyId: member.familyId,
-      name: member.name,
-      nameKana: member.nameKana,
+      displayName,
+      familyName: member.familyName || displayName,
+      givenName: member.givenName || "",
+      familyNameKana: member.familyNameKana || member.nameKana,
+      givenNameKana: member.givenNameKana || "",
+      name: displayName,
+      nameKana: member.familyNameKana || member.nameKana,
+      birthDate: member.birthDate || "",
+      phoneNumber: member.phoneNumber || "",
       enrollmentYear: member.enrollmentYear ? String(member.enrollmentYear) : "",
       instrumentCodes: member.instrumentCodes,
       memberTypes: member.memberTypes,
@@ -583,6 +640,108 @@ export function MembersManagementPage() {
     }));
   };
 
+  const addFamilyVehicle = () => {
+    setFamilyVehicleForm(emptyFamilyVehicleModal());
+    setIsFamilyVehicleModalOpen(true);
+  };
+
+  const removeFamilyVehicle = (index: number) => {
+    setFamilyForm((current) => ({
+      ...current,
+      vehicles: current.vehicles.filter((_, vehicleIndex) => vehicleIndex !== index),
+    }));
+  };
+
+  const openFamilyVehicleEdit = (index: number) => {
+    const vehicle = familyForm.vehicles[index];
+    if (!vehicle) return;
+    setFamilyVehicleForm({
+      index,
+      maker: vehicle.maker,
+      model: vehicle.model,
+      capacity: vehicle.capacity !== null ? String(vehicle.capacity) : "",
+      notes: vehicle.notes,
+    });
+    setIsFamilyVehicleModalOpen(true);
+  };
+
+  const closeFamilyVehicleModal = () => {
+    setFamilyVehicleForm(emptyFamilyVehicleModal());
+    setIsFamilyVehicleModalOpen(false);
+  };
+
+  const submitFamilyVehicle = () => {
+    const nextVehicle: FamilyVehicleRecord = {
+      maker: familyVehicleForm.maker.trim(),
+      model: familyVehicleForm.model.trim(),
+      capacity: familyVehicleForm.capacity.trim() ? Number(familyVehicleForm.capacity.trim()) : null,
+      notes: familyVehicleForm.notes.trim(),
+    };
+
+    setFamilyForm((current) => {
+      if (familyVehicleForm.index === null) {
+        return {
+          ...current,
+          vehicles: [...current.vehicles, nextVehicle],
+        };
+      }
+
+      return {
+        ...current,
+        vehicles: current.vehicles.map((vehicle, index) => (index === familyVehicleForm.index ? nextVehicle : vehicle)),
+      };
+    });
+
+    closeFamilyVehicleModal();
+  };
+
+  const buildMemberSortOrders = (): Partial<Record<MemberType, number>> => {
+    const existingMember = memberForm.id ? members.find((member) => member.id === memberForm.id) ?? null : null;
+    const nextSortOrders: Partial<Record<MemberType, number>> = {};
+
+    memberForm.memberTypes.forEach((memberType) => {
+      const existingSortOrder = existingMember?.sortOrders?.[memberType];
+      if (typeof existingSortOrder === "number" && Number.isFinite(existingSortOrder)) {
+        nextSortOrders[memberType] = existingSortOrder;
+        return;
+      }
+
+      const maxSortOrder = members
+        .filter((member) => member.id !== memberForm.id && member.memberTypes.includes(memberType))
+        .reduce((result, member) => {
+          const value = member.sortOrders?.[memberType];
+          if (typeof value === "number" && Number.isFinite(value)) {
+            return Math.max(result, value);
+          }
+          return result;
+        }, -1);
+
+      nextSortOrders[memberType] = maxSortOrder + 1;
+    });
+
+    return nextSortOrders;
+  };
+
+  const moveMemberOrder = async (memberId: string, direction: -1 | 1) => {
+    if (activeMemberTypeFilter === "all") return;
+    const currentIndex = filteredMembers.findIndex((member) => member.id === memberId);
+    const nextIndex = currentIndex + direction;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= filteredMembers.length) {
+      return;
+    }
+
+    const orderedIds = filteredMembers.map((member) => member.id);
+    const [targetId] = orderedIds.splice(currentIndex, 1);
+    orderedIds.splice(nextIndex, 0, targetId);
+
+    try {
+      await updateMemberTypeOrder(activeMemberTypeFilter, orderedIds);
+      setToastMessage("並び順を更新しました。");
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : "並び順の更新に失敗しました。");
+    }
+  };
+
   const submitFamily = async () => {
     const nextErrors: FieldErrors = {};
     if (!familyForm.name.trim()) {
@@ -594,6 +753,8 @@ export function MembersManagementPage() {
     try {
       await saveFamily(familyForm.id, {
         name: familyForm.name,
+        address: familyForm.address,
+        vehicles: familyForm.vehicles,
         status: familyForm.status,
         notes: familyForm.notes,
       });
@@ -609,8 +770,13 @@ export function MembersManagementPage() {
     const normalizedLoginId = memberForm.loginId ? normalizeLoginId(memberForm.loginId) : "";
     const memberTypesError = validateMemberTypes(memberForm.memberTypes);
     const normalizedEnrollmentYear = memberForm.enrollmentYear.trim();
+    const displayName = buildDisplayName(memberForm.familyName, memberForm.givenName, memberForm.displayName);
 
-    if (!memberForm.name.trim()) nextErrors.name = "member 名を入力してください。";
+    if (!displayName.trim()) nextErrors.name = "member 名を入力してください。";
+    if (!memberForm.familyName.trim()) nextErrors.familyName = "姓を入力してください。";
+    if (!memberForm.givenName.trim()) nextErrors.givenName = "名を入力してください。";
+    if (!memberForm.familyNameKana.trim()) nextErrors.familyNameKana = "セイを入力してください。";
+    if (!memberForm.givenNameKana.trim()) nextErrors.givenNameKana = "メイを入力してください。";
     if (memberTypesError) nextErrors.memberTypes = memberTypesError;
     if (!adminRoleOptions.some((option) => option.value === memberForm.adminRole)) {
       nextErrors.adminRole = "管理権限を選択してください。";
@@ -628,6 +794,10 @@ export function MembersManagementPage() {
       nextErrors.enrollmentYear = "入学年度は西暦4桁で入力してください。";
     }
 
+    if (memberForm.birthDate.trim() && !isValidBirthDate(memberForm.birthDate.trim())) {
+      nextErrors.birthDate = "生年月日を正しく入力してください。";
+    }
+
     const duplicateLoginId = members.find(
       (member) => member.id !== memberForm.id && member.loginId && member.loginId === normalizedLoginId,
     );
@@ -641,8 +811,15 @@ export function MembersManagementPage() {
     try {
       await saveMember(memberForm.id, {
         familyId: memberForm.familyId,
-        name: memberForm.name,
-        nameKana: memberForm.nameKana,
+        displayName,
+        familyName: memberForm.familyName,
+        givenName: memberForm.givenName,
+        familyNameKana: memberForm.familyNameKana,
+        givenNameKana: memberForm.givenNameKana,
+        name: displayName,
+        nameKana: memberForm.familyNameKana,
+        birthDate: memberForm.birthDate.trim(),
+        phoneNumber: memberForm.phoneNumber,
         enrollmentYear: normalizedEnrollmentYear ? Number(normalizedEnrollmentYear) : null,
         instrumentCodes: memberForm.instrumentCodes,
         memberTypes: memberForm.memberTypes,
@@ -650,6 +827,7 @@ export function MembersManagementPage() {
         staffPermissions: memberForm.staffPermissions,
         memberStatus: memberForm.memberStatus,
         loginId: normalizedLoginId,
+        sortOrders: buildMemberSortOrders(),
         notes: memberForm.notes,
       });
       setIsMemberModalOpen(false);
@@ -780,8 +958,8 @@ export function MembersManagementPage() {
       setCsvImportPreview(
         result.rows.slice(0, 8).map((item) => ({
           rowNumber: item.rowNumber,
-          familyName: item.familyName || "未所属",
-          name: item.input.name,
+          familyDisplayName: item.familyDisplayName || "未所属",
+          displayName: item.input.displayName,
           loginId: item.input.loginId,
         })),
       );
@@ -816,12 +994,15 @@ export function MembersManagementPage() {
       const response = await bulkRegisterMembers(
         result.rows.map((row) => ({
           rowNumber: row.rowNumber,
+          familyDisplayName: row.familyDisplayName,
           input: row.input,
         })),
       );
       setCsvImportResults(response.results);
       setToastMessage(
-        `一括登録が完了しました。成功 ${response.successCount} 件 / 失敗 ${response.failureCount} 件`,
+        `一括登録が完了しました。成功 ${response.successCount} 件 / 失敗 ${response.failureCount} 件${
+          response.createdFamilyCount ? ` / Family自動作成 ${response.createdFamilyCount} 件` : ""
+        }`,
       );
       if (response.successCount > 0) {
         try {
@@ -953,24 +1134,20 @@ export function MembersManagementPage() {
                         type="button"
                         className="button button-small button-danger"
                         onClick={() =>
-                          openDeleteDialog(
-                            "family",
-                            family.id,
-                            "family を削除",
-                            memberCount > 0
-                              ? "所属 member があるため削除できません。先に member を整理してください。"
-                              : `${family.name} を削除しますか？`,
-                          )
+                          openDeleteDialog("family", family.id, "family を削除", `${family.name} を削除しますか？`)
                         }
+                        disabled={memberCount > 0}
+                        title={memberCount > 0 ? "所属 member がある間は削除できません。" : undefined}
                       >
                         削除
                       </button>
                     </div>
                   </div>
                   <p className="muted">status: {family.status}</p>
+                  {family.address && <p className="muted">住所: {family.address}</p>}
+                  <p className="muted">車両: {family.vehicles.length}台</p>
                   <p className="muted">{family.notes || "notes なし"}</p>
                   <p className="muted">所属member: {memberCount}件</p>
-                  {memberCount > 0 && <p className="field-error-inline">所属 member がある間は削除できません。</p>}
                 </article>
               );
             })}
@@ -1018,11 +1195,12 @@ export function MembersManagementPage() {
             ))}
           </div>
           <div className="members-admin-list-panel">
-            {filteredMembers.map((member) => {
+            {filteredMembers.map((member, index) => {
               const childMember = isChildMember(member);
               const childRelations = childMember ? childRelationsByChildId[member.id] ?? [] : [];
               const summaryBadges = buildMemberSummaryBadges(member);
               const profileDetails: string[] = [];
+              const birthAge = member.birthDate ? calculateAge(member.birthDate) : null;
               if (member.enrollmentYear) {
                 profileDetails.push(`${member.enrollmentYear}年度入学`);
               } else if (childMember || member.memberTypes.includes("obog")) {
@@ -1037,6 +1215,30 @@ export function MembersManagementPage() {
                     <div className="members-admin-card-header members-member-card-header">
                       <strong>{member.name}</strong>
                       <div className="members-admin-row-actions">
+                        {activeMemberTypeFilter !== "all" && (
+                          <div className="members-order-controls" aria-label="並び順操作">
+                            <button
+                              type="button"
+                              className="button button-small button-secondary"
+                              onClick={() => void moveMemberOrder(member.id, -1)}
+                              disabled={index === 0}
+                              title="上へ移動"
+                              aria-label="上へ移動"
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              className="button button-small button-secondary"
+                              onClick={() => void moveMemberOrder(member.id, 1)}
+                              disabled={index === filteredMembers.length - 1}
+                              title="下へ移動"
+                              aria-label="下へ移動"
+                            >
+                              ↓
+                            </button>
+                          </div>
+                        )}
                         <button
                           type="button"
                           className="button button-small button-secondary"
@@ -1064,6 +1266,13 @@ export function MembersManagementPage() {
                       {familyNameById[member.familyId] || "family 未設定"} / {summaryBadges.join(" / ") || "-"}
                     </p>
                     {profileDetails.length > 0 && <p className="muted">{profileDetails.join(" / ")}</p>}
+                    {member.birthDate && (
+                      <p className="muted">
+                        生年月日: {member.birthDate}
+                        {birthAge !== null ? ` / ${birthAge}歳` : ""}
+                      </p>
+                    )}
+                    {member.phoneNumber && <p className="muted">電話番号: {member.phoneNumber}</p>}
                     {childMember && (
                       <div className="members-child-relations">
                         <div className="members-child-relations-header">
@@ -1295,7 +1504,7 @@ export function MembersManagementPage() {
       )}
       {isFamilyModalOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
-          <section className="modal-panel">
+          <section className="modal-panel family-modal-panel">
             <button
               type="button"
               className="modal-close"
@@ -1331,6 +1540,59 @@ export function MembersManagementPage() {
               </select>
             </label>
             <label>
+              住所
+              <textarea
+                placeholder="例: 名古屋市○○区..."
+                value={familyForm.address}
+                onChange={(event) => setFamilyForm((current) => ({ ...current, address: event.target.value }))}
+              />
+            </label>
+            <div className="members-vehicles-field">
+              <div className="members-vehicles-header">
+                <div>
+                  <strong>車両情報</strong>
+                  <p className="muted">Family本体とは分けて、1台ずつ追加・編集します。</p>
+                </div>
+                <button type="button" className="button button-small button-secondary" onClick={addFamilyVehicle}>
+                  車両追加
+                </button>
+              </div>
+              {familyForm.vehicles.length === 0 ? (
+                <p className="muted">車両はまだありません。</p>
+              ) : (
+                <div className="members-vehicles-list">
+                  {familyForm.vehicles.map((vehicle, index) => (
+                    <div key={`${familyForm.id ?? "new"}-vehicle-${index}`} className="members-vehicle-card">
+                      <div className="members-vehicle-summary">
+                        <strong>{vehicle.maker || "メーカー未設定"}</strong>
+                        <p className="muted">
+                          {vehicle.model || "車種未設定"}
+                          {vehicle.capacity !== null ? ` / ${vehicle.capacity}人` : ""}
+                        </p>
+                        {vehicle.notes && <p className="muted">{vehicle.notes}</p>}
+                      </div>
+                      <div className="members-admin-row-actions">
+                        <button
+                          type="button"
+                          className="button button-small button-secondary"
+                          onClick={() => openFamilyVehicleEdit(index)}
+                        >
+                          編集
+                        </button>
+                        <button
+                          type="button"
+                          className="button button-small button-danger"
+                          onClick={() => removeFamilyVehicle(index)}
+                        >
+                          削除
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <label>
               notes
               <textarea
                 value={familyForm.notes}
@@ -1342,6 +1604,83 @@ export function MembersManagementPage() {
                 キャンセル
               </button>
               <button type="button" className="button" onClick={() => void submitFamily()}>
+                保存
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {isFamilyVehicleModalOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <section className="modal-panel family-vehicle-modal-panel">
+            <button
+              type="button"
+              className="modal-close"
+              aria-label="閉じる"
+              title="閉じる"
+              onClick={closeFamilyVehicleModal}
+            >
+              ×
+            </button>
+            <h3>{familyVehicleForm.index === null ? "車両を追加" : "車両を編集"}</h3>
+            <label>
+              メーカー
+              <input
+                value={familyVehicleForm.maker}
+                onChange={(event) =>
+                  setFamilyVehicleForm((current) => ({
+                    ...current,
+                    maker: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              車種
+              <input
+                value={familyVehicleForm.model}
+                onChange={(event) =>
+                  setFamilyVehicleForm((current) => ({
+                    ...current,
+                    model: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              乗車定員
+              <input
+                type="number"
+                inputMode="numeric"
+                min="1"
+                step="1"
+                value={familyVehicleForm.capacity}
+                onChange={(event) =>
+                  setFamilyVehicleForm((current) => ({
+                    ...current,
+                    capacity: event.target.value.replace(/[^\d]/g, ""),
+                  }))
+                }
+              />
+            </label>
+            <label>
+              備考
+              <textarea
+                value={familyVehicleForm.notes}
+                onChange={(event) =>
+                  setFamilyVehicleForm((current) => ({
+                    ...current,
+                    notes: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <div className="modal-actions">
+              <button type="button" className="button button-secondary" onClick={closeFamilyVehicleModal}>
+                キャンセル
+              </button>
+              <button type="button" className="button" onClick={submitFamilyVehicle}>
                 保存
               </button>
             </div>
@@ -1377,19 +1716,103 @@ export function MembersManagementPage() {
               </select>
               {memberErrors.familyId && <span className="field-error">{memberErrors.familyId}</span>}
             </label>
+            <div className="member-name-fields">
+              <label>
+                姓
+                <input
+                  value={memberForm.familyName}
+                  onChange={(event) =>
+                    setMemberForm((current) => {
+                      const familyName = event.target.value;
+                      const displayName = buildDisplayName(familyName, current.givenName);
+                      return {
+                        ...current,
+                        familyName,
+                        displayName,
+                        name: displayName,
+                      };
+                    })
+                  }
+                />
+                {memberErrors.familyName && <span className="field-error">{memberErrors.familyName}</span>}
+              </label>
+              <label>
+                名
+                <input
+                  value={memberForm.givenName}
+                  onChange={(event) =>
+                    setMemberForm((current) => {
+                      const givenName = event.target.value;
+                      const displayName = buildDisplayName(current.familyName, givenName);
+                      return {
+                        ...current,
+                        givenName,
+                        displayName,
+                        name: displayName,
+                      };
+                    })
+                  }
+                />
+                {memberErrors.givenName && <span className="field-error">{memberErrors.givenName}</span>}
+              </label>
+            </div>
+            <p className="muted">表示名: {buildDisplayName(memberForm.familyName, memberForm.givenName) || "-"}</p>
+            {memberErrors.name && <span className="field-error">{memberErrors.name}</span>}
+            <div className="member-name-fields">
+              <label>
+                セイ
+                <input
+                  value={memberForm.familyNameKana}
+                  onChange={(event) =>
+                    setMemberForm((current) => ({
+                      ...current,
+                      familyNameKana: event.target.value,
+                      nameKana: event.target.value,
+                    }))
+                  }
+                />
+                {memberErrors.familyNameKana && <span className="field-error">{memberErrors.familyNameKana}</span>}
+              </label>
+              <label>
+                メイ
+                <input
+                  value={memberForm.givenNameKana}
+                  onChange={(event) =>
+                    setMemberForm((current) => ({
+                      ...current,
+                      givenNameKana: event.target.value,
+                    }))
+                  }
+                />
+                {memberErrors.givenNameKana && <span className="field-error">{memberErrors.givenNameKana}</span>}
+              </label>
+            </div>
             <label>
-              name
+              生年月日
               <input
-                value={memberForm.name}
-                onChange={(event) => setMemberForm((current) => ({ ...current, name: event.target.value }))}
+                type="date"
+                value={memberForm.birthDate}
+                onChange={(event) =>
+                  setMemberForm((current) => ({
+                    ...current,
+                    birthDate: event.target.value,
+                  }))
+                }
               />
-              {memberErrors.name && <span className="field-error">{memberErrors.name}</span>}
+              {memberErrors.birthDate && <span className="field-error">{memberErrors.birthDate}</span>}
             </label>
             <label>
-              nameKana
+              電話番号
               <input
-                value={memberForm.nameKana}
-                onChange={(event) => setMemberForm((current) => ({ ...current, nameKana: event.target.value }))}
+                type="tel"
+                placeholder="例: 090-1234-5678"
+                value={memberForm.phoneNumber}
+                onChange={(event) =>
+                  setMemberForm((current) => ({
+                    ...current,
+                    phoneNumber: event.target.value,
+                  }))
+                }
               />
             </label>
             <label>
@@ -1704,7 +2127,7 @@ export function MembersManagementPage() {
                 <ul className="members-admin-list">
                   {csvImportPreview.map((item) => (
                     <li key={`${item.rowNumber}-${item.loginId}`}>
-                      {item.rowNumber}行目: {item.name} / {item.loginId} / {item.familyName}
+                      {item.rowNumber}行目: {item.displayName} / {item.loginId} / {item.familyDisplayName}
                     </li>
                   ))}
                 </ul>

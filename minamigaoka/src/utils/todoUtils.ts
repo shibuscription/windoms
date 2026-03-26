@@ -66,14 +66,14 @@ export const resolveTodoRelatedSummary = (
   }
 
   const parsed = parseSessionRelatedId(related.id);
-  if (!parsed) return { label: "📅 セッション（不明）", to: null };
+  if (!parsed) return { label: "📅 予定（不明）", to: null };
   const day = data.scheduleDays[parsed.dateKey];
   const session = day?.sessions.find((item) => item.order === parsed.order);
   const sessionName = session
     ? session.type === "event"
       ? session.eventName ?? typeLabel.event
       : typeLabel[session.type]
-    : "セッション";
+    : "予定";
   return {
     label: `📅 ${toDateLabel(parsed.dateKey)} ${sessionName}`,
     to: `/today?date=${parsed.dateKey}`,

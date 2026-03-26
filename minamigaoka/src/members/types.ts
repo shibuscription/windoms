@@ -32,9 +32,18 @@ export type RelationshipType =
   | "guardian_other";
 export type RelationStatus = "active" | "inactive";
 
+export type FamilyVehicleRecord = {
+  maker: string;
+  model: string;
+  capacity: number | null;
+  notes: string;
+};
+
 export type FamilyRecord = {
   id: string;
   name: string;
+  address: string;
+  vehicles: FamilyVehicleRecord[];
   status: FamilyStatus;
   notes: string;
   createdAt: unknown;
@@ -44,8 +53,15 @@ export type FamilyRecord = {
 export type MemberRecord = {
   id: string;
   familyId: string;
+  displayName: string;
+  familyName: string;
+  givenName: string;
+  familyNameKana: string;
+  givenNameKana: string;
   name: string;
   nameKana: string;
+  birthDate: string;
+  phoneNumber: string;
   enrollmentYear: number | null;
   instrumentCodes: InstrumentCode[];
   memberTypes: MemberType[];
@@ -58,6 +74,7 @@ export type MemberRecord = {
   loginId: string;
   authUid: string;
   authEmail: string;
+  sortOrders?: Partial<Record<MemberType, number>>;
   notes: string;
   createdAt: unknown;
   updatedAt: unknown;
@@ -93,6 +110,7 @@ export type AuthUsersResponse = {
 
 export type BulkRegisterMemberRow = {
   rowNumber: number;
+  familyDisplayName?: string;
   input: SaveMemberInput;
 };
 
@@ -110,26 +128,36 @@ export type BulkRegisterMembersResponse = {
   results: BulkRegisterMemberResult[];
   successCount: number;
   failureCount: number;
+  createdFamilyCount?: number;
   projectId: string;
   functionsRegion?: string;
 };
 
-export type SaveFamilyInput = Pick<FamilyRecord, "name" | "status" | "notes">;
+export type SaveFamilyInput = Pick<FamilyRecord, "name" | "address" | "vehicles" | "status" | "notes">;
 
 export type SaveMemberInput = Pick<
   MemberRecord,
   | "familyId"
+  | "displayName"
+  | "familyName"
+  | "givenName"
+  | "familyNameKana"
+  | "givenNameKana"
   | "name"
   | "nameKana"
-  | "enrollmentYear"
+  | "phoneNumber"
   | "instrumentCodes"
   | "memberTypes"
   | "adminRole"
   | "staffPermissions"
   | "memberStatus"
   | "loginId"
+  | "sortOrders"
   | "notes"
->;
+> & {
+  enrollmentYear: number | null;
+  birthDate?: string;
+};
 
 export type SaveRelationInput = Pick<
   MemberRelationRecord,

@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import type { DayLog, DemoData, DemoRsvp, DutyRequirement, RsvpStatus, SessionDoc, Todo } from "../types";
+import { Link, useSearchParams } from "react-router-dom";
+import { BirthdayCelebrationModal } from "../components/BirthdayCelebrationModal";
+import { getBirthdayCelebrants } from "../members/birthday";
+import { isChildMember, sortMembersForDisplay } from "../members/permissions";
+import { subscribeMembers } from "../members/service";
+import type { MemberRecord } from "../members/types";
+import type { DayLog, DemoData, DutyRequirement, RsvpStatus, SessionDoc, Todo } from "../types";
 import {
   formatDateYmd,
-  formatWeekdayJa,
   formatTimeNoLeadingZero,
+  formatWeekdayJa,
   isValidDateKey,
   shiftDateKey,
   todayDateKey,
@@ -19,6 +24,12 @@ type TodayPageProps = {
   updateTodos: (updater: (prev: Todo[]) => Todo[]) => void;
 };
 
+type AttendanceRow = {
+  uid: string;
+  displayName: string;
+  status: RsvpStatus;
+};
+
 const typeLabel: Record<SessionDoc["type"], string> = {
   normal: "通常練習",
   self: "自主練",
@@ -30,45 +41,8 @@ const dutyLabel: Record<DutyRequirement, string> = {
   watch: "見守り",
 };
 
-const toFamilyName = (name?: string): string => {
-  const value = (name ?? "").trim();
-  if (!value || value === "-") return "-";
-  if (value.includes(" ")) return value.split(" ")[0] || "-";
-  if (value.includes("　")) return value.split("　")[0] || "-";
-  return value;
-};
-
-const statusSymbol: Record<RsvpStatus, string> = {
-  yes: "◯",
-  maybe: "△",
-  no: "×",
-  unknown: "-",
-};
-
-const countRsvps = (session: SessionDoc) => {
-  const list = session.demoRsvps ?? [];
-  return {
-    yes: list.filter((item) => item.status === "yes").length,
-    maybe: list.filter((item) => item.status === "maybe").length,
-    no: list.filter((item) => item.status === "no").length,
-  };
-};
-
-const sortRsvps = (items: DemoRsvp[], data: DemoData): DemoRsvp[] =>
-  [...items].sort((a, b) => {
-    const ma = data.members[a.uid];
-    const mb = data.members[b.uid];
-    if (ma && mb) {
-      if (ma.grade !== mb.grade) return mb.grade - ma.grade;
-      if (ma.instrumentOrder !== mb.instrumentOrder) return ma.instrumentOrder - mb.instrumentOrder;
-      return ma.kana.localeCompare(mb.kana, "ja");
-    }
-    if (ma && !mb) return -1;
-    if (!ma && mb) return 1;
-    return a.displayName.localeCompare(b.displayName, "ja");
-  });
-
 const weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"] as const;
+
 const demoViewTitle: Record<string, string> = {
   calendar: "カレンダー",
   event: "イベント",
@@ -86,6 +60,21 @@ const demoViewTitle: Record<string, string> = {
   members: "メンバー",
   links: "リンク集",
   settings: "設定",
+};
+
+const statusSymbol: Record<RsvpStatus, string> = {
+  yes: "○",
+  maybe: "△",
+  no: "×",
+  unknown: "ー",
+};
+
+const toFamilyName = (name?: string): string => {
+  const value = (name ?? "").trim();
+  if (!value || value === "-") return "-";
+  if (value.includes(" ")) return value.split(" ")[0] || "-";
+  if (value.includes("　")) return value.split("　")[0] || "-";
+  return value;
 };
 
 const toMonthKey = (dateKey: string): string => dateKey.slice(0, 7);
@@ -114,24 +103,45 @@ const buildMonthCells = (monthKey: string): Array<string | null> => {
   return cells;
 };
 
+const countAttendanceRows = (rows: AttendanceRow[]) => ({
+  yes: rows.filter((item) => item.status === "yes").length,
+  maybe: rows.filter((item) => item.status === "maybe").length,
+  no: rows.filter((item) => item.status === "no").length,
+  unknown: rows.filter((item) => item.status === "unknown").length,
+});
+
+const getSessionDisplayTitle = (session: SessionDoc): string =>
+  session.type === "event" && session.eventName?.trim() ? session.eventName.trim() : typeLabel[session.type];
+
 export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: TodayPageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
+  const [selectedSession, setSelectedSession] = useState<SessionDoc | null>(null);
+  const [birthdayModalDate, setBirthdayModalDate] = useState<string | null>(null);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(todayDateKey().slice(0, 7));
+  const [noticeExpanded, setNoticeExpanded] = useState(false);
+  const [noticeCanToggle, setNoticeCanToggle] = useState(false);
+  const [isFutureLogConfirmOpen, setIsFutureLogConfirmOpen] = useState(false);
+  const [members, setMembers] = useState<MemberRecord[]>([]);
+  const [pageError, setPageError] = useState("");
+  const calendarWrapRef = useRef<HTMLDivElement>(null);
+  const noticeContentRef = useRef<HTMLDivElement>(null);
   const today = todayDateKey();
   const view = searchParams.get("view") ?? "";
   const queryDate = searchParams.get("date") ?? "";
   const date = queryDate && isValidDateKey(queryDate) ? queryDate : today;
-  const [selectedSession, setSelectedSession] = useState<SessionDoc | null>(null);
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [calendarMonth, setCalendarMonth] = useState(toMonthKey(date));
-  const [noticeExpanded, setNoticeExpanded] = useState(false);
-  const [noticeCanToggle, setNoticeCanToggle] = useState(false);
-  const [isFutureLogConfirmOpen, setIsFutureLogConfirmOpen] = useState(false);
-  const calendarWrapRef = useRef<HTMLDivElement>(null);
-  const noticeContentRef = useRef<HTMLDivElement>(null);
   const day = data.scheduleDays[date];
   const dayDefaultLocation = day?.defaultLocation;
   const noticeText = day?.notice?.trim() ?? "";
+
+  useEffect(() => {
+    try {
+      return subscribeMembers(setMembers);
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : "メンバーの読み込みに失敗しました。");
+      return undefined;
+    }
+  }, []);
 
   useEffect(() => {
     if (!queryDate) return;
@@ -173,24 +183,52 @@ export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: Today
     [day],
   );
 
-  const hasLog = Boolean(data.dayLogs[date]);
-  const hasSessions = sessions.length > 0;
-  const logStatus = hasLog ? "☑ 記録あり" : hasSessions ? "⚠ 記録なし" : "⚠ 未作成";
-  const logStatusClass = hasLog ? "has-log" : "no-log";
-  const selectedCounts = selectedSession ? countRsvps(selectedSession) : null;
-  const sortedSelectedRsvps = useMemo(
-    () => (selectedSession ? sortRsvps(selectedSession.demoRsvps ?? [], data) : []),
-    [selectedSession, data],
+  const visibleChildMembers = useMemo(
+    () =>
+      sortMembersForDisplay(
+        members.filter((member) => member.memberStatus === "active" && isChildMember(member)),
+        "child",
+      ),
+    [members],
   );
+
+  const attendanceRowsByOrder = useMemo(() => {
+    return sessions.reduce<Record<number, AttendanceRow[]>>((result, session) => {
+      const rows = visibleChildMembers.map((member) => {
+        const matched =
+          session.demoRsvps?.find(
+            (item) =>
+              item.uid === member.authUid ||
+              item.uid === member.id ||
+              item.uid === member.loginId,
+          ) ?? null;
+
+        return {
+          uid: member.id,
+          displayName: member.name,
+          status: matched?.status ?? "unknown",
+        };
+      });
+      result[session.order] = rows;
+      return result;
+    }, {});
+  }, [sessions, visibleChildMembers]);
+
+  const selectedRows = selectedSession ? attendanceRowsByOrder[selectedSession.order] ?? [] : [];
+  const selectedCounts = useMemo(() => countAttendanceRows(selectedRows), [selectedRows]);
   const selectedSessionTodos = useMemo(() => {
     if (!selectedSession) return [] as Todo[];
     const relatedId = makeSessionRelatedId(date, selectedSession.order);
     return sortTodosOpenFirst(
-      data.todos.filter(
-        (todo) => todo.related?.type === "session" && todo.related.id === relatedId,
-      ),
+      data.todos.filter((todo) => todo.related?.type === "session" && todo.related.id === relatedId),
     );
   }, [data.todos, date, selectedSession]);
+  const birthdayCelebrants = useMemo(() => getBirthdayCelebrants(members, date), [date, members]);
+
+  const hasLog = Boolean(data.dayLogs[date]);
+  const hasSessions = sessions.length > 0;
+  const logStatus = hasLog ? "日誌あり" : hasSessions ? "日誌なし" : "未活動";
+  const logStatusClass = hasLog ? "has-log" : "no-log";
   const calendarCells = useMemo(() => buildMonthCells(calendarMonth), [calendarMonth]);
   const calendarPath = `/calendar?ym=${toMonthKey(date)}&date=${date}`;
 
@@ -226,15 +264,6 @@ export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: Today
     setIsFutureLogConfirmOpen(false);
   };
 
-  const toggleNoticeExpanded = () => {
-    setNoticeExpanded((prev) => !prev);
-  };
-
-  const toggleMiniCalendar = () => {
-    setCalendarMonth(toMonthKey(date));
-    setIsCalendarOpen((prev) => !prev);
-  };
-
   const assigneeLabel = (uid: string | null): string => {
     if (!uid) return "未アサイン";
     return data.users[uid]?.displayName ?? uid;
@@ -252,7 +281,7 @@ export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: Today
     return (
       <section className="card">
         <h1>{title}</h1>
-        <p>この画面は準備中です。今後のフェーズで実装します。</p>
+        <p>この画面は準備中です。必要な導線だけ先に置いています。</p>
         <Link to="/today" className="button">
           Todayへ戻る
         </Link>
@@ -267,28 +296,36 @@ export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: Today
           <button type="button" className="date-nav-button" onClick={() => moveDate(-1)}>
             ← 前日
           </button>
-          <div
-            className="today-date-center"
-            ref={calendarWrapRef}
-          >
+          <div className="today-date-center" ref={calendarWrapRef}>
             <button
               type="button"
               className="today-date-picker-trigger"
-              onClick={toggleMiniCalendar}
-              aria-label="日付選択を開く"
+              onClick={() => setIsCalendarOpen((prev) => !prev)}
+              aria-label="日付を選ぶ"
             >
               <span className="date-main date-full">{formatDateYmd(date)}</span>
               <span className="date-main date-short">{formatDateYmd(date).slice(5)}</span>
               <span className={`date-weekday ${weekdayTone(date)}`}>（{formatWeekdayJa(date)}）</span>
             </button>
-            <button
-              type="button"
+            {birthdayCelebrants.length > 0 && (
+              <button
+                type="button"
+                className="today-birthday-trigger"
+                onClick={() => setBirthdayModalDate(date)}
+                aria-label="誕生日のお祝いを見る"
+                title="誕生日のお祝いを見る"
+              >
+                🎂
+              </button>
+            )}
+            <Link
+              to={calendarPath}
               className="today-calendar-link-trigger"
-              onClick={() => navigate(calendarPath)}
               aria-label="カレンダーを開く"
+              title="カレンダーを開く"
             >
               🗓️
-            </button>
+            </Link>
             {isCalendarOpen && (
               <div className="today-calendar-popover" onClick={(event) => event.stopPropagation()}>
                 <div className="mini-calendar-header">
@@ -321,9 +358,7 @@ export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: Today
                       <button
                         key={cell}
                         type="button"
-                        className={`mini-calendar-day ${cell === date ? "selected" : ""} ${
-                          cell === today ? "today" : ""
-                        }`}
+                        className={`mini-calendar-day ${cell === date ? "selected" : ""} ${cell === today ? "today" : ""}`}
                         onClick={() => selectDate(cell)}
                       >
                         {Number(cell.slice(-2))}
@@ -354,17 +389,19 @@ export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: Today
         </div>
       </div>
 
+      {pageError && <p className="field-error">{pageError}</p>}
+
       {noticeText && (
         <div className="notice-block notice-collapsible">
           <div
             ref={noticeContentRef}
             className={`notice-content ${noticeExpanded ? "expanded" : "collapsed"}`}
-            onClick={noticeCanToggle ? toggleNoticeExpanded : undefined}
+            onClick={noticeCanToggle ? () => setNoticeExpanded((prev) => !prev) : undefined}
           >
             {noticeText}
           </div>
           {noticeCanToggle && (
-            <button type="button" className="notice-toggle" onClick={toggleNoticeExpanded}>
+            <button type="button" className="notice-toggle" onClick={() => setNoticeExpanded((prev) => !prev)}>
               {noticeExpanded ? "▲ たたむ" : "▼ ひらく"}
             </button>
           )}
@@ -372,44 +409,38 @@ export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: Today
       )}
 
       {!day || sessions.length === 0 ? (
-        <p>この日のセッションは未登録です。</p>
+        <p>この日の予定はまだありません。</p>
       ) : (
         <div className="session-list">
           {sessions.map((session, index) => {
-            const counts = countRsvps(session);
-            const label = typeLabel[session.type];
-            const eventName = session.type === "event" ? session.eventName?.trim() ?? "" : "";
+            const counts = countAttendanceRows(attendanceRowsByOrder[session.order] ?? []);
             return (
               <article key={`${session.order}-${index}`} className={`session-card ${session.type}`}>
-                <span className={`session-type-badge ${session.type}`}>{label}</span>
+                <span className={`session-type-badge ${session.type}`}>{typeLabel[session.type]}</span>
                 <div className="session-time">
-                  {formatTimeNoLeadingZero(session.startTime)} -{" "}
-                  {formatTimeNoLeadingZero(session.endTime)}
+                  {formatTimeNoLeadingZero(session.startTime)} - {formatTimeNoLeadingZero(session.endTime)}
                 </div>
-                {eventName && <div className="session-subtitle">{eventName}</div>}
+                {session.type === "event" && session.eventName?.trim() && (
+                  <div className="session-subtitle">{session.eventName}</div>
+                )}
                 <div className="kv-row">
-                  <span className="kv-key">{dutyLabel[session.dutyRequirement]}：</span>
-                  <span className="kv-val shift-role">
-                    {toFamilyName(session.assigneeNameSnapshot)}
-                  </span>
+                  <span className="kv-key">{dutyLabel[session.dutyRequirement]}:</span>
+                  <span className="kv-val shift-role">{toFamilyName(session.assigneeNameSnapshot)}</span>
                 </div>
                 <div className="kv-row">
-                  <span className="kv-key">出欠：</span>
+                  <span className="kv-key">出欠:</span>
                   <span className="kv-val">
-                    <button
-                      type="button"
-                      className="attendance-trigger"
-                      onClick={() => setSelectedSession(session)}
-                    >
-                      <span className="count-yes">◯{counts.yes}</span>
+                    <button type="button" className="attendance-trigger" onClick={() => setSelectedSession(session)}>
+                      <span className="count-yes">○{counts.yes}</span>
                       <span className="count-maybe">△{counts.maybe}</span>
                       <span className="count-no">×{counts.no}</span>
+                      <span className="count-unknown">ー{counts.unknown}</span>
                     </button>
                   </span>
                 </div>
                 {session.location && session.location !== dayDefaultLocation && (
                   <div className="kv-row">
-                    <span className="kv-key">場所：</span>
+                    <span className="kv-key">場所:</span>
                     <span className="kv-val">{session.location}</span>
                   </div>
                 )}
@@ -426,86 +457,100 @@ export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: Today
               type="button"
               className="modal-close"
               onClick={() => setSelectedSession(null)}
-              aria-label="閉じる" title="閉じる"
+              aria-label="閉じる"
+              title="閉じる"
             >
               ×
             </button>
             <p className="modal-context">
-              {formatDateYmd(date)}（{formatWeekdayJa(date)}）{" "}
-              {formatTimeNoLeadingZero(selectedSession.startTime)}–
-              {formatTimeNoLeadingZero(selectedSession.endTime)}
+              {formatDateYmd(date)}（{formatWeekdayJa(date)}） /{" "}
+              {formatTimeNoLeadingZero(selectedSession.startTime)}-{formatTimeNoLeadingZero(selectedSession.endTime)}
             </p>
-            {selectedSession.type === "event" && selectedSession.eventName?.trim() && (
-              <p className="modal-summary">{selectedSession.eventName}</p>
-            )}
-            {selectedCounts && (
-              <p className="modal-summary">
-                出欠：<span className="count-yes">◯{selectedCounts.yes}</span>{" "}
-                <span className="count-maybe">△{selectedCounts.maybe}</span>{" "}
-                <span className="count-no">×{selectedCounts.no}</span>
-              </p>
-            )}
+            <h3>{getSessionDisplayTitle(selectedSession)}</h3>
+            {selectedSession.location && <p className="modal-summary muted">場所: {selectedSession.location}</p>}
+            <p className="modal-summary">
+              出欠: <span className="count-yes">○{selectedCounts.yes}</span>{" "}
+              <span className="count-maybe">△{selectedCounts.maybe}</span>{" "}
+              <span className="count-no">×{selectedCounts.no}</span>{" "}
+              <span className="count-unknown">ー{selectedCounts.unknown}</span>
+            </p>
             <div className="rsvp-table">
-              {sortedSelectedRsvps.map((rsvp) => (
-                <div key={rsvp.uid} className="rsvp-row">
-                  <span>{rsvp.displayName}</span>
-                  <span className={`rsvp-mark ${rsvp.status}`}>{statusSymbol[rsvp.status]}</span>
+              {selectedRows.map((row) => (
+                <div key={row.uid} className="rsvp-row">
+                  <span>{row.displayName}</span>
+                  <span className={`rsvp-mark ${row.status}`}>{statusSymbol[row.status]}</span>
                 </div>
               ))}
+              {selectedRows.length === 0 && (
+                <div className="rsvp-row">
+                  <span>対象の部員はまだいません。</span>
+                  <span className="rsvp-mark unknown">ー</span>
+                </div>
+              )}
             </div>
-            <section className="related-todos-block">
-              <h4>関連TODO</h4>
-              <div className="related-todos-list">
-                {selectedSessionTodos.map((todo) => {
-                  const takeover = takeoverLabel(todo);
-                  return (
-                    <article key={todo.id} className={`todo-row compact ${todo.completed ? "completed" : ""}`}>
-                      <label className="todo-check">
-                        <input
-                          type="checkbox"
-                          checked={todo.completed}
-                          onChange={() =>
-                            updateTodos((prev) =>
-                              prev.map((item) =>
-                                item.id === todo.id ? { ...item, completed: !item.completed } : item,
-                              ),
-                            )
-                          }
-                        />
-                      </label>
-                      <div className="todo-main">
-                        <p className="todo-title">{todo.title}</p>
-                        <p className="todo-meta">
-                          <span>担当: {assigneeLabel(todo.assigneeUid)}</span>
-                          <span>期限: {todo.dueDate ?? "—"}</span>
-                        </p>
-                      </div>
-                      <div className="todo-actions">
-                        {takeover && (
-                          <button
-                            type="button"
-                            className="button button-small"
-                            onClick={() =>
+            {selectedSessionTodos.length > 0 && (
+              <section className="related-todos-block">
+                <h4>関連TODO</h4>
+                <div className="related-todos-list">
+                  {selectedSessionTodos.map((todo) => {
+                    const takeover = takeoverLabel(todo);
+                    return (
+                      <article key={todo.id} className={`todo-row compact ${todo.completed ? "completed" : ""}`}>
+                        <label className="todo-check">
+                          <input
+                            type="checkbox"
+                            checked={todo.completed}
+                            onChange={() =>
                               updateTodos((prev) =>
                                 prev.map((item) =>
-                                  item.id === todo.id ? { ...item, assigneeUid: currentUid } : item,
+                                  item.id === todo.id ? { ...item, completed: !item.completed } : item,
                                 ),
                               )
                             }
-                          >
-                            {takeover}
-                          </button>
-                        )}
-                      </div>
-                    </article>
-                  );
-                })}
-                {selectedSessionTodos.length === 0 && <p className="muted">関連TODOはありません。</p>}
-              </div>
-            </section>
+                          />
+                        </label>
+                        <div className="todo-main">
+                          <p className="todo-title">{todo.title}</p>
+                          <p className="todo-meta">
+                            <span>担当: {assigneeLabel(todo.assigneeUid)}</span>
+                            <span>期限: {todo.dueDate ?? "—"}</span>
+                          </p>
+                        </div>
+                        <div className="todo-actions">
+                          {takeover && (
+                            <button
+                              type="button"
+                              className="button button-small"
+                              onClick={() =>
+                                updateTodos((prev) =>
+                                  prev.map((item) =>
+                                    item.id === todo.id ? { ...item, assigneeUid: currentUid } : item,
+                                  ),
+                                )
+                              }
+                            >
+                              {takeover}
+                            </button>
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
           </div>
         </div>
       )}
+
+      {birthdayModalDate && birthdayCelebrants.length > 0 && (
+        <BirthdayCelebrationModal
+          date={birthdayModalDate}
+          celebrants={birthdayCelebrants}
+          onClose={() => setBirthdayModalDate(null)}
+        />
+      )}
+
       {isFutureLogConfirmOpen && (
         <div className="modal-backdrop" onClick={() => setIsFutureLogConfirmOpen(false)}>
           <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
@@ -513,11 +558,12 @@ export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: Today
               type="button"
               className="modal-close"
               onClick={() => setIsFutureLogConfirmOpen(false)}
-              aria-label="閉じる" title="閉じる"
+              aria-label="閉じる"
+              title="閉じる"
             >
               ×
             </button>
-            <p className="modal-context">選択した日付は未来日です。日誌を作成してもよろしいですか？</p>
+            <p className="modal-context">選択した日は未来日です。日誌を作成してもよろしいですか？</p>
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={() => setIsFutureLogConfirmOpen(false)}>
                 キャンセル

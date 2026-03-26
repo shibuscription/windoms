@@ -233,6 +233,53 @@ const assertAdmin = async (
   }
 };
 
+const assertCalendarSessionManager = async (
+  auth:
+    | {
+        uid?: string;
+        token?: Record<string, unknown>;
+      }
+    | undefined,
+) => {
+  if (!auth?.uid) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+
+  if (auth.token?.admin === true) {
+    return;
+  }
+
+  const memberSnapshot = await firestore
+    .collection("members")
+    .where("authUid", "==", auth.uid)
+    .limit(1)
+    .get();
+
+  const member = memberSnapshot.docs[0];
+  const adminRole = typeof member?.get("adminRole") === "string" ? String(member.get("adminRole")) : "";
+  const role = typeof member?.get("role") === "string" ? String(member.get("role")) : "";
+  const rawStaffPermissions = member?.get("staffPermissions");
+  const staffPermissions = Array.isArray(rawStaffPermissions)
+    ? rawStaffPermissions.filter((item: unknown): item is string => typeof item === "string")
+    : [];
+
+  if (role === "admin" || adminRole === "admin" || staffPermissions.includes("shift_management")) {
+    return;
+  }
+
+  logger.warn("calendar session manager permission required", {
+    projectId: serverProjectId || "(unknown)",
+    functionsRegion,
+    authUid: auth.uid,
+  });
+  throw new HttpsError("permission-denied", "Calendar session management permission is required.", {
+    projectId: serverProjectId,
+    functionsRegion,
+    errorCode: "auth/calendar-session-manager-required",
+    errorMessage: "admin またはシフト作成担当者の権限が必要です。",
+  });
+};
+
 const listAllAuthUsers = async () => {
   const users: Array<{
     uid: string;
@@ -339,8 +386,14 @@ export const linkMemberAuth = onCall(async (request) => {
 
 type BulkRegisterRowInput = {
   rowNumber?: number;
+  familyDisplayName?: string;
   input?: {
     familyId?: string;
+    displayName?: string;
+    familyName?: string;
+    givenName?: string;
+    familyNameKana?: string;
+    givenNameKana?: string;
     name?: string;
     nameKana?: string;
     enrollmentYear?: number | null;
@@ -363,6 +416,8 @@ export const bulkRegisterMembers = onCall(async (request) => {
   }
 
   const seenLoginIds = new Set<string>();
+  const familyIdByDisplayName = new Map<string, string>();
+  let createdFamilyCount = 0;
   const results: Array<{
     rowNumber: number;
     userId: string;
@@ -376,7 +431,15 @@ export const bulkRegisterMembers = onCall(async (request) => {
   for (const row of rows) {
     const rowNumber = typeof row.rowNumber === "number" ? row.rowNumber : 0;
     const input = row.input ?? {};
-    const displayName = typeof input.name === "string" ? input.name.trim() : "";
+    const familyDisplayName = typeof row.familyDisplayName === "string" ? row.familyDisplayName.trim() : "";
+    const familyName = typeof input.familyName === "string" ? input.familyName.trim() : "";
+    const givenName = typeof input.givenName === "string" ? input.givenName.trim() : "";
+    const familyNameKana = typeof input.familyNameKana === "string" ? input.familyNameKana.trim() : "";
+    const givenNameKana = typeof input.givenNameKana === "string" ? input.givenNameKana.trim() : "";
+    const displayName =
+      typeof input.displayName === "string" && input.displayName.trim()
+        ? input.displayName.trim()
+        : `${familyName}${givenName}`.trim() || (typeof input.name === "string" ? input.name.trim() : "");
     const loginId = normalizeLoginId(typeof input.loginId === "string" ? input.loginId : "");
     const generatedEmail = loginId ? toInternalAuthEmail(loginId) : "";
 
@@ -391,6 +454,26 @@ export const bulkRegisterMembers = onCall(async (request) => {
         errorMessage: message,
       });
     };
+
+    if (!familyName) {
+      fail("familyName が不足しています。");
+      continue;
+    }
+
+    if (!givenName) {
+      fail("givenName が不足しています。");
+      continue;
+    }
+
+    if (!familyNameKana) {
+      fail("familyNameKana が不足しています。");
+      continue;
+    }
+
+    if (!givenNameKana) {
+      fail("givenNameKana が不足しています。");
+      continue;
+    }
 
     if (!displayName) {
       fail("displayName が不足しています。");
@@ -414,8 +497,36 @@ export const bulkRegisterMembers = onCall(async (request) => {
     seenLoginIds.add(loginId);
 
     try {
-      if (typeof input.familyId === "string" && input.familyId.trim()) {
-        const familySnapshot = await firestore.collection("families").doc(input.familyId.trim()).get();
+      let resolvedFamilyId = typeof input.familyId === "string" ? input.familyId.trim() : "";
+      if (familyDisplayName) {
+        const cachedFamilyId = familyIdByDisplayName.get(familyDisplayName);
+        if (cachedFamilyId) {
+          resolvedFamilyId = cachedFamilyId;
+        } else {
+          const existingFamilySnapshot = await firestore
+            .collection("families")
+            .where("name", "==", familyDisplayName)
+            .limit(1)
+            .get();
+
+          if (!existingFamilySnapshot.empty) {
+            resolvedFamilyId = existingFamilySnapshot.docs[0].id;
+          } else {
+            const familyRef = await firestore.collection("families").add({
+              name: familyDisplayName,
+              status: "active",
+              notes: "",
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+            resolvedFamilyId = familyRef.id;
+            createdFamilyCount += 1;
+          }
+
+          familyIdByDisplayName.set(familyDisplayName, resolvedFamilyId);
+        }
+      } else if (resolvedFamilyId) {
+        const familySnapshot = await firestore.collection("families").doc(resolvedFamilyId).get();
         if (!familySnapshot.exists) {
           fail("familyId に一致する family が見つかりません。");
           continue;
@@ -462,9 +573,14 @@ export const bulkRegisterMembers = onCall(async (request) => {
         const legacyRole = deriveLegacyRole(memberTypes, adminRole);
 
         await firestore.collection("members").add({
-          familyId: typeof input.familyId === "string" ? input.familyId : "",
+          familyId: resolvedFamilyId,
+          displayName,
+          familyName,
+          givenName,
+          familyNameKana,
+          givenNameKana,
           name: displayName,
-          nameKana: typeof input.nameKana === "string" ? input.nameKana.trim() : "",
+          nameKana: familyNameKana,
           enrollmentYear: typeof input.enrollmentYear === "number" ? input.enrollmentYear : null,
           instrumentCodes: Array.isArray(input.instrumentCodes)
             ? input.instrumentCodes.filter((item): item is string => typeof item === "string")
@@ -514,13 +630,14 @@ export const bulkRegisterMembers = onCall(async (request) => {
     results,
     successCount: results.filter((item) => item.status === "success").length,
     failureCount: results.filter((item) => item.status === "error").length,
+    createdFamilyCount,
     projectId: serverProjectId,
     functionsRegion,
   };
 });
 
 export const createCalendarSession = onCall(async (request) => {
-  await assertAdmin(request.auth);
+  await assertCalendarSessionManager(request.auth);
 
   const payload = parseCalendarSessionPayload(request.data, "create");
   let assigneeNameSnapshot = "";
@@ -568,7 +685,7 @@ export const createCalendarSession = onCall(async (request) => {
 });
 
 export const updateCalendarSession = onCall(async (request) => {
-  await assertAdmin(request.auth);
+  await assertCalendarSessionManager(request.auth);
 
   const payload = parseCalendarSessionPayload(request.data, "update");
   let assigneeNameSnapshot = "";
@@ -589,7 +706,7 @@ export const updateCalendarSession = onCall(async (request) => {
   const sourceSnapshot = await sourceRef.get();
 
   if (!sourceSnapshot.exists) {
-    throw new HttpsError("not-found", "編集対象のセッションが見つかりません。");
+    throw new HttpsError("not-found", "編集対象の予定が見つかりません。");
   }
 
   const currentData = sourceSnapshot.data() ?? {};
@@ -645,7 +762,7 @@ export const updateCalendarSession = onCall(async (request) => {
 });
 
 export const deleteCalendarSession = onCall(async (request) => {
-  await assertAdmin(request.auth);
+  await assertCalendarSessionManager(request.auth);
 
   const payload = parseCalendarSessionPayload(request.data, "delete");
   const sessionRef = firestore
@@ -656,7 +773,7 @@ export const deleteCalendarSession = onCall(async (request) => {
   const sessionSnapshot = await sessionRef.get();
 
   if (!sessionSnapshot.exists) {
-    throw new HttpsError("not-found", "削除対象のセッションが見つかりません。");
+    throw new HttpsError("not-found", "削除対象の予定が見つかりません。");
   }
 
   await sessionRef.delete();

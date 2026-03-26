@@ -1958,6 +1958,20 @@ TODO：
 - 当番や車両は将来 `family` 単位で扱う。
 - `member.familyId` は 1 つのみ持つ。
 - `family` の複数所属は今回は扱わない。
+- `family` は表示用の短い名称として `name` を持つ。
+- `family.name` はカレンダーや当番表示でそのまま使うため、原則として `田中` のような苗字のみを登録する。
+- `family` は任意で `address` を 1 本の文字列として持てる。
+- `family` は任意で複数台の車両情報 `vehicles` を持てる。
+- 車両情報の最小項目は以下とする。
+  - `maker`
+  - `model`
+  - `capacity`
+  - `notes`
+- `capacity` は乗車定員として数値で扱える形を基本とする。
+- `address` と `vehicles` は管理者向けメンバー管理画面でのみ扱い、一般画面には表示しない。
+- Family 編集では、車両は Family 本体フォームの中に詳細フォームを縦に並べ続けず、一覧 + 追加/編集導線で扱う。
+- 車両追加 / 編集は、Family 編集モーダルとは分離した別モーダルで 1 台単位に行う。
+- Family 編集モーダルと車両追加 / 編集モーダルは、縦長になっても操作不能にならないよう最大高さと縦スクロールを持てるようにする。
 - `family.name` は表示用の短い名称として扱う。
 - カレンダーや当番表示では、この `family.name` をそのまま利用する。
 - `family.name` は原則として苗字のみを登録する。
@@ -1996,14 +2010,23 @@ TODO：
 #### 30.9.8 Firestore コレクション
 - `families/{familyId}`
   - `name`
+  - `address`
+  - `vehicles`
   - `status`
   - `notes`
   - `createdAt`
   - `updatedAt`
 - `members/{memberId}`
   - `familyId`
-  - `name`
+  - `displayName`
+  - `familyName`
+  - `givenName`
+  - `familyNameKana`
+  - `givenNameKana`
+  - `name`（既存互換用に当面併存可）
   - `nameKana`
+  - `birthDate`
+  - `phoneNumber`
   - `role`
   - `permissions`
   - `status`
@@ -2058,6 +2081,7 @@ TODO：
 - `member` は削除可能とする。
 - `member` 削除時は、その `member` を参照している `memberRelations` も一緒に削除する。
 - `family` は所属 `member` が 0 件のときのみ削除可能とする。
+- `family` に所属 `member` が 1 件以上ある場合、管理画面の Family 一覧では削除ボタンを非活性で表示し、常時の警告文は出さなくてよい。
 - Firebase Authentication のユーザー削除は今回の管理 UI の対象外とする。
 - 削除操作はすべて確認モーダル経由とする。
 - 削除失敗時は対象カード付近またはモーダル内に理由を表示する。
@@ -2144,6 +2168,10 @@ TODO：
   - 一般向けメンバー画面と同様に、種別フィルタを持つ。
   - フィルタ表示順は `すべて / 部員 / 保護者 / 先輩 / 先生` の固定順とする。
   - フィルタ判定は内部値 `child / parent / obog / teacher` で行う。
+  - `すべて` 表示時の全体表示順は `部員 → 保護者 → 先輩 → 先生` とする。
+  - 各区分の中では、その区分に設定された並び順を使う。
+  - 並べ替え UI は区分ごとに絞り込んだときのみ表示し、`すべて` 表示時には並び順は反映するが並べ替え UI は表示しない。
+  - 並べ替え UI はドラッグ操作を第一候補とするが、初期実装では迷いにくさを優先して上下移動などの単純な UI でもよい。
 - `Auth` タブ:
   - auth の確認、紐付け、再取得など、認証情報関連を扱う。
   - 主操作は `Auth再取得` とする。
@@ -2155,6 +2183,28 @@ TODO：
 
 #### 30.9.10.7 Member の追加項目
 - `members` には既存の権限系項目に加えて、以下の項目を持てるようにする。
+  - 氏名項目
+    - `displayName`
+      - 表示互換用に保持する表示名
+    - `familyName`
+      - 姓
+    - `givenName`
+      - 名
+    - `familyNameKana`
+      - 姓のフリガナ
+    - `givenNameKana`
+      - 名のフリガナ
+    - 新規作成・編集では `familyName` / `givenName` を別入力する
+    - 新規作成・編集では、カナも `familyNameKana` / `givenNameKana` を別入力する
+    - `displayName` は少なくとも `familyName + givenName` をベースに自動生成してよい
+    - 当面の利用者向け表示は `displayName` ベースで壊れないことを優先する
+    - 既存互換のため、当面は legacy `name` を `displayName` と同値で併存してよい
+    - 既存互換のため、当面は legacy `nameKana` を `familyNameKana` と同値で併存してよい
+    - 既存データに `familyName` / `givenName` が無い場合は、暫定移行として `familyName = 旧 displayName`、`givenName = ""`、`displayName = 旧 displayName` を採用する
+    - 既存データに `familyNameKana` / `givenNameKana` が無い場合は、暫定移行として `familyNameKana = 旧 nameKana`、`givenNameKana = ""` を採用する
+    - 既存 `displayName` の機械的な姓・名自動分割は行わない
+    - 既存 `nameKana` の機械的な姓カナ・名カナ自動分割は行わない
+    - 少数の既存テストデータは、その後にメンバー管理画面から手修正してよい
   - `enrollmentYear`
     - 入学年度
     - 西暦 4 桁の数値
@@ -2169,6 +2219,18 @@ TODO：
     - 複数担当可
     - 楽器候補はマスタ定義から選択する
     - 将来、候補追加や細分化ができる構造にする
+  - `birthDate`
+    - 生年月日
+    - `YYYY-MM-DD` 形式の日付文字列
+    - 任意項目とする
+    - CSV 取り込みには含めず、メンバー管理画面から手入力・編集する
+    - センシティブ情報として扱う
+  - `phoneNumber`
+    - 電話番号
+    - 文字列として保持する
+    - 1 人 1 つでよい
+    - 厳格な正規化は今回は行わない
+    - 管理者向けメンバー管理画面でのみ扱い、一般画面には表示しない
 - `member` は原則として `family` に所属するが、仮運用では `familyId` 空欄の未所属 member を許容する。
 - `familyId` 空欄の member は管理画面の点検対象として把握できるようにする。
 
@@ -2201,6 +2263,8 @@ TODO：
 - Member 設定モーダルでは、既存の権限設定に加えて以下を設定できるようにする。
   - `enrollmentYear`
   - `instrumentCodes`
+- `birthDate` は `input type="date"` 相当の手入力 UI で設定・編集できるようにする。
+- `phoneNumber` は手入力の文字列項目として設定・編集できるようにする。
 - `enrollmentYear` は西暦 4 桁を想定した数値入力とする。
 - `instrumentCodes` はマスタからの複数選択 UI とする。
 - `instrumentCodes` の UI はチェックボックス一覧とし、各選択肢は `チェックボックス + 楽器名` を 1 セットで横並び表示する。
@@ -2216,11 +2280,57 @@ TODO：
 - `enrollmentYear` 未設定で学年表示相当が必要な場面では、`学年未設定` と分かる表示を許可する。
 - 管理画面内の種別表示は `部員 / 保護者 / 先輩 / 先生` に統一する。
 - 従来の `子ども` 表記は、管理画面では `部員` に置き換える。
+- 生年月日と年齢は、管理者のみメンバー管理画面で確認できるようにする。
+- 年齢は保存せず、`birthDate` から都度計算する。
+- 一般利用者向け画面には、生年月日と年齢を表示しない。
+- 電話番号も管理者向けメンバー管理画面でのみ扱い、一般利用者向け画面には表示しない。
+- メンバーの並び順は、都度 `学年順` や `楽器順` を計算するのではなく、メンバー管理で設定できる区分ごとの並び順を使う。
+- 並び順は `部員 / 保護者 / 先輩 / 先生` ごとに独立して保持する。
+- 新規追加メンバーは、その人が属する各区分の末尾に入る。
+- 今回の優先適用先は、少なくとも一般向けメンバー一覧と出欠表示とする。
+- Family 作成・編集では、`address` と `vehicles` を管理できるようにする。
+- Family 一覧では、住所や車両情報を全文表示しなくてもよく、住所の省略表示や `車両 N台` のような要約表示でよい。
+- Family 編集モーダルでは、車両は `メーカー / 車種 / 乗車定員` が分かる要約一覧を表示し、各車両ごとに `編集 / 削除` を行えるようにする。
+- 車両詳細の入力は、Family 本体編集とは分離した別モーダルで行う。
+- `address` / `vehicles` / `phoneNumber` は今回 Member CSV 取り込みには含めない。
+
+#### 30.9.10.12 出欠表示と予定詳細
+- Calendar と Today の予定詳細表示は、情報構成を可能な範囲で揃える。
+- 少なくとも `日付 / 時刻 / タイトル / 出欠集計 / 関連TODO / 場所` の出し方を揃える。
+- 関連TODO セクションは、関連TODO が 1 件以上ある場合のみ表示する。
+- 関連TODO が 0 件の場合は、`関連TODO はありません` などの文言を出さず、見出しごと表示しない。
+- 出欠表示と出欠集計の対象は `部員のみ` とする。
+- 保護者 / 先輩 / 先生は、出欠表示および出欠集計の対象に含めない。
+- 出欠データが 1 件も存在しない場合でも、対象となる部員は全員分表示する。
+- 出欠未入力は `ー` で表示する。
+- 出欠表示の状態は `出席 = ○` / `遅刻・保留等 = △` / `欠席 = ×` / `未入力 = ー` とする。
+- 出欠集計には `○ / △ / ×` に加えて、未入力数 `ー` を含める。
+- 出欠一覧の表示名はフルネームとする。
+- ただし現行データ構造では、既存の表示名文字列をそのままフルネームとして扱ってよい。
+
+#### 30.9.10.13 Today レイアウトと誕生日表示
+- Today 画面は、Demo 時点のレイアウト感を基準に維持・復旧する。
+- 少なくとも `日付見出し / 前日・翌日ボタン / 日誌導線 / 記録あり・なし表示 / お知らせ欄 / 予定カード` を自然な配置で表示する。
+- Calendar と Today では、その日に誕生日のメンバーがいる場合に小さなケーキアイコンを表示してよい。
+- 誕生日演出の対象区分は `部員 / 先輩 / 先生` とし、保護者は対象に含めない。
+- 誕生日判定は `birthDate` の月日で行い、年はお祝い判定に使わない。
+- Calendar と Today のケーキアイコンは、同じ誕生日モーダルを開く共通導線とする。
+- 誕生日モーダルでは、生年月日や年齢は表示しない。
+- 誕生日モーダルの表示名には区分ごとの敬称を付ける。
+  - 部員: `○○さん`
+  - 先輩: `○○先輩`
+  - 先生: `○○先生`
+- 複数人が同じ日に誕生日の場合も、各人の区分に応じた敬称で一覧表示する。
 
 #### 30.9.10.10 Member CSV インポート / テンプレート
 - CSV インポートは Windoms 専用の整形済みフォーマットを対象とする。
 - Google フォームの生データを直接読む機能は持たない。
 - 管理者が Windoms 用に整えた CSV を取り込む前提とする。
+- CSV の氏名列は `familyName` / `givenName` を正とし、1 列のフルネームからの自動姓名分割は行わない。
+- CSV のフリガナ列は `familyNameKana` / `givenNameKana` を正とし、1 列のフリガナ全文からの自動分割は行わない。
+- CSV 取り込み時の `displayName` は、少なくとも `familyName + givenName` をベースに自動生成してよい。
+- CSV 取り込みでは `familyName` / `givenName` / `familyNameKana` / `givenNameKana` を必須とし、どれかが欠けている行はエラーとして扱う。
+- `birthDate` は今回の Member CSV 取り込み列には含めない。
 - CSV はヘッダ行ありとする。
 - 取り込み時はヘッダ名を参照しない。
 - 1 行目は無条件でヘッダとしてスキップし、2 行目以降を列順固定で解釈する。
@@ -2228,19 +2338,21 @@ TODO：
 - 管理画面からテンプレート CSV をダウンロードできるようにする。
 - テンプレート CSV はヘッダ行のみでよい。
 - ヘッダは以下とする。
-  - `familyName,name,nameKana,loginId,memberTypes,adminRole,staffPermissions,memberStatus,enrollmentYear,instrumentCodes,notes`
+  - `familyDisplayName,familyName,givenName,familyNameKana,givenNameKana,loginId,memberTypes,adminRole,staffPermissions,memberStatus,enrollmentYear,instrumentCodes,notes`
 - 列順は以下とする。
-  - 1 列目: `familyName`
-  - 2 列目: `name`
-  - 3 列目: `nameKana`
-  - 4 列目: `loginId`
-  - 5 列目: `memberTypes`
-  - 6 列目: `adminRole`
-  - 7 列目: `staffPermissions`
-  - 8 列目: `memberStatus`
-  - 9 列目: `enrollmentYear`
-  - 10 列目: `instrumentCodes`
-  - 11 列目: `notes`
+  - 1 列目: `familyDisplayName`
+  - 2 列目: `familyName`
+  - 3 列目: `givenName`
+  - 4 列目: `familyNameKana`
+  - 5 列目: `givenNameKana`
+  - 6 列目: `loginId`
+  - 7 列目: `memberTypes`
+  - 8 列目: `adminRole`
+  - 9 列目: `staffPermissions`
+  - 10 列目: `memberStatus`
+  - 11 列目: `enrollmentYear`
+  - 12 列目: `instrumentCodes`
+  - 13 列目: `notes`
 
 #### 30.9.10.11 Member CSV 一括ユーザー登録
 - メンバー管理画面に、管理者向けの `CSV一括登録` 機能を持つ。
@@ -2257,15 +2369,24 @@ TODO：
 - 一括登録を実行できるのは `admin` custom claims を持つ管理者のみとする。
 - 今回は初回ログイン時の強制パスワード変更までは実装しないが、将来拡張候補とする。
 - 値ルールは以下とする。
-  - `familyName`
+  - `familyDisplayName`
     - 空欄可
     - 空欄時は未所属 member として扱ってよい
-    - 値が入っている場合は既存 `family.name` と完全一致する family にのみ紐付ける
-    - 一致しない場合は取り込みエラーとする
-  - `name`
+    - 値が入っている場合は、まず既存 `family.name` と完全一致する family を探して紐付ける
+    - 一致する family が無い場合は、その `familyDisplayName` を使って family を自動作成する
+    - 同一 CSV 内で同じ `familyDisplayName` が複数回出る場合は、family は 1 回だけ作成し、2 件目以降は同じ family を再利用する
+  - `familyName`
     - 必須
-  - `nameKana`
-    - 空欄可
+    - 姓
+  - `givenName`
+    - 必須
+    - 名
+  - `familyNameKana`
+    - 必須
+    - 姓のフリガナ
+  - `givenNameKana`
+    - 必須
+    - 名のフリガナ
   - `loginId`
     - 必須
   - `memberTypes`
@@ -2289,7 +2410,9 @@ TODO：
     - 空欄可
 - CSV 取り込み時も、既存の `memberTypes` 組み合わせ制約を適用する。
 - `instrumentCodes` は楽器マスタに存在する `code` のみ許可する。
+- `familyDisplayName` に一致する family が未作成でも、それ自体はエラーにせず自動作成対象として扱う。
 - `loginId` 重複はエラーとして取り込みを止める。
+- `familyName` / `givenName` / `familyNameKana` / `givenNameKana` の不足行もエラーとして扱う。
 - エラーは可能な範囲で行番号つきで表示し、無反応に見える状態を作らない。
 
 #### 30.9.11 Auth 一覧取得
@@ -2385,10 +2508,13 @@ TODO：
 - セッションの基本作成は `シフト作成` モジュールで一括生成する。
 - カレンダーは作成済みセッションの確認と個別調整に使う。
 - カレンダーからも単発の追加 / 編集 / 削除はできるが、主用途は微調整とする。
-- DaySheet からのセッション追加 / 編集 / 削除は `admin` のみ可能とする。
-- 非 `admin` はカレンダー / DaySheet を閲覧のみとし、追加ボタン / 編集ボタン / 削除ボタンを表示しない。
-- UI 非表示だけでなく、Cloud Functions 側でも `admin` 権限を必須にする。
-- DaySheet では対象日のセッション一覧を確認でき、`admin` のみ以下の操作を行える。
+- 内部仕様用語・実装用語としては `セッション` を維持する。
+- 一般利用者向け UI 表示では、分かりやすさを優先して `セッション` ではなく `予定` を使ってよい。
+- DaySheet からのセッション追加 / 編集 / 削除は `admin` に加えて `shift_management` を持つシフト作成担当者も可能とする。
+- 権限のない利用者はカレンダー / DaySheet を閲覧のみとし、追加ボタン / 編集ボタン / 削除ボタンを表示しない。
+- UI 非表示だけでなく、Cloud Functions 側でも同じ権限条件を必須にする。
+- Calendar と Today の予定詳細では、関連TODO は存在時のみ表示し、出欠集計には未入力 `ー` を含める。
+- DaySheet では対象日のセッション一覧を確認でき、`admin` またはシフト作成担当者のみ以下の操作を行える。
   - セッション追加
   - セッション編集
   - セッション削除
@@ -2398,6 +2524,8 @@ TODO：
 - `type === "event"` のときは `eventName` を必須とする。
 - `type === "normal"` / `type === "self"` のときは `eventName` を不要とする。
 - 月カレンダーでは `event` は `開始時刻 + eventName` を優先表示する。
+- DaySheet のセッションカード右上バッジは、`event` でも固定で `イベント` と表示する。
+- イベント名そのものは本文側で判別できればよく、バッジは種別表示に徹する。
 - DaySheet でも `eventName` が自然に分かるように表示する。
 - Today でも `eventName` が自然に分かるように表示することを原則とする。
 - セッション当番は `family` 単位で管理する。
@@ -2410,6 +2538,13 @@ TODO：
 - 場所は固定候補に縛らない自由入力とする。
 - 場所入力では、過去のセッションで使用した `location` を候補表示して入力補助できるようにしてよい。
 - 場所候補は軽量な補助 UI とし、自由入力を阻害しないことを優先する。
+- カレンダー / DaySheet の単発追加・個別調整に使う `startTime` / `endTime` の入力 UI は、追加・編集ともに 30 分単位の select ベースとする。
+- 時刻選択肢は `00:00` から `23:30` までの 30 分刻みを基本とする。
+- 終了時刻は開始時刻より後のみを許可し、開始時刻以下の終了時刻は UI 上で選べない / 保持しないようにする。
+- 既存データに 30 分単位以外の時刻がある場合は、表示と編集を壊さない範囲で既存値も扱ってよい。
+- セッション新規追加時、その日に既存セッションが 1 件以上ある場合は、その日の最後のセッションの終了時刻を開始時刻初期値に使う。
+- セッション新規追加時の終了時刻初期値は、開始時刻 + 3 時間とする。
+- 同日に既存セッションが無い場合の新規追加初期値は `09:00-12:00` とする。
 - 今回の個別CRUDで最低限扱う項目は以下とする。
   - `date`
   - `startTime`

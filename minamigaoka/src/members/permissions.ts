@@ -31,6 +31,8 @@ export const memberTypeLabel: Record<MemberType, string> = {
   obog: "先輩",
 };
 
+export const memberTypeDisplayOrder: MemberType[] = ["child", "parent", "obog", "teacher"];
+
 export const adminRoleOptions: Array<{ value: AdminRole; label: string }> = [
   { value: "none", label: "なし" },
   { value: "officer", label: "役員" },
@@ -123,7 +125,10 @@ export const normalizeAdminRole = (value: unknown, legacyRole?: MemberRole): Adm
   return legacyRoleToPermissionModel(legacyRole ?? "parent").adminRole;
 };
 
-export const normalizeStaffPermissions = (value: unknown, legacyRole?: MemberRole): StaffPermission[] => {
+export const normalizeStaffPermissions = (
+  value: unknown,
+  legacyRole?: MemberRole,
+): StaffPermission[] => {
   if (Array.isArray(value)) {
     return Array.from(
       new Set(
@@ -229,3 +234,75 @@ export const getPrimaryMemberTypeLabel = (
   }
   return memberTypeLabel.parent;
 };
+
+export const canManageCalendarSessions = (
+  member: Pick<MemberRecord, "role" | "adminRole" | "staffPermissions"> | null | undefined,
+): boolean =>
+  member?.role === "admin" ||
+  member?.adminRole === "admin" ||
+  member?.staffPermissions.includes("shift_management") === true;
+
+const getMemberDisplayType = (member: Pick<MemberRecord, "memberTypes" | "role">): MemberType => {
+  if (member.memberTypes.includes("child") || member.role === "child") {
+    return "child";
+  }
+  if (member.memberTypes.includes("parent")) {
+    return "parent";
+  }
+  if (member.memberTypes.includes("obog")) {
+    return "obog";
+  }
+  if (member.memberTypes.includes("teacher") || member.role === "teacher") {
+    return "teacher";
+  }
+  return "parent";
+};
+
+const getMemberSortValue = (
+  member: Pick<MemberRecord, "sortOrders">,
+  memberType: MemberType,
+): number => {
+  const sortValue = member.sortOrders?.[memberType];
+  return typeof sortValue === "number" && Number.isFinite(sortValue)
+    ? sortValue
+    : Number.MAX_SAFE_INTEGER;
+};
+
+const compareMemberName = (
+  left: Pick<MemberRecord, "nameKana" | "name" | "id">,
+  right: Pick<MemberRecord, "nameKana" | "name" | "id">,
+): number => {
+  const kanaCompare = (left.nameKana || "").localeCompare(right.nameKana || "", "ja");
+  if (kanaCompare !== 0) return kanaCompare;
+  const nameCompare = (left.name || "").localeCompare(right.name || "", "ja");
+  if (nameCompare !== 0) return nameCompare;
+  return left.id.localeCompare(right.id, "ja");
+};
+
+export const sortMembersForDisplay = <T extends MemberRecord>(
+  members: T[],
+  filter: MemberTypeFilter,
+): T[] =>
+  [...members].sort((left, right) => {
+    if (filter === "all") {
+      const leftType = getMemberDisplayType(left);
+      const rightType = getMemberDisplayType(right);
+      const leftTypeIndex = memberTypeDisplayOrder.indexOf(leftType);
+      const rightTypeIndex = memberTypeDisplayOrder.indexOf(rightType);
+      if (leftTypeIndex !== rightTypeIndex) {
+        return leftTypeIndex - rightTypeIndex;
+      }
+      const orderCompare = getMemberSortValue(left, leftType) - getMemberSortValue(right, rightType);
+      if (orderCompare !== 0) {
+        return orderCompare;
+      }
+      return compareMemberName(left, right);
+    }
+
+    const memberType = filter as MemberType;
+    const orderCompare = getMemberSortValue(left, memberType) - getMemberSortValue(right, memberType);
+    if (orderCompare !== 0) {
+      return orderCompare;
+    }
+    return compareMemberName(left, right);
+  });

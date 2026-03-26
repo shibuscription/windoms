@@ -330,7 +330,7 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
               紐づき
               <select value={relatedFilter} onChange={(event) => setRelatedFilter(event.target.value as RelatedFilter)}>
                 <option value="all">すべて</option>
-                <option value="session">セッション</option>
+                <option value="session">予定</option>
                 <option value="event">イベント</option>
                 <option value="none">なし</option>
               </select>
@@ -403,7 +403,7 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
                 紐づき種別
                 <select value={editDraft.relatedType} onChange={(event) => updateDraftRelationType(setEditDraft, event.target.value as RelatedInputType)}>
                   <option value="none">なし</option>
-                  <option value="session">セッション</option>
+                  <option value="session">予定</option>
                   <option value="event">イベント</option>
                 </select>
               </label>
@@ -484,7 +484,7 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
                   }
                 >
                   <option value="none">なし</option>
-                  <option value="session">セッション</option>
+                  <option value="session">予定</option>
                   <option value="event">イベント</option>
                 </select>
               </label>
@@ -537,7 +537,7 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
             )}
             {relatedDetail.type === "session" && (
               <>
-                <p className="modal-summary">種別: セッション</p>
+                <p className="modal-summary">種別: 予定</p>
                 {relatedSessionInfo && (
                   <p>
                     日付: {relatedSessionInfo.dateKey.replace(/-/g, "/")} / 枠: {relatedSessionInfo.order}
@@ -551,7 +551,7 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
                     <p>種類: {relatedSessionDoc.type === "event" ? "イベント" : relatedSessionDoc.type === "self" ? "自主練" : "通常練習"}</p>
                   </>
                 )}
-                {!relatedSessionDoc && <p className="muted">セッション情報を取得できませんでした。</p>}
+                {!relatedSessionDoc && <p className="muted">予定情報を取得できませんでした。</p>}
               </>
             )}
             <div className="modal-actions">

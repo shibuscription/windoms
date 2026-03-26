@@ -19,9 +19,11 @@ import type {
 } from "./types";
 
 export const memberCsvTemplateHeader = [
+  "familyDisplayName",
   "familyName",
-  "name",
-  "nameKana",
+  "givenName",
+  "familyNameKana",
+  "givenNameKana",
   "loginId",
   "memberTypes",
   "adminRole",
@@ -34,7 +36,7 @@ export const memberCsvTemplateHeader = [
 
 export type ParsedMemberCsvRow = {
   rowNumber: number;
-  familyName: string;
+  familyDisplayName: string;
   input: SaveMemberInput;
 };
 
@@ -129,20 +131,38 @@ export const parseMemberCsv = (
 
   rows.slice(1).forEach((cols, index) => {
     const rowNumber = index + 2;
-    const familyName = (cols[0] ?? "").trim();
-    const name = (cols[1] ?? "").trim();
-    const nameKana = (cols[2] ?? "").trim();
-    const rawLoginId = (cols[3] ?? "").trim();
-    const rawMemberTypes = splitCsvList((cols[4] ?? "").trim());
-    const rawAdminRole = (cols[5] ?? "").trim();
-    const rawStaffPermissions = splitCsvList((cols[6] ?? "").trim());
-    const rawMemberStatus = (cols[7] ?? "").trim();
-    const rawEnrollmentYear = (cols[8] ?? "").trim();
-    const rawInstrumentCodes = splitCsvList((cols[9] ?? "").trim());
-    const notes = (cols[10] ?? "").trim();
+    const familyDisplayName = (cols[0] ?? "").trim();
+    const familyName = (cols[1] ?? "").trim();
+    const givenName = (cols[2] ?? "").trim();
+    const familyNameKana = (cols[3] ?? "").trim();
+    const givenNameKana = (cols[4] ?? "").trim();
+    const rawLoginId = (cols[5] ?? "").trim();
+    const rawMemberTypes = splitCsvList((cols[6] ?? "").trim());
+    const rawAdminRole = (cols[7] ?? "").trim();
+    const rawStaffPermissions = splitCsvList((cols[8] ?? "").trim());
+    const rawMemberStatus = (cols[9] ?? "").trim();
+    const rawEnrollmentYear = (cols[10] ?? "").trim();
+    const rawInstrumentCodes = splitCsvList((cols[11] ?? "").trim());
+    const notes = (cols[12] ?? "").trim();
+    const displayName = `${familyName}${givenName}`.trim();
 
-    if (!name) {
-      errors.push({ rowNumber, message: "name は必須です。" });
+    if (!familyName) {
+      errors.push({ rowNumber, message: "familyName は必須です。" });
+      return;
+    }
+
+    if (!givenName) {
+      errors.push({ rowNumber, message: "givenName は必須です。" });
+      return;
+    }
+
+    if (!familyNameKana) {
+      errors.push({ rowNumber, message: "familyNameKana は必須です。" });
+      return;
+    }
+
+    if (!givenNameKana) {
+      errors.push({ rowNumber, message: "givenNameKana は必須です。" });
       return;
     }
 
@@ -214,20 +234,22 @@ export const parseMemberCsv = (
       return;
     }
 
-    const familyId = familyName ? familyNameToId[familyName] ?? "" : "";
-    if (familyName && !familyId) {
-      errors.push({ rowNumber, message: `familyName に一致する family がありません: ${familyName}` });
-      return;
-    }
+    const familyId = familyDisplayName ? familyNameToId[familyDisplayName] ?? "" : "";
 
     seenLoginIds.add(loginId);
     parsedRows.push({
       rowNumber,
-      familyName,
+      familyDisplayName,
       input: {
         familyId,
-        name,
-        nameKana,
+        displayName,
+        familyName,
+        givenName,
+        familyNameKana,
+        givenNameKana,
+        name: displayName,
+        nameKana: familyNameKana,
+        phoneNumber: "",
         enrollmentYear,
         instrumentCodes: rawInstrumentCodes as InstrumentCode[],
         memberTypes,
