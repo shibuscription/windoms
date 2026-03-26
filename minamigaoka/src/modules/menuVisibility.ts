@@ -1,0 +1,176 @@
+import type { AdminRole, MemberRecord, MemberType, StaffPermission } from "../members/types";
+
+export type DemoMenuRole = "child" | "parent" | "admin";
+
+export type ModuleMenuId =
+  | "today"
+  | "calendar"
+  | "duty-log"
+  | "practice-log"
+  | "homework"
+  | "todo"
+  | "event"
+  | "shift-create"
+  | "purchase-request"
+  | "reimbursement"
+  | "lunch"
+  | "accounting"
+  | "instruments"
+  | "scores"
+  | "docs"
+  | "members"
+  | "links"
+  | "settings"
+  | "members-management"
+  | "module-management";
+
+export type ModuleSectionId = "activity" | "accounting" | "assets" | "settings";
+
+export type ModuleVisibilityRule = {
+  memberTypes: MemberType[];
+  adminRoles: AdminRole[];
+  staffPermissions: StaffPermission[];
+};
+
+export type ModuleVisibilitySettings = Record<ModuleMenuId, ModuleVisibilityRule>;
+
+export type MenuModuleDefinition = {
+  id: ModuleMenuId;
+  label: string;
+  icon: string;
+  sectionId: ModuleSectionId;
+  allowedRoles: DemoMenuRole[];
+  lockedToAdmin?: boolean;
+};
+
+export const menuModuleDefinitions: MenuModuleDefinition[] = [
+  { id: "today", label: "Today", icon: "🏠", sectionId: "activity", allowedRoles: ["child", "parent", "admin"] },
+  { id: "calendar", label: "カレンダー", icon: "🗓️", sectionId: "activity", allowedRoles: ["child", "parent", "admin"] },
+  { id: "duty-log", label: "当番日誌", icon: "📝", sectionId: "activity", allowedRoles: ["parent", "admin"] },
+  { id: "practice-log", label: "練習日誌", icon: "🎺", sectionId: "activity", allowedRoles: ["child", "parent", "admin"] },
+  { id: "homework", label: "宿題", icon: "📚", sectionId: "activity", allowedRoles: ["child", "parent", "admin"] },
+  { id: "todo", label: "TODO", icon: "✅", sectionId: "activity", allowedRoles: ["parent", "admin"] },
+  { id: "event", label: "イベント", icon: "🎪", sectionId: "activity", allowedRoles: ["child", "parent", "admin"] },
+  { id: "shift-create", label: "シフト作成", icon: "🧭", sectionId: "activity", allowedRoles: ["admin"] },
+  { id: "purchase-request", label: "購入依頼", icon: "🛒", sectionId: "accounting", allowedRoles: ["parent", "admin"] },
+  { id: "reimbursement", label: "立替", icon: "💴", sectionId: "accounting", allowedRoles: ["parent", "admin"] },
+  { id: "lunch", label: "お弁当", icon: "🍱", sectionId: "accounting", allowedRoles: ["parent", "admin"] },
+  { id: "accounting", label: "会計", icon: "💰", sectionId: "accounting", allowedRoles: ["admin"] },
+  { id: "instruments", label: "楽器", icon: "🎷", sectionId: "assets", allowedRoles: ["child", "parent", "admin"] },
+  { id: "scores", label: "楽譜", icon: "🎼", sectionId: "assets", allowedRoles: ["child", "parent", "admin"] },
+  { id: "docs", label: "資料", icon: "📄", sectionId: "assets", allowedRoles: ["child", "parent", "admin"] },
+  { id: "members", label: "メンバー", icon: "👥", sectionId: "assets", allowedRoles: ["child", "parent", "admin"] },
+  { id: "links", label: "リンク集", icon: "🔗", sectionId: "assets", allowedRoles: ["child", "parent", "admin"] },
+  { id: "settings", label: "設定", icon: "⚙️", sectionId: "settings", allowedRoles: ["child", "parent", "admin"] },
+  {
+    id: "members-management",
+    label: "メンバー管理",
+    icon: "🛠️",
+    sectionId: "settings",
+    allowedRoles: ["admin"],
+    lockedToAdmin: true,
+  },
+  {
+    id: "module-management",
+    label: "モジュール管理",
+    icon: "🧩",
+    sectionId: "settings",
+    allowedRoles: ["admin"],
+    lockedToAdmin: true,
+  },
+];
+
+const parentScopedMemberTypes: MemberType[] = ["parent", "obog", "teacher"];
+
+const buildDefaultRule = (definition: MenuModuleDefinition): ModuleVisibilityRule => {
+  const memberTypes: MemberType[] = [];
+  const adminRoles: AdminRole[] = [];
+
+  if (definition.allowedRoles.includes("child")) {
+    memberTypes.push("child");
+  }
+  if (definition.allowedRoles.includes("parent")) {
+    memberTypes.push(...parentScopedMemberTypes);
+  }
+  if (definition.allowedRoles.includes("admin")) {
+    adminRoles.push("admin");
+  }
+
+  return {
+    memberTypes: Array.from(new Set(memberTypes)),
+    adminRoles: Array.from(new Set(adminRoles)),
+    staffPermissions: [],
+  };
+};
+
+export const defaultModuleVisibilitySettings = menuModuleDefinitions.reduce<ModuleVisibilitySettings>((result, definition) => {
+  result[definition.id] = buildDefaultRule(definition);
+  return result;
+}, {} as ModuleVisibilitySettings);
+
+const normalizeMemberTypes = (value: unknown): MemberType[] =>
+  Array.isArray(value)
+    ? value.filter((item): item is MemberType => item === "parent" || item === "child" || item === "teacher" || item === "obog")
+    : [];
+
+const normalizeAdminRoles = (value: unknown): AdminRole[] =>
+  Array.isArray(value)
+    ? value.filter((item): item is AdminRole => item === "none" || item === "officer" || item === "admin")
+    : [];
+
+const normalizeStaffPermissions = (value: unknown): StaffPermission[] =>
+  Array.isArray(value)
+    ? value.filter((item): item is StaffPermission => item === "accounting" || item === "shift_management")
+    : [];
+
+export const sanitizeModuleVisibilitySettings = (value: unknown): ModuleVisibilitySettings => {
+  const source = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return menuModuleDefinitions.reduce<ModuleVisibilitySettings>((result, definition) => {
+    const rawRule = source[definition.id];
+    if (rawRule && typeof rawRule === "object") {
+      const rule = rawRule as Record<string, unknown>;
+      result[definition.id] = {
+        memberTypes: normalizeMemberTypes(rule.memberTypes),
+        adminRoles: normalizeAdminRoles(rule.adminRoles),
+        staffPermissions: normalizeStaffPermissions(rule.staffPermissions),
+      };
+    } else {
+      result[definition.id] = defaultModuleVisibilitySettings[definition.id];
+    }
+    return result;
+  }, {} as ModuleVisibilitySettings);
+};
+
+export const canAccessModuleBySettings = (
+  moduleId: ModuleMenuId,
+  member: MemberRecord | null | undefined,
+  fallbackRole: DemoMenuRole,
+  settings: ModuleVisibilitySettings,
+): boolean => {
+  const definition = menuModuleDefinitions.find((item) => item.id === moduleId);
+  if (!definition) return false;
+
+  if (definition.lockedToAdmin) {
+    return member?.role === "admin" || member?.adminRole === "admin" || fallbackRole === "admin";
+  }
+
+  if (!definition.allowedRoles.includes(fallbackRole)) {
+    return false;
+  }
+
+  const rule = settings[moduleId] ?? defaultModuleVisibilitySettings[moduleId];
+  if (!member) {
+    return true;
+  }
+
+  if (member.memberTypes.some((type) => rule.memberTypes.includes(type))) {
+    return true;
+  }
+  if (rule.adminRoles.includes(member.adminRole)) {
+    return true;
+  }
+  if (member.staffPermissions.some((permission) => rule.staffPermissions.includes(permission))) {
+    return true;
+  }
+  return false;
+};

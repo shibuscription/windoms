@@ -20,6 +20,12 @@ const memberTypeIcon = (member: MemberRecord): string => {
   return "👪";
 };
 
+const formatMemberKanaLabel = (member: MemberRecord): string => {
+  const familyNameKana = member.familyNameKana?.trim() ?? "";
+  const givenNameKana = member.givenNameKana?.trim() ?? "";
+  return `${familyNameKana}${givenNameKana}`.trim() || familyNameKana || givenNameKana;
+};
+
 export function MemberDirectoryPage() {
   const [members, setMembers] = useState<MemberRecord[]>([]);
   const [relations, setRelations] = useState<MemberRelationRecord[]>([]);
@@ -117,6 +123,7 @@ export function MemberDirectoryPage() {
 
       <div className="members-list">
         {visibleMembers.map((member) => {
+          const kanaLabel = formatMemberKanaLabel(member);
           const childRelations =
             member.memberTypes.includes("child") || member.role === "child"
               ? childRelationsByChildId[member.id] ?? []
@@ -130,7 +137,7 @@ export function MemberDirectoryPage() {
                 </span>
                 <div className="member-meta">
                   <strong className="member-name">{member.name}</strong>
-                  {member.nameKana && <span className="member-kana">{member.nameKana}</span>}
+                  {kanaLabel && <span className="member-kana">{kanaLabel}</span>}
                   <span className="member-type">{getPrimaryMemberTypeLabel(member)}</span>
                 </div>
                 <span className="member-card-spacer" />

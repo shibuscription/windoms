@@ -202,6 +202,12 @@ const emptyFamilyVehicleModal = (): FamilyVehicleModalState => ({
 
 const formatMemberLabel = (member: MemberRecord) => member.displayName || member.name || member.loginId || member.id;
 
+const formatMemberKanaLabel = (member: MemberRecord) => {
+  const familyNameKana = member.familyNameKana?.trim() ?? "";
+  const givenNameKana = member.givenNameKana?.trim() ?? "";
+  return `${familyNameKana}${givenNameKana}`.trim() || familyNameKana || givenNameKana;
+};
+
 type PermissionSectionProps = {
   title: string;
   description?: string;
@@ -1114,9 +1120,12 @@ export function MembersManagementPage() {
               </button>
             </div>
           </div>
-          <div className="members-admin-grid">
+          <div className="members-admin-list-panel members-family-list-panel">
             {families.map((family) => {
               const memberCount = familyMemberCountById[family.id] ?? 0;
+              const familyAddressMapUrl = family.address
+                ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(family.address)}`
+                : null;
 
               return (
                 <article key={family.id} className="members-admin-card">
@@ -1144,7 +1153,20 @@ export function MembersManagementPage() {
                     </div>
                   </div>
                   <p className="muted">status: {family.status}</p>
-                  {family.address && <p className="muted">住所: {family.address}</p>}
+                  {family.address && (
+                    <p className="muted">
+                      住所:{" "}
+                      <a
+                        href={familyAddressMapUrl ?? undefined}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={`${family.address} を Google マップで開く`}
+                        aria-label={`${family.address} を Google マップで開く`}
+                      >
+                        {family.address}
+                      </a>
+                    </p>
+                  )}
                   <p className="muted">車両: {family.vehicles.length}台</p>
                   <p className="muted">{family.notes || "notes なし"}</p>
                   <p className="muted">所属member: {memberCount}件</p>
@@ -1199,6 +1221,7 @@ export function MembersManagementPage() {
               const childMember = isChildMember(member);
               const childRelations = childMember ? childRelationsByChildId[member.id] ?? [] : [];
               const summaryBadges = buildMemberSummaryBadges(member);
+              const kanaLabel = formatMemberKanaLabel(member);
               const profileDetails: string[] = [];
               const birthAge = member.birthDate ? calculateAge(member.birthDate) : null;
               if (member.enrollmentYear) {
@@ -1262,6 +1285,7 @@ export function MembersManagementPage() {
                         </button>
                       </div>
                     </div>
+                    {kanaLabel && <p className="muted members-member-kana">{kanaLabel}</p>}
                     <p className="muted">
                       {familyNameById[member.familyId] || "family 未設定"} / {summaryBadges.join(" / ") || "-"}
                     </p>
@@ -1276,14 +1300,13 @@ export function MembersManagementPage() {
                     {childMember && (
                       <div className="members-child-relations">
                         <div className="members-child-relations-header">
-                          <p className="members-child-relations-title">保護者 relation</p>
+                          <p className="members-child-relations-title">保護者</p>
                           <button type="button" className="button button-small" onClick={() => openRelationCreate(member.id)}>
                             追加
                           </button>
                         </div>
-                        <p className="muted">{relationHelpText}</p>
                         {childRelations.length === 0 ? (
-                          <p className="muted">保護者 relation は未設定です。</p>
+                          <p className="muted">保護者は未設定です。</p>
                         ) : (
                           <ul className="members-admin-list members-child-relations-list">
                             {childRelations.map((relation) => (

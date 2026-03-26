@@ -82,13 +82,11 @@ export function SettingsPage() {
     <section className="card settings-page">
       <div className="settings-page-header">
         <h1>設定</h1>
-        <p className="muted">ログイン中の本人が利用する設定を扱います。</p>
       </div>
 
       <section className="settings-section">
         <div className="settings-section-head">
           <h2>パスワード変更</h2>
-          <p className="muted">現在のパスワードで再認証してから、新しいパスワードへ変更します。</p>
         </div>
 
         <div className="settings-form-grid">

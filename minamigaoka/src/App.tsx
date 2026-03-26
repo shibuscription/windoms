@@ -12,6 +12,7 @@ import { LunchPage } from "./pages/LunchPage";
 import { LinksPage } from "./pages/LinksPage";
 import { MemberDirectoryPage } from "./pages/MemberDirectoryPage";
 import { MembersManagementPage } from "./pages/MembersPage";
+import { ModuleSettingsPage } from "./pages/ModuleSettingsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { EventsPage } from "./pages/EventsPage";
 import { TodosPage } from "./pages/TodosPage";
@@ -53,10 +54,19 @@ import { loadInitialData } from "./data/runtimeData";
 import { getMemberByAuthUid } from "./members/service";
 import type { MemberRecord, MemberRole } from "./members/types";
 import { canManageCalendarSessions as canManageCalendarSessionsByMember } from "./members/permissions";
+import {
+  canAccessModuleBySettings,
+  menuModuleDefinitions,
+  sanitizeModuleVisibilitySettings,
+  type DemoMenuRole,
+  type ModuleMenuId,
+  type ModuleVisibilitySettings,
+} from "./modules/menuVisibility";
+import { subscribeModuleVisibilitySettings } from "./modules/moduleVisibilityService";
 import { subscribeScheduleDays } from "./schedule/service";
 
 type MenuItem = {
-  id: string;
+  id: ModuleMenuId;
   label: string;
   icon: string;
   to: string;
@@ -70,8 +80,6 @@ type MenuSection = {
   heading: string;
   items: MenuItem[];
 };
-
-type DemoMenuRole = "child" | "parent" | "admin";
 
 type DemoNotification = {
   id: string;
@@ -121,6 +129,7 @@ const resolvePageLabel = (pathname: string, search: string): string | null => {
   if (pathname === "/docs" || pathname.startsWith("/docs/")) return "資料";
   if (pathname === "/members") return "メンバー";
   if (pathname === "/settings/members") return "メンバー管理";
+  if (pathname === "/settings/modules") return "モジュール管理";
   if (pathname === "/links") return "リンク集";
   return null;
 };
@@ -129,6 +138,8 @@ const menuSections = (
   today: string,
   activityPlanBadgeText: string | undefined,
   role: DemoMenuRole,
+  linkedMember: MemberRecord | null,
+  moduleVisibilitySettings: ModuleVisibilitySettings,
 ): MenuSection[] => {
   const sections: MenuSection[] = [
     {
@@ -307,14 +318,35 @@ const menuSections = (
           allowedRoles: ["admin"],
           isActive: (location) => location.pathname === "/settings/members",
         },
+        {
+          id: "module-management",
+          label: "モジュール管理",
+          icon: "🧩",
+          to: "/settings/modules",
+          allowedRoles: ["admin"],
+          isActive: (location) => location.pathname === "/settings/modules",
+        },
       ],
     },
   ];
 
+  const moduleDefinitionsById = menuModuleDefinitions.reduce<Record<string, (typeof menuModuleDefinitions)[number]>>(
+    (result, definition) => {
+      result[definition.id] = definition;
+      return result;
+    },
+    {},
+  );
+
   return sections
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => item.allowedRoles.includes(role)),
+      items: section.items.filter(
+        (item) =>
+          item.allowedRoles.includes(role) &&
+          canAccessModuleBySettings(item.id, linkedMember, role, moduleVisibilitySettings) &&
+          moduleDefinitionsById[item.id] !== undefined,
+      ),
     }))
     .filter((section) => section.items.length > 0);
 };
@@ -328,6 +360,9 @@ export function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [linkedMember, setLinkedMember] = useState<MemberRecord | null>(null);
   const [isLinkedMemberReady, setIsLinkedMemberReady] = useState(false);
+  const [moduleVisibilitySettings, setModuleVisibilitySettings] = useState<ModuleVisibilitySettings>(() =>
+    sanitizeModuleVisibilitySettings(undefined),
+  );
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [activeStatusPanel, setActiveStatusPanel] = useState<"notice" | "todo" | null>(
@@ -361,9 +396,11 @@ export function App() {
   const hasShiftSurveyTodo = isAdmin && activityPlanStatus === "SURVEY_OPEN" && unansweredCount > 0;
   const shiftSurveyPath = `/shift-survey?month=${activityPlanMonthKey}`;
   const visibleMenuSections = useMemo(
-    () => menuSections(today, activityPlanBadgeText, currentRole),
-    [today, activityPlanBadgeText, currentRole],
+    () => menuSections(today, activityPlanBadgeText, currentRole, linkedMember, moduleVisibilitySettings),
+    [today, activityPlanBadgeText, currentRole, linkedMember, moduleVisibilitySettings],
   );
+
+  useEffect(() => subscribeModuleVisibilitySettings(setModuleVisibilitySettings), []);
 
   useEffect(() => {
     let active = true;
@@ -524,6 +561,7 @@ export function App() {
   };
   const lunchDate = resolveLunchDate(location, today);
   const lunchPath = `/lunch?date=${lunchDate}`;
+  const usesWidePageLayout = location.pathname === "/settings/modules";
 
   const context = useMemo(
     () => ({
@@ -731,7 +769,7 @@ export function App() {
           </button>
         </div>
       </header>
-      <main className="page-wrap">
+      <main className={`page-wrap${usesWidePageLayout ? " page-wrap-wide" : ""}`}>
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route
@@ -833,6 +871,10 @@ export function App() {
           <Route
             path="/settings/members"
             element={isAdmin ? <MembersManagementPage /> : <Navigate to="/today" replace />}
+          />
+          <Route
+            path="/settings/modules"
+            element={isAdmin ? <ModuleSettingsPage /> : <Navigate to="/today" replace />}
           />
           <Route path="/accounting" element={isAdmin ? <AccountingHome /> : <Navigate to="/today" replace />} />
           <Route path="/accounting/ledger" element={isAdmin ? <AccountLedger /> : <Navigate to="/today" replace />} />
