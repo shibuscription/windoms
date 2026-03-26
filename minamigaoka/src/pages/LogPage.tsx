@@ -1,13 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import type { Activity, DayLog, DemoData, DemoRsvp, RsvpStatus, SessionDoc } from "../types";
+import { isChildMember, sortMembersForDisplay } from "../members/permissions";
+import { subscribeFamilies, subscribeMembers } from "../members/service";
+import type { FamilyRecord, MemberRecord } from "../members/types";
+import { buildScoreSearchHaystack, normalizeScoreSearchText, tokenizeScoreSearch } from "../scores/search";
 import { formatDateYmd, formatTimeNoLeadingZero, formatWeekdayJa, weekdayTone } from "../utils/date";
 
 type LogPageProps = {
   data: DemoData;
   updateDayLog: (date: string, updater: (prev: DayLog) => DayLog) => void;
+  saveDayLog: (date: string, dayLog: DayLog) => Promise<void>;
+  ensureDayLog: (date: string) => Promise<void>;
   updateSessionRsvps: (date: string, sessionOrder: number, rsvps: DemoRsvp[]) => void;
+  saveSessionRsvps: (date: string, sessionId: string, rsvps: DemoRsvp[]) => Promise<void>;
   updateDemoDictionaries: (next: Partial<DemoData["demoDictionaries"]>) => void;
+  isScoresLoading: boolean;
+  scoresLoadError: string;
+  linkedMember: MemberRecord | null;
 };
 
 type SortedActivityEntry = {
@@ -15,6 +25,12 @@ type SortedActivityEntry = {
   index: number;
 };
 type SongMasterItem = { id: string; name: string };
+type AttendanceRow = {
+  uid: string;
+  rsvpUid: string;
+  displayName: string;
+  status: RsvpStatus;
+};
 
 type WeatherValue = "" | "晴れ" | "くもり" | "雨" | "雪" | "その他";
 
@@ -31,13 +47,6 @@ const weatherOptions: ReadonlyArray<{
     { value: "その他", label: "その他", toneClass: "other", emoji: "🌤️" },
   ];
 const activitySuggestions = ["筋トレ", "腹式呼吸", "基礎練習", "個人練習", "合奏", "休憩"] as const;
-const songMaster: SongMasterItem[] = [
-  { id: "song_001", name: "威風堂々" },
-  { id: "song_002", name: "春の猟犬" },
-  { id: "song_003", name: "宝島" },
-  { id: "song_004", name: "アルメニアン・ダンス" },
-  { id: "song_005", name: "マーチ「ブルー・スプリング」" },
-];
 const MAX_ACTIVITY_SONGS = 10;
 
 const uniq = (values: string[]): string[] => Array.from(new Set(values.filter(Boolean)));
@@ -51,7 +60,7 @@ const sortedActivityEntries = (items: Activity[]): SortedActivityEntry[] =>
       return a.index - b.index;
     });
 
-const formatActivitySongSummary = (activity: Activity): string => {
+const formatActivitySongSummary = (activity: Activity, songMaster: SongMasterItem[]): string => {
   const ids = activity.songIds ?? [];
   if (ids.length === 0) return "";
   const names = ids
@@ -62,9 +71,9 @@ const formatActivitySongSummary = (activity: Activity): string => {
   return `${names[0]} ＋他${names.length - 1}曲`;
 };
 
-const formatActivityBody = (activity: Activity): string => {
+const formatActivityBody = (activity: Activity, songMaster: SongMasterItem[]): string => {
   const type = activity.type;
-  const details = [activity.title?.trim() ?? "", formatActivitySongSummary(activity)].filter(Boolean);
+  const details = [activity.title?.trim() ?? "", formatActivitySongSummary(activity, songMaster)].filter(Boolean);
   if (details.length === 0) return type;
   return `${type}（${details.join(" / ")}）`;
 };
@@ -268,6 +277,8 @@ type SongInlineSuggestAddProps = {
   onRemove: (index: number) => void;
   onAddSongId: (songId: string) => void;
   maxSongs: number;
+  isLoading: boolean;
+  loadError: string;
 };
 
 function SongInlineSuggestAdd({
@@ -277,6 +288,8 @@ function SongInlineSuggestAdd({
   onRemove,
   onAddSongId,
   maxSongs,
+  isLoading,
+  loadError,
 }: SongInlineSuggestAddProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [draft, setDraft] = useState("");
@@ -317,10 +330,19 @@ function SongInlineSuggestAdd({
 
   const suggestions = useMemo(() => {
     if (selectedSongIds.length >= maxSongs) return [];
-    const keyword = draft.trim().toLowerCase();
-    const base = keyword
-      ? songMaster.filter((song) => song.name.toLowerCase().includes(keyword))
-      : recentSongSuggestions;
+    const tokens = tokenizeScoreSearch(draft);
+    const base =
+      tokens.length > 0
+        ? songMaster.filter((song) => {
+            const haystack = buildScoreSearchHaystack({
+              title: song.name,
+              publisher: "",
+              productCode: "",
+              note: "",
+            });
+            return tokens.every((token) => haystack.includes(token));
+          })
+        : recentSongSuggestions;
     return base.slice(0, 10);
   }, [selectedSongIds.length, maxSongs, draft, songMaster, recentSongSuggestions]);
 
@@ -363,7 +385,8 @@ function SongInlineSuggestAdd({
       showToast("曲名を入力してください");
       return false;
     }
-    const exact = songMaster.find((song) => song.name.trim() === keyword);
+    const normalizedKeyword = normalizeScoreSearchText(keyword);
+    const exact = songMaster.find((song) => normalizeScoreSearchText(song.name) === normalizedKeyword);
     if (!exact) {
       showToast("曲が見つかりません");
       return false;
@@ -421,24 +444,32 @@ function SongInlineSuggestAdd({
               </button>
             </div>
             {toastMessage && <div className="inline-toast">{toastMessage}</div>}
-            {isOpen && suggestions.length > 0 && (
+            {isOpen && (
               <div className="suggestion-dropdown" role="listbox">
-                {suggestions.map((song) => (
-                  <button
-                    key={song.id}
-                    type="button"
-                    className="suggestion-option"
-                    onPointerDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }}
-                    onClick={() => {
-                      if (addSelectedSong(song.id)) closeEditor();
-                    }}
-                  >
-                    {song.name}
-                  </button>
-                ))}
+                {isLoading ? (
+                  <div className="suggestion-empty">候補を読み込み中です</div>
+                ) : loadError ? (
+                  <div className="suggestion-empty">{loadError}</div>
+                ) : suggestions.length > 0 ? (
+                  suggestions.map((song) => (
+                    <button
+                      key={song.id}
+                      type="button"
+                      className="suggestion-option"
+                      onPointerDown={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      onClick={() => {
+                        if (addSelectedSong(song.id)) closeEditor();
+                      }}
+                    >
+                      {song.name}
+                    </button>
+                  ))
+                ) : (
+                  <div className="suggestion-empty">候補がありません</div>
+                )}
               </div>
             )}
           </div>
@@ -464,28 +495,6 @@ function SongInlineSuggestAdd({
     </>
   );
 }
-
-const countRsvps = (session: SessionDoc) => {
-  const list = session.demoRsvps ?? [];
-  return {
-    yes: list.filter((item) => item.status === "yes").length,
-    maybe: list.filter((item) => item.status === "maybe").length,
-    no: list.filter((item) => item.status === "no").length,
-  };
-};
-const sortRsvps = (items: DemoRsvp[], data: DemoData): DemoRsvp[] =>
-  [...items].sort((a, b) => {
-    const ma = data.members[a.uid];
-    const mb = data.members[b.uid];
-    if (ma && mb) {
-      if (ma.grade !== mb.grade) return mb.grade - ma.grade;
-      if (ma.instrumentOrder !== mb.instrumentOrder) return ma.instrumentOrder - mb.instrumentOrder;
-      return ma.kana.localeCompare(mb.kana, "ja");
-    }
-    if (ma && !mb) return -1;
-    if (!ma && mb) return 1;
-    return a.displayName.localeCompare(b.displayName, "ja");
-  });
 
 const emptyActivity = (): Activity => ({
   startTime: "09:00",
@@ -549,13 +558,33 @@ const DEMO_STAMP_USER = {
 };
 const MAIN_INSTRUCTOR_NAME = "井野";
 
+const resolveMainInstructorPlanned = (session: SessionDoc): boolean | null => {
+  if (typeof session.mainInstructorPlanned === "boolean") {
+    return session.mainInstructorPlanned;
+  }
+  const plannedInstructors = session.plannedInstructors ?? [];
+  if (plannedInstructors.includes(MAIN_INSTRUCTOR_NAME) || plannedInstructors.includes("井野先生")) {
+    return true;
+  }
+  return null;
+};
+
 export function LogPage({
   data,
   updateDayLog,
+  saveDayLog,
+  ensureDayLog,
   updateSessionRsvps,
-  updateDemoDictionaries,
+  saveSessionRsvps,
+  updateDemoDictionaries: _updateDemoDictionaries,
+  isScoresLoading,
+  scoresLoadError,
+  linkedMember,
 }: LogPageProps) {
   const { date = "" } = useParams();
+  const [families, setFamilies] = useState<FamilyRecord[]>([]);
+  const [members, setMembers] = useState<MemberRecord[]>([]);
+  const [saveState, setSaveState] = useState<"saving" | "saved" | "error">("saved");
   const day = data.scheduleDays[date];
   const sessions = useMemo(
     () => [...(day?.sessions ?? [])].sort((a, b) => a.order - b.order),
@@ -591,7 +620,7 @@ export function LogPage({
   const [isActivityModalOpen, setIsActivityModalOpen] = useState(false);
   const [editingActivityIndex, setEditingActivityIndex] = useState<number | null>(null);
   const [activityDraft, setActivityDraft] = useState<Activity>(emptyActivity);
-  const [refModal, setRefModal] = useState<"mainInstructor" | "instructors" | "seniors" | null>(null);
+  const [refModal, setRefModal] = useState<"instructors" | "seniors" | null>(null);
   const [selectedRsvpSession, setSelectedRsvpSession] = useState<SessionDoc | null>(null);
   const [rsvpDraft, setRsvpDraft] = useState<Record<string, RsvpStatus | "">>({});
   const [rsvpError, setRsvpError] = useState("");
@@ -604,9 +633,11 @@ export function LogPage({
   const [activityTypeError, setActivityTypeError] = useState("");
   const [stampMessage, setStampMessage] = useState("");
   const [animatingStampOrder, setAnimatingStampOrder] = useState<number | null>(null);
-  const [isSaveNoticeOpen, setIsSaveNoticeOpen] = useState(false);
   const [pendingDeleteActivityIndex, setPendingDeleteActivityIndex] = useState<number | null>(null);
   const [pendingStampSession, setPendingStampSession] = useState<{ sessionOrder: number; fromName: string } | null>(null);
+  const [notesDraft, setNotesDraft] = useState(log.notes ?? "");
+  const latestLogRef = useRef<DayLog>(log);
+  const saveRequestIdRef = useRef(0);
 
   useEffect(() => {
     if (!stampMessage) return;
@@ -614,52 +645,103 @@ export function LogPage({
     return () => window.clearTimeout(timer);
   }, [stampMessage]);
 
-  const onSaveDemo = () => {
-    const nextInstructors = log.actualInstructors.map((name) => name.trim()).filter(Boolean);
-    const nextSeniors = log.actualSeniors.map((name) => name.trim()).filter(Boolean);
-    updateDemoDictionaries({
-      instructors: nextInstructors,
-      seniors: nextSeniors,
-    });
-    setIsSaveNoticeOpen(true);
+  useEffect(() => {
+    try {
+      return subscribeFamilies(setFamilies);
+    } catch {
+      setFamilies([]);
+      return undefined;
+    }
+  }, []);
+  useEffect(() => {
+    try {
+      return subscribeMembers(setMembers);
+    } catch {
+      setMembers([]);
+      return undefined;
+    }
+  }, []);
+  useEffect(() => {
+    latestLogRef.current = log;
+  }, [log]);
+  useEffect(() => {
+    setNotesDraft(log.notes ?? "");
+  }, [date, log.notes]);
+  useEffect(() => {
+    if (!date) return undefined;
+    let active = true;
+    setSaveState("saving");
+    void ensureDayLog(date)
+      .then(() => {
+        if (active) setSaveState("saved");
+      })
+      .catch(() => {
+        if (active) setSaveState("error");
+      });
+    return () => {
+      active = false;
+    };
+  }, [date, ensureDayLog]);
+
+  const persistDayLog = async (nextLog: DayLog) => {
+    const requestId = saveRequestIdRef.current + 1;
+    saveRequestIdRef.current = requestId;
+    setSaveState("saving");
+    try {
+      await saveDayLog(date, nextLog);
+      if (saveRequestIdRef.current === requestId) {
+        setSaveState("saved");
+      }
+    } catch {
+      if (saveRequestIdRef.current === requestId) {
+        setSaveState("error");
+      }
+    }
+  };
+
+  const applyDayLogUpdate = (updater: (prev: DayLog) => DayLog) => {
+    const nextLog = updater(latestLogRef.current);
+    latestLogRef.current = nextLog;
+    updateDayLog(date, () => nextLog);
+    void persistDayLog(nextLog);
+    return nextLog;
   };
 
   const dayStartTime = sessions[0]?.startTime ?? "--:--";
   const dayEndTime = sessions[sessions.length - 1]?.endTime ?? "--:--";
+  const currentStampFamilyName = useMemo(() => {
+    const linkedFamily = linkedMember?.familyId
+      ? families.find((family) => family.id === linkedMember.familyId)
+      : null;
+    const fallbackName =
+      linkedFamily?.name?.trim() ||
+      linkedMember?.familyName?.trim() ||
+      (linkedMember?.name ? toFamilyName(linkedMember.name) : "") ||
+      DEMO_STAMP_USER.name;
+    return fallbackName.trim() || DEMO_STAMP_USER.name;
+  }, [families, linkedMember]);
+  const currentStampUid = linkedMember?.authUid || linkedMember?.id || DEMO_STAMP_USER.uid;
   const dutySlots = sessions.map((session, index) => {
     const name = session.assigneeNameSnapshot?.trim() || "";
     const seed = `${name}-${index}`
       .split("")
       .reduce((acc, char) => acc + char.charCodeAt(0), 0);
     const rotate = ((seed % 5) - 2).toString();
-    return { name, familyName: toFamilyName(name), rotate };
+    return { name, familyName: toFamilyName(name) || "-", rotate };
   });
 
-  const locationRows = sessions.filter((session) => Boolean(session.location));
+  const locationRows = sessions;
   const weatherValue = normalizeWeather(log.weather);
   const selectedWeatherTone = weatherToneClass(weatherValue);
   const mainInstructorPlanByOrder = useMemo(() => {
     const entries = sessions.map((session) => [
       session.order,
-      Boolean((session.plannedInstructors ?? []).includes(MAIN_INSTRUCTOR_NAME)),
+      resolveMainInstructorPlanned(session),
     ]);
-    return Object.fromEntries(entries) as Record<number, boolean>;
+    return Object.fromEntries(entries) as Record<number, boolean | null>;
   }, [sessions]);
-  const refModalItems =
-    refModal === "mainInstructor"
-      ? sessions.map((session) => {
-          const planned = mainInstructorPlanByOrder[session.order] ? "◯" : "×";
-          return `${formatTimeNoLeadingZero(session.startTime)}〜${formatTimeNoLeadingZero(session.endTime)}　${planned}`;
-        })
-      : refModal === "instructors"
-        ? plannedInstructors
-        : plannedSeniors;
-  const refModalTitle =
-    refModal === "mainInstructor"
-      ? "講師予定（井野）"
-      : refModal === "instructors"
-        ? "外部講師予定"
-        : "先輩予定";
+  const refModalItems = refModal === "instructors" ? plannedInstructors : plannedSeniors;
+  const refModalTitle = refModal === "instructors" ? "外部講師予定" : "先輩予定";
 
   const activityEntries = useMemo(() => sortedActivityEntries(log.activities), [log.activities]);
   const instructorHistoryCandidates = useMemo(
@@ -689,6 +771,14 @@ export function LogPage({
     [activityDraft.type],
   );
   const recentSongIds = useMemo(() => recentSongIdsFromLogs(data.dayLogs), [data.dayLogs]);
+  const songMaster = useMemo(
+    () =>
+      data.scores.map((score) => ({
+        id: score.id,
+        name: score.title,
+      })),
+    [data.scores],
+  );
   const recentSongSuggestions = useMemo(
     () =>
       recentSongIds
@@ -697,16 +787,47 @@ export function LogPage({
         .slice(0, 10),
     [recentSongIds],
   );
-  const sortedSelectedRsvps = useMemo(
-    () => (selectedRsvpSession ? sortRsvps(selectedRsvpSession.demoRsvps ?? [], data) : []),
-    [selectedRsvpSession, data],
+  const visibleChildMembers = useMemo(
+    () =>
+      sortMembersForDisplay(
+        members.filter((member) => member.memberStatus === "active" && isChildMember(member)),
+        "child",
+      ),
+    [members],
   );
+  const attendanceRowsByOrder = useMemo(
+    () =>
+      sessions.reduce<Record<number, AttendanceRow[]>>((result, session) => {
+        result[session.order] = visibleChildMembers.map((member) => {
+          const rsvpUid = member.authUid || member.id || member.loginId;
+          const matched =
+            session.demoRsvps?.find(
+              (item) =>
+                item.uid === member.authUid ||
+                item.uid === member.id ||
+                item.uid === member.loginId,
+            ) ?? null;
+          return {
+            uid: member.id,
+            rsvpUid,
+            displayName: member.name,
+            status: matched?.status ?? "unknown",
+          };
+        });
+        return result;
+      }, {}),
+    [sessions, visibleChildMembers],
+  );
+  const selectedAttendanceRows = selectedRsvpSession
+    ? attendanceRowsByOrder[selectedRsvpSession.order] ?? []
+    : [];
   const rsvpCounts = selectedRsvpSession
     ? {
-      yes: sortedSelectedRsvps.filter((rsvp) => rsvpDraft[rsvp.uid] === "yes").length,
-      maybe: sortedSelectedRsvps.filter((rsvp) => rsvpDraft[rsvp.uid] === "maybe").length,
-      no: sortedSelectedRsvps.filter((rsvp) => rsvpDraft[rsvp.uid] === "no").length,
-    }
+        yes: selectedAttendanceRows.filter((row) => rsvpDraft[row.rsvpUid] === "yes").length,
+        maybe: selectedAttendanceRows.filter((row) => rsvpDraft[row.rsvpUid] === "maybe").length,
+        no: selectedAttendanceRows.filter((row) => rsvpDraft[row.rsvpUid] === "no").length,
+        unknown: selectedAttendanceRows.filter((row) => !rsvpDraft[row.rsvpUid]).length,
+      }
     : null;
 
   useEffect(() => {
@@ -793,7 +914,7 @@ export function LogPage({
       songIds: activityDraft.songIds?.length ? activityDraft.songIds : [],
     };
 
-    updateDayLog(date, (prev) => {
+    applyDayLogUpdate((prev) => {
       if (editingActivityIndex === null) {
         return {
           ...prev,
@@ -819,7 +940,7 @@ export function LogPage({
 
   const confirmDeleteActivity = () => {
     if (pendingDeleteActivityIndex === null) return;
-    updateDayLog(date, (prev) => ({
+    applyDayLogUpdate((prev) => ({
       ...prev,
       activities: prev.activities.filter((_, index) => index !== pendingDeleteActivityIndex),
     }));
@@ -845,14 +966,14 @@ export function LogPage({
   const addArrayItem = (field: "actualInstructors" | "actualSeniors", value: string) => {
     const nextValue = value.trim();
     if (!nextValue) return;
-    updateDayLog(date, (prev) => ({
+    applyDayLogUpdate((prev) => ({
       ...prev,
       [field]: [...(prev[field] ?? []), nextValue],
     }));
   };
 
   const removeArrayItem = (field: "actualInstructors" | "actualSeniors", index: number) => {
-    updateDayLog(date, (prev) => ({
+    applyDayLogUpdate((prev) => ({
       ...prev,
       [field]: (prev[field] ?? []).filter((_, currentIndex) => currentIndex !== index),
     }));
@@ -860,7 +981,7 @@ export function LogPage({
 
   const toggleMainInstructorAttendance = (sessionOrder: number) => {
     const key = String(sessionOrder);
-    updateDayLog(date, (prev) => ({
+    applyDayLogUpdate((prev) => ({
       ...prev,
       mainInstructorAttendance: {
         ...(prev.mainInstructorAttendance ?? {}),
@@ -872,8 +993,8 @@ export function LogPage({
   const openRsvpModal = (session: SessionDoc) => {
     setSelectedRsvpSession(session);
     const nextDraft: Record<string, RsvpStatus | ""> = {};
-    (session.demoRsvps ?? []).forEach((rsvp) => {
-      nextDraft[rsvp.uid] = rsvp.status === "unknown" ? "" : rsvp.status;
+    (attendanceRowsByOrder[session.order] ?? []).forEach((row) => {
+      nextDraft[row.rsvpUid] = row.status === "unknown" ? "" : row.status;
     });
     setRsvpDraft(nextDraft);
     setRsvpError("");
@@ -894,28 +1015,40 @@ export function LogPage({
 
   const onSaveRsvps = () => {
     if (!selectedRsvpSession) return;
-    const hasUnselected = sortedSelectedRsvps.some((rsvp) => !rsvpDraft[rsvp.uid]);
+    const hasUnselected = selectedAttendanceRows.some((row) => !rsvpDraft[row.rsvpUid]);
     if (hasUnselected) {
       setRsvpError("未選択のメンバーがいます");
       return;
     }
-    const nextRsvps = (selectedRsvpSession.demoRsvps ?? []).map((rsvp) => ({
-      ...rsvp,
-      status: (rsvpDraft[rsvp.uid] as RsvpStatus) ?? "unknown",
-    }));
+    if (!selectedRsvpSession.id) {
+      setRsvpError("セッションの保存先が見つかりません。");
+      return;
+    }
+    const nextRsvps = selectedAttendanceRows.flatMap((row) => {
+      const status = rsvpDraft[row.rsvpUid];
+      if (!status) return [];
+      return [{ uid: row.rsvpUid, displayName: row.displayName, status: status as RsvpStatus }];
+    });
     updateSessionRsvps(date, selectedRsvpSession.order, nextRsvps);
+    setSaveState("saving");
+    void saveSessionRsvps(date, selectedRsvpSession.id, nextRsvps)
+      .then(() => setSaveState("saved"))
+      .catch(() => {
+        setSaveState("error");
+        setRsvpError("出欠を保存できませんでした。");
+      });
     closeRsvpModal();
   };
 
   const applyDutyStamp = (sessionOrder: number) => {
     const key = String(sessionOrder);
-    updateDayLog(date, (prev) => ({
+    applyDayLogUpdate((prev) => ({
       ...prev,
       dutyStamps: {
         ...(prev.dutyStamps ?? {}),
         [key]: {
-          stampedByUid: DEMO_STAMP_USER.uid,
-          stampedByName: DEMO_STAMP_USER.name,
+          stampedByUid: currentStampUid,
+          stampedByName: currentStampFamilyName,
           stampedAt: new Date().toISOString(),
         },
       },
@@ -929,18 +1062,17 @@ export function LogPage({
   };
 
   const onStampDuty = (sessionOrder: number, plannedName: string) => {
-    if (!plannedName) return;
     const key = String(sessionOrder);
     const current = log.dutyStamps?.[key];
 
-    if (current?.stampedByUid === DEMO_STAMP_USER.uid) {
+    if (current?.stampedByUid === currentStampUid) {
       setStampMessage("捺印済みです");
       return;
     }
 
-    const needsConfirm = Boolean(current) || plannedName !== DEMO_STAMP_USER.name;
+    const needsConfirm = Boolean(current) || (Boolean(plannedName) && plannedName !== currentStampFamilyName);
     if (needsConfirm) {
-      const fromName = current?.stampedByName ?? plannedName;
+      const fromName = current?.stampedByName ?? (plannedName || "未設定");
       setPendingStampSession({ sessionOrder, fromName });
       return;
     }
@@ -950,12 +1082,17 @@ export function LogPage({
   return (
     <section className="card log-page">
       <div className="log-toolbar">
-        <Link to="/today" className="button button-small">
-          Todayへ
-        </Link>
-        <button type="button" className="button button-small" onClick={onSaveDemo}>
-          保存
-        </button>
+        <div className="log-toolbar-links">
+          <Link to={`/today?date=${date}`} className="button button-small">
+            Todayへ
+          </Link>
+          <Link to={`/logs?ym=${date.slice(0, 7)}`} className="button button-small ghost-button">
+            一覧へ
+          </Link>
+        </div>
+        <span className={`log-save-status ${saveState}`}>
+          {saveState === "saving" ? "保存中" : saveState === "error" ? "保存失敗" : "保存済み"}
+        </span>
       </div>
 
       <div className="log-date-block">
@@ -988,7 +1125,7 @@ export function LogPage({
                   type="button"
                   className="weather-option none"
                   onClick={() => {
-                    updateDayLog(date, (prev) => ({ ...prev, weather: "" }));
+                    applyDayLogUpdate((prev) => ({ ...prev, weather: "" }));
                     setIsWeatherMenuOpen(false);
                   }}
                 >
@@ -1001,7 +1138,7 @@ export function LogPage({
                     type="button"
                     className={`weather-option ${option.toneClass}`}
                     onClick={() => {
-                      updateDayLog(date, (prev) => ({ ...prev, weather: option.value }));
+                      applyDayLogUpdate((prev) => ({ ...prev, weather: option.value }));
                       setIsWeatherMenuOpen(false);
                     }}
                   >
@@ -1030,7 +1167,7 @@ export function LogPage({
                     {formatTimeNoLeadingZero(session.startTime)}〜
                     {formatTimeNoLeadingZero(session.endTime)}
                   </span>
-                  <span className="attendance-value">{session.location}</span>
+                  <span className="attendance-value">{session.location?.trim() || "-"}</span>
                 </li>
               ))}
             </ul>
@@ -1042,7 +1179,13 @@ export function LogPage({
           </div>
           <div className="attendance-list">
             {sessions.map((session, index) => {
-              const counts = countRsvps(session);
+              const rows = attendanceRowsByOrder[session.order] ?? [];
+              const counts = {
+                yes: rows.filter((row) => row.status === "yes").length,
+                maybe: rows.filter((row) => row.status === "maybe").length,
+                no: rows.filter((row) => row.status === "no").length,
+                unknown: rows.filter((row) => row.status === "unknown").length,
+              };
               return (
                 <div key={`${session.order}-${index}`} className="attendance-row">
                   <span className="attendance-time">
@@ -1053,6 +1196,7 @@ export function LogPage({
                     <span className="count-yes">◯{counts.yes}</span>
                     <span className="count-maybe">△{counts.maybe}</span>
                     <span className="count-no">×{counts.no}</span>
+                    <span className="count-unknown">ー{counts.unknown}</span>
                   </button>
                 </div>
               );
@@ -1065,14 +1209,7 @@ export function LogPage({
         <div className="log-panel">
           <div className="ref-panel">
             <div className="section-header">
-              <h2>講師（井野）</h2>
-              <button
-                type="button"
-                className="button button-small ghost-button section-action"
-                onClick={() => setRefModal("mainInstructor")}
-              >
-                予定を見る
-              </button>
+              <h2>講師</h2>
             </div>
           </div>
           <div className="panel-body">
@@ -1080,12 +1217,15 @@ export function LogPage({
               {sessions.map((session) => {
                 const key = String(session.order);
                 const checked = Boolean(log.mainInstructorAttendance?.[key]);
+                const plannedValue = mainInstructorPlanByOrder[session.order];
+                const planned = plannedValue === true ? "○" : plannedValue === false ? "×" : "-";
                 return (
                   <li key={session.order} className="main-instructor-row">
                     <span className="main-instructor-time">
                       {formatTimeNoLeadingZero(session.startTime)}〜
                       {formatTimeNoLeadingZero(session.endTime)}
                     </span>
+                    <span className="main-instructor-plan">予定 {planned}</span>
                     <span className="main-instructor-check">
                       <input
                         type="checkbox"
@@ -1191,7 +1331,7 @@ export function LogPage({
                     <span className="activity-log-time">
                       {formatTimeNoLeadingZero(entry.activity.startTime)}～
                     </span>
-                    <span>{formatActivityBody(entry.activity)}</span>
+                    <span>{formatActivityBody(entry.activity, songMaster)}</span>
                   </span>
                 </button>
                 <button
@@ -1220,8 +1360,12 @@ export function LogPage({
         </div>
         <div className="panel-body">
           <textarea
-            value={log.notes}
-            onChange={(e) => updateDayLog(date, (prev) => ({ ...prev, notes: e.target.value }))}
+            value={notesDraft}
+            onChange={(e) => setNotesDraft(e.target.value)}
+            onBlur={() => {
+              if (notesDraft === (latestLogRef.current.notes ?? "")) return;
+              applyDayLogUpdate((prev) => ({ ...prev, notes: notesDraft }));
+            }}
           />
         </div>
       </div>
@@ -1242,25 +1386,25 @@ export function LogPage({
                   : slot.familyName;
                 return (
                   <div key={`${slot.name}-${index}`} className="duty-connected-cell">
-                    {slot.name ? (
-                      <button
-                        type="button"
-                        className={`duty-stamp-circle duty-stamp-button ${
-                          isStamped ? "stamped" : "unstamped"
-                        }`}
-                        style={{ transform: `rotate(${slot.rotate}deg)` }}
-                        onClick={() => onStampDuty(order, slot.name)}
-                        title={
-                          stamp
-                            ? `捺印者: ${stamp.stampedByName} / ${new Date(stamp.stampedAt).toLocaleString("ja-JP")}`
-                            : "未捺印"
-                        }
-                        >
-                        <span className={`duty-stamp-text ${animatingStampOrder === order ? "stamp-pop" : ""}`}>
-                          {stampDisplayName}
-                        </span>
-                      </button>
-                    ) : null}
+                    <button
+                      type="button"
+                      className={`duty-stamp-circle duty-stamp-button ${
+                        isStamped ? "stamped" : "unstamped"
+                      } ${!slot.name ? "unassigned" : ""}`}
+                      style={{ transform: `rotate(${slot.rotate}deg)` }}
+                      onClick={() => onStampDuty(order, slot.name)}
+                      title={
+                        stamp
+                          ? `捺印者: ${stamp.stampedByName} / ${new Date(stamp.stampedAt).toLocaleString("ja-JP")}`
+                          : slot.name
+                            ? "未捺印"
+                            : "当番未設定"
+                      }
+                    >
+                      <span className={`duty-stamp-text ${animatingStampOrder === order ? "stamp-pop" : ""}`}>
+                        {stampDisplayName}
+                      </span>
+                    </button>
                   </div>
                 );
               })}
@@ -1269,22 +1413,6 @@ export function LogPage({
           {stampMessage && <p className="duty-stamp-note">{stampMessage}</p>}
         </div>
       </div>
-
-      {isSaveNoticeOpen && (
-        <div className="modal-backdrop" onClick={() => setIsSaveNoticeOpen(false)}>
-          <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" onClick={() => setIsSaveNoticeOpen(false)} aria-label="閉じる" title="閉じる">
-              ×
-            </button>
-            <p className="modal-context">保存しました（デモ）</p>
-            <div className="modal-actions">
-              <button type="button" className="button button-small" onClick={() => setIsSaveNoticeOpen(false)}>
-                OK
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {pendingDeleteActivityIndex !== null && (
         <div className="modal-backdrop" onClick={() => setPendingDeleteActivityIndex(null)}>
@@ -1321,7 +1449,7 @@ export function LogPage({
               ×
             </button>
             <p className="modal-context">
-              当番者を「{pendingStampSession.fromName}」から「{DEMO_STAMP_USER.name}」に変更して捺印します。よろしいですか？
+              当番者を「{pendingStampSession.fromName}」から「{currentStampFamilyName}」に変更して捺印します。よろしいですか？
             </p>
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={() => setPendingStampSession(null)}>
@@ -1493,6 +1621,8 @@ export function LogPage({
                     onRemove={removeSongAt}
                     onAddSongId={addSongId}
                     maxSongs={MAX_ACTIVITY_SONGS}
+                    isLoading={isScoresLoading}
+                    loadError={scoresLoadError}
                   />
                 </div>
               </div>
@@ -1525,32 +1655,33 @@ export function LogPage({
               <p className="modal-summary">
                 出欠：<span className="count-yes">◯{rsvpCounts.yes}</span>{" "}
                 <span className="count-maybe">△{rsvpCounts.maybe}</span>{" "}
-                <span className="count-no">×{rsvpCounts.no}</span>
+                <span className="count-no">×{rsvpCounts.no}</span>{" "}
+                <span className="count-unknown">ー{rsvpCounts.unknown}</span>
               </p>
             )}
             <div className="rsvp-table">
-              {sortedSelectedRsvps.map((rsvp) => (
-                <div key={rsvp.uid} className="rsvp-row">
-                  <span>{rsvp.displayName}</span>
+              {selectedAttendanceRows.map((row) => (
+                <div key={row.uid} className="rsvp-row">
+                  <span>{row.displayName}</span>
                   <div className="rsvp-toggle-group">
                     <button
                       type="button"
-                      className={`rsvp-toggle yes ${rsvpDraft[rsvp.uid] === "yes" ? "active" : ""}`}
-                      onClick={() => toggleRsvp(rsvp.uid, "yes")}
+                      className={`rsvp-toggle yes ${rsvpDraft[row.rsvpUid] === "yes" ? "active" : ""}`}
+                      onClick={() => toggleRsvp(row.rsvpUid, "yes")}
                     >
                       ◯
                     </button>
                     <button
                       type="button"
-                      className={`rsvp-toggle maybe ${rsvpDraft[rsvp.uid] === "maybe" ? "active" : ""}`}
-                      onClick={() => toggleRsvp(rsvp.uid, "maybe")}
+                      className={`rsvp-toggle maybe ${rsvpDraft[row.rsvpUid] === "maybe" ? "active" : ""}`}
+                      onClick={() => toggleRsvp(row.rsvpUid, "maybe")}
                     >
                       △
                     </button>
                     <button
                       type="button"
-                      className={`rsvp-toggle no ${rsvpDraft[rsvp.uid] === "no" ? "active" : ""}`}
-                      onClick={() => toggleRsvp(rsvp.uid, "no")}
+                      className={`rsvp-toggle no ${rsvpDraft[row.rsvpUid] === "no" ? "active" : ""}`}
+                      onClick={() => toggleRsvp(row.rsvpUid, "no")}
                     >
                       ×
                     </button>

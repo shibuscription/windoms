@@ -550,8 +550,8 @@ const demoQuoCards: DemoData["quoCards"] = [
 
 export const mockData: DemoData = {
   demoDictionaries: {
-    instructors: ["講師A", "講師B", "講師C"],
-    seniors: ["先輩B", "先輩C", "先輩D"],
+    instructors: [],
+    seniors: [],
   },
   members: {
     m01: { uid: "m01", grade: 3, instrumentOrder: 2, kana: "たなか" },
@@ -738,41 +738,31 @@ export const mockData: DemoData = {
   },
   dayLogs: {
     [dayMinus3]: {
-      notes: "過去ログ（MRU確認用）",
-      weather: "くもり",
-      activities: [
-        { startTime: "15:00", type: "合奏", title: "通し確認", songIds: ["song_004", "song_001"] },
-      ],
-      actualInstructors: ["講師C"],
-      actualSeniors: ["先輩B"],
+      notes: "",
+      weather: "",
+      activities: [],
+      actualInstructors: [],
+      actualSeniors: [],
     },
     [dayMinus2]: {
-      notes: "過去ログ（MRU確認用）",
-      weather: "雨",
-      activities: [
-        { startTime: "09:20", type: "基礎練習", title: "発音", songIds: ["song_002"] },
-        { startTime: "10:10", type: "合奏", title: "部分練習", songIds: ["song_003", "song_005"] },
-      ],
-      actualInstructors: ["講師A"],
+      notes: "",
+      weather: "",
+      activities: [],
+      actualInstructors: [],
       actualSeniors: [],
     },
     [dayMinus1]: {
-      notes: "過去ログ（MRU確認用）",
-      weather: "晴れ",
-      activities: [
-        { startTime: "16:10", type: "合奏", title: "全体", songIds: ["song_005", "song_001", "song_003"] },
-      ],
-      actualInstructors: ["講師B"],
-      actualSeniors: ["先輩D"],
+      notes: "",
+      weather: "",
+      activities: [],
+      actualInstructors: [],
+      actualSeniors: [],
     },
     [today]: {
       notes: "",
-      weather: "晴れ",
-      activities: [
-        { startTime: "09:00", type: "腹式呼吸", title: "" },
-        { startTime: "09:15", type: "基礎練習", title: "ロングトーン" },
-      ],
-      actualInstructors: ["講師A"],
+      weather: "",
+      activities: [],
+      actualInstructors: [],
       actualSeniors: [],
       mainInstructorAttendance: {},
     },

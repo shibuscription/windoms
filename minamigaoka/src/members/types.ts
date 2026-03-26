@@ -42,6 +42,7 @@ export type FamilyVehicleRecord = {
 export type FamilyRecord = {
   id: string;
   name: string;
+  sortOrder: number | null;
   address: string;
   vehicles: FamilyVehicleRecord[];
   status: FamilyStatus;
@@ -133,7 +134,7 @@ export type BulkRegisterMembersResponse = {
   functionsRegion?: string;
 };
 
-export type SaveFamilyInput = Pick<FamilyRecord, "name" | "address" | "vehicles" | "status" | "notes">;
+export type SaveFamilyInput = Pick<FamilyRecord, "name" | "sortOrder" | "address" | "vehicles" | "status" | "notes">;
 
 export type SaveMemberInput = Pick<
   MemberRecord,

@@ -53,6 +53,8 @@ const relationsCollection = db ? collection(db, "memberRelations") : null;
 const toFamilyRecord = (id: string, value: Record<string, unknown>): FamilyRecord => ({
   id,
   name: typeof value.name === "string" ? value.name : "",
+  sortOrder:
+    typeof value.sortOrder === "number" && Number.isFinite(value.sortOrder) ? value.sortOrder : null,
   address: typeof value.address === "string" ? value.address : "",
   vehicles: Array.isArray(value.vehicles)
     ? value.vehicles.reduce<FamilyVehicleRecord[]>((result, item) => {
@@ -283,6 +285,7 @@ export const saveFamily = async (familyId: string | null, input: SaveFamilyInput
   ensureDb();
   const payload = {
     name: input.name.trim(),
+    sortOrder: typeof input.sortOrder === "number" && Number.isFinite(input.sortOrder) ? input.sortOrder : null,
     address: input.address.trim(),
     vehicles: input.vehicles.map((vehicle) => ({
       maker: vehicle.maker.trim(),
@@ -458,6 +461,24 @@ export const updateMemberTypeOrder = async (
         sortOrders: {
           [memberType]: index,
         },
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+  });
+
+  await batch.commit();
+};
+
+export const updateFamilyOrder = async (orderedFamilyIds: string[]): Promise<void> => {
+  ensureDb();
+  const batch = writeBatch(db!);
+
+  orderedFamilyIds.forEach((familyId, index) => {
+    batch.set(
+      doc(familiesCollection!, familyId),
+      {
+        sortOrder: index,
         updatedAt: serverTimestamp(),
       },
       { merge: true },

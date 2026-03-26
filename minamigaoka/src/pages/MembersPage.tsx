@@ -51,6 +51,7 @@ import {
   subscribeFamilies,
   subscribeMemberRelations,
   subscribeMembers,
+  updateFamilyOrder,
   updateMemberTypeOrder,
 } from "../members/service";
 import type {
@@ -71,6 +72,7 @@ import type {
 type FamilyFormState = {
   id: string | null;
   name: string;
+  sortOrder: number | null;
   address: string;
   vehicles: FamilyVehicleRecord[];
   status: "active" | "inactive";
@@ -150,9 +152,30 @@ type DeleteDialogState =
 
 type ManagementTab = "family" | "member" | "auth" | "integrity";
 
+const compareFamilyName = (left: FamilyRecord, right: FamilyRecord): number => {
+  const nameCompare = (left.name || "").localeCompare(right.name || "", "ja");
+  if (nameCompare !== 0) return nameCompare;
+  return left.id.localeCompare(right.id, "ja");
+};
+
+const sortFamiliesForDisplay = (rows: FamilyRecord[]): FamilyRecord[] =>
+  [...rows].sort((left, right) => {
+    const leftOrder =
+      typeof left.sortOrder === "number" && Number.isFinite(left.sortOrder) ? left.sortOrder : Number.MAX_SAFE_INTEGER;
+    const rightOrder =
+      typeof right.sortOrder === "number" && Number.isFinite(right.sortOrder)
+        ? right.sortOrder
+        : Number.MAX_SAFE_INTEGER;
+    if (leftOrder !== rightOrder) {
+      return leftOrder - rightOrder;
+    }
+    return compareFamilyName(left, right);
+  });
+
 const emptyFamilyForm = (): FamilyFormState => ({
   id: null,
   name: "",
+  sortOrder: null,
   address: "",
   vehicles: [],
   status: "active",
@@ -288,6 +311,7 @@ export function MembersManagementPage() {
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false);
   const [isRelationModalOpen, setIsRelationModalOpen] = useState(false);
   const [isFamilyVehicleModalOpen, setIsFamilyVehicleModalOpen] = useState(false);
+  const [familyVehicleDetailTarget, setFamilyVehicleDetailTarget] = useState<FamilyRecord | null>(null);
   const [linkTargetMemberId, setLinkTargetMemberId] = useState<string | null>(null);
   const [selectedAuthUid, setSelectedAuthUid] = useState("");
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>(null);
@@ -319,6 +343,7 @@ export function MembersManagementPage() {
       }, {}),
     [families],
   );
+  const orderedFamilies = useMemo(() => sortFamiliesForDisplay(families), [families]);
 
   const memberNameById = useMemo(
     () =>
@@ -529,6 +554,7 @@ export function MembersManagementPage() {
     setFamilyForm({
       id: family.id,
       name: family.name,
+      sortOrder: family.sortOrder,
       address: family.address,
       vehicles: family.vehicles.map((vehicle) => ({ ...vehicle })),
       status: family.status,
@@ -676,6 +702,20 @@ export function MembersManagementPage() {
     setIsFamilyVehicleModalOpen(false);
   };
 
+  const buildFamilySortOrder = (): number => {
+    const existingFamily = familyForm.id ? families.find((family) => family.id === familyForm.id) ?? null : null;
+    if (typeof existingFamily?.sortOrder === "number" && Number.isFinite(existingFamily.sortOrder)) {
+      return existingFamily.sortOrder;
+    }
+    const maxSortOrder = orderedFamilies.reduce((result, family) => {
+      if (typeof family.sortOrder === "number" && Number.isFinite(family.sortOrder)) {
+        return Math.max(result, family.sortOrder);
+      }
+      return result;
+    }, -1);
+    return maxSortOrder + 1;
+  };
+
   const submitFamilyVehicle = () => {
     const nextVehicle: FamilyVehicleRecord = {
       maker: familyVehicleForm.maker.trim(),
@@ -748,6 +788,25 @@ export function MembersManagementPage() {
     }
   };
 
+  const moveFamilyOrder = async (familyId: string, direction: -1 | 1) => {
+    const currentIndex = orderedFamilies.findIndex((family) => family.id === familyId);
+    const nextIndex = currentIndex + direction;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= orderedFamilies.length) {
+      return;
+    }
+
+    const orderedIds = orderedFamilies.map((family) => family.id);
+    const [targetId] = orderedIds.splice(currentIndex, 1);
+    orderedIds.splice(nextIndex, 0, targetId);
+
+    try {
+      await updateFamilyOrder(orderedIds);
+      setToastMessage("Family の並び順を更新しました。");
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : "Family の並び順の更新に失敗しました。");
+    }
+  };
+
   const submitFamily = async () => {
     const nextErrors: FieldErrors = {};
     if (!familyForm.name.trim()) {
@@ -759,6 +818,7 @@ export function MembersManagementPage() {
     try {
       await saveFamily(familyForm.id, {
         name: familyForm.name,
+        sortOrder: buildFamilySortOrder(),
         address: familyForm.address,
         vehicles: familyForm.vehicles,
         status: familyForm.status,
@@ -1121,7 +1181,7 @@ export function MembersManagementPage() {
             </div>
           </div>
           <div className="members-admin-list-panel members-family-list-panel">
-            {families.map((family) => {
+            {orderedFamilies.map((family, index) => {
               const memberCount = familyMemberCountById[family.id] ?? 0;
               const familyAddressMapUrl = family.address
                 ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(family.address)}`
@@ -1132,6 +1192,30 @@ export function MembersManagementPage() {
                   <div className="members-admin-card-header">
                     <strong>{family.name}</strong>
                     <div className="members-admin-row-actions">
+                      {orderedFamilies.length > 1 && (
+                        <div className="members-order-controls" aria-label="Family 並び順操作">
+                          <button
+                            type="button"
+                            className="button button-small button-secondary"
+                            onClick={() => void moveFamilyOrder(family.id, -1)}
+                            disabled={index === 0}
+                            title="上へ移動"
+                            aria-label="上へ移動"
+                          >
+                            ↑
+                          </button>
+                          <button
+                            type="button"
+                            className="button button-small button-secondary"
+                            onClick={() => void moveFamilyOrder(family.id, 1)}
+                            disabled={index === orderedFamilies.length - 1}
+                            title="下へ移動"
+                            aria-label="下へ移動"
+                          >
+                            ↓
+                          </button>
+                        </div>
+                      )}
                       <button
                         type="button"
                         className="button button-small button-secondary"
@@ -1167,13 +1251,28 @@ export function MembersManagementPage() {
                       </a>
                     </p>
                   )}
-                  <p className="muted">車両: {family.vehicles.length}台</p>
+                  <p className="muted">
+                    車両:{" "}
+                    {family.vehicles.length > 0 ? (
+                      <button
+                        type="button"
+                        className="members-inline-link"
+                        onClick={() => setFamilyVehicleDetailTarget(family)}
+                        title={`${family.name} の車両詳細を開く`}
+                        aria-label={`${family.name} の車両詳細を開く`}
+                      >
+                        {family.vehicles.length}台
+                      </button>
+                    ) : (
+                      "0台"
+                    )}
+                  </p>
                   <p className="muted">{family.notes || "notes なし"}</p>
                   <p className="muted">所属member: {memberCount}件</p>
                 </article>
               );
             })}
-            {families.length === 0 && <p className="muted">family はまだありません。</p>}
+            {orderedFamilies.length === 0 && <p className="muted">family はまだありません。</p>}
           </div>
         </section>
       )}
@@ -1705,6 +1804,48 @@ export function MembersManagementPage() {
               </button>
               <button type="button" className="button" onClick={submitFamilyVehicle}>
                 保存
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {familyVehicleDetailTarget && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <section className="modal-panel family-vehicle-detail-modal-panel">
+            <button
+              type="button"
+              className="modal-close"
+              aria-label="閉じる"
+              title="閉じる"
+              onClick={() => setFamilyVehicleDetailTarget(null)}
+            >
+              ×
+            </button>
+            <h3>{familyVehicleDetailTarget.name} の車両</h3>
+            <div className="members-vehicles-list members-vehicle-detail-list">
+              {familyVehicleDetailTarget.vehicles.map((vehicle, index) => (
+                <div key={`${familyVehicleDetailTarget.id}-detail-${index}`} className="members-vehicle-card">
+                  <div className="members-vehicle-summary">
+                    <p>
+                      <strong>メーカー:</strong> {vehicle.maker || "-"}
+                    </p>
+                    <p>
+                      <strong>車種:</strong> {vehicle.model || "-"}
+                    </p>
+                    <p>
+                      <strong>乗車定員:</strong> {vehicle.capacity !== null ? `${vehicle.capacity}人` : "-"}
+                    </p>
+                    <p>
+                      <strong>備考:</strong> {vehicle.notes || "-"}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="button button-secondary" onClick={() => setFamilyVehicleDetailTarget(null)}>
+                閉じる
               </button>
             </div>
           </section>

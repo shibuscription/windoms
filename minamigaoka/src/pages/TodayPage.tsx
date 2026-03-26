@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { BirthdayCelebrationModal } from "../components/BirthdayCelebrationModal";
 import { getBirthdayCelebrants } from "../members/birthday";
 import { isChildMember, sortMembersForDisplay } from "../members/permissions";
 import { subscribeMembers } from "../members/service";
 import type { MemberRecord } from "../members/types";
-import type { DayLog, DemoData, DutyRequirement, RsvpStatus, SessionDoc, Todo } from "../types";
+import type { DemoData, DutyRequirement, RsvpStatus, SessionDoc, Todo } from "../types";
 import {
   formatDateYmd,
   formatTimeNoLeadingZero,
@@ -19,7 +19,7 @@ import { makeSessionRelatedId, sortTodosOpenFirst } from "../utils/todoUtils";
 
 type TodayPageProps = {
   data: DemoData;
-  updateDayLog: (date: string, updater: (prev: DayLog) => DayLog) => void;
+  ensureDayLog: (date: string) => Promise<void>;
   currentUid: string;
   updateTodos: (updater: (prev: Todo[]) => Todo[]) => void;
 };
@@ -113,15 +113,15 @@ const countAttendanceRows = (rows: AttendanceRow[]) => ({
 const getSessionDisplayTitle = (session: SessionDoc): string =>
   session.type === "event" && session.eventName?.trim() ? session.eventName.trim() : typeLabel[session.type];
 
-export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: TodayPageProps) {
+export function TodayPage({ data, ensureDayLog, currentUid, updateTodos }: TodayPageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [selectedSession, setSelectedSession] = useState<SessionDoc | null>(null);
   const [birthdayModalDate, setBirthdayModalDate] = useState<string | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(todayDateKey().slice(0, 7));
   const [noticeExpanded, setNoticeExpanded] = useState(false);
   const [noticeCanToggle, setNoticeCanToggle] = useState(false);
-  const [isFutureLogConfirmOpen, setIsFutureLogConfirmOpen] = useState(false);
   const [members, setMembers] = useState<MemberRecord[]>([]);
   const [pageError, setPageError] = useState("");
   const calendarWrapRef = useRef<HTMLDivElement>(null);
@@ -225,10 +225,7 @@ export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: Today
   }, [data.todos, date, selectedSession]);
   const birthdayCelebrants = useMemo(() => getBirthdayCelebrants(members, date), [date, members]);
 
-  const hasLog = Boolean(data.dayLogs[date]);
   const hasSessions = sessions.length > 0;
-  const logStatus = hasLog ? "日誌あり" : hasSessions ? "日誌なし" : "未活動";
-  const logStatusClass = hasLog ? "has-log" : "no-log";
   const calendarCells = useMemo(() => buildMonthCells(calendarMonth), [calendarMonth]);
   const calendarPath = `/calendar?ym=${toMonthKey(date)}&date=${date}`;
 
@@ -251,17 +248,10 @@ export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: Today
     setSearchParams({ date: nextDate });
   };
 
-  const createDayLog = () => {
-    if (date > today) {
-      setIsFutureLogConfirmOpen(true);
-      return;
-    }
-    updateDayLog(date, (prev) => ({ ...prev }));
-  };
-
-  const confirmCreateFutureDayLog = () => {
-    updateDayLog(date, (prev) => ({ ...prev }));
-    setIsFutureLogConfirmOpen(false);
+  const openDayLog = async () => {
+    if (!hasSessions) return;
+    await ensureDayLog(date);
+    navigate(`/logs/${date}`);
   };
 
   const assigneeLabel = (uid: string | null): string => {
@@ -376,16 +366,11 @@ export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: Today
           </button>
         </div>
         <div className="today-actions">
-          {hasLog ? (
-            <Link to={`/logs/${date}`} className="button button-small">
+          {hasSessions && (
+            <button type="button" className="button button-small" onClick={() => void openDayLog()}>
               日誌へ
-            </Link>
-          ) : (
-            <button type="button" className="button button-small" onClick={createDayLog}>
-              日誌を作成
             </button>
           )}
-          <span className={`log-status ${logStatusClass}`}>{logStatus}</span>
         </div>
       </div>
 
@@ -551,30 +536,6 @@ export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: Today
         />
       )}
 
-      {isFutureLogConfirmOpen && (
-        <div className="modal-backdrop" onClick={() => setIsFutureLogConfirmOpen(false)}>
-          <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
-            <button
-              type="button"
-              className="modal-close"
-              onClick={() => setIsFutureLogConfirmOpen(false)}
-              aria-label="閉じる"
-              title="閉じる"
-            >
-              ×
-            </button>
-            <p className="modal-context">選択した日は未来日です。日誌を作成してもよろしいですか？</p>
-            <div className="modal-actions">
-              <button type="button" className="button button-secondary" onClick={() => setIsFutureLogConfirmOpen(false)}>
-                キャンセル
-              </button>
-              <button type="button" className="button button-small" onClick={confirmCreateFutureDayLog}>
-                作成する
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </section>
   );
 }

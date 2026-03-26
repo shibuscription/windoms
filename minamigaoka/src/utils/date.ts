@@ -26,6 +26,22 @@ export const shiftDateKey = (baseDateKey: string, days: number): string => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+export const isValidMonthKey = (value: string): boolean => {
+  if (!/^\d{4}-\d{2}$/.test(value)) return false;
+  const [year, month] = value.split("-").map(Number);
+  return year >= 1900 && month >= 1 && month <= 12;
+};
+
+export const getMonthKeyFromDateKey = (dateKey: string): string => dateKey.slice(0, 7);
+
+export const shiftMonthKey = (baseMonthKey: string, months: number): string => {
+  const [year, month] = baseMonthKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1 + months, 1));
+  const yyyy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+  return `${yyyy}-${mm}`;
+};
+
 export const todayDateKey = (): string => {
   const parts = jstDateFormatter.formatToParts(new Date());
   const year = parts.find((part) => part.type === "year")?.value ?? "1970";
@@ -37,6 +53,11 @@ export const todayDateKey = (): string => {
 export const formatDateJa = (dateKey: string): string => {
   const [y, m, d] = dateKey.split("-");
   return `${y}/${m}/${d}`;
+};
+
+export const formatMonthJa = (monthKey: string): string => {
+  const [year, month] = monthKey.split("-").map(Number);
+  return `${year}年${month}月`;
 };
 
 export const formatDateYmd = (dateKey: string): string => {

@@ -25,6 +25,7 @@ const TEXT = {
   saveSuccess: "\u30e2\u30b8\u30e5\u30fc\u30eb\u8868\u793a\u8a2d\u5b9a\u3092\u4fdd\u5b58\u3057\u307e\u3057\u305f\u3002",
   saveError: "\u30e2\u30b8\u30e5\u30fc\u30eb\u8868\u793a\u8a2d\u5b9a\u306e\u4fdd\u5b58\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002",
   moduleColumn: "\u30e2\u30b8\u30e5\u30fc\u30eb",
+  publicColumn: "\u4e00\u822c\u516c\u958b",
   memberTypes: "\u5229\u7528\u8005\u533a\u5206",
   adminRoles: "\u7ba1\u7406\u6a29\u9650",
   staffPermissions: "\u62c5\u5f53\u696d\u52d9",
@@ -40,7 +41,7 @@ const TEXT = {
 };
 
 const adminRoleColumns = adminRoleOptions.filter((option) => option.value !== "none");
-const totalColumns = 1 + memberTypeOptions.length + adminRoleColumns.length + staffPermissionOptions.length;
+const totalColumns = 2 + memberTypeOptions.length + adminRoleColumns.length + staffPermissionOptions.length;
 
 export function ModuleSettingsPage() {
   const [settings, setSettings] = useState<ModuleVisibilitySettings>(defaultModuleVisibilitySettings);
@@ -102,6 +103,17 @@ export function ModuleSettingsPage() {
     });
   };
 
+  const togglePublic = (moduleId: ModuleMenuId, checked: boolean) => {
+    setSettings((current) => {
+      const next = cloneSettings(current);
+      next[moduleId] = {
+        ...next[moduleId],
+        isPublic: checked,
+      };
+      return next;
+    });
+  };
+
   const submit = async () => {
     setIsSaving(true);
     setPageError("");
@@ -140,6 +152,9 @@ export function ModuleSettingsPage() {
                   <th rowSpan={2} className="module-settings-module-col">
                     {TEXT.moduleColumn}
                   </th>
+                  <th rowSpan={2} className="module-settings-public-col">
+                    <span className="module-settings-head-text">{TEXT.publicColumn}</span>
+                  </th>
                   <th colSpan={memberTypeOptions.length}>{TEXT.memberTypes}</th>
                   <th colSpan={adminRoleColumns.length}>{TEXT.adminRoles}</th>
                   <th colSpan={staffPermissionOptions.length}>{TEXT.staffPermissions}</th>
@@ -173,7 +188,10 @@ export function ModuleSettingsPage() {
                       const locked = definition.lockedToAdmin === true;
 
                       return (
-                        <tr key={definition.id}>
+                        <tr
+                          key={definition.id}
+                          className={!rule.isPublic ? "module-settings-row-private" : undefined}
+                        >
                           <th scope="row" className="module-settings-module-cell">
                             <div className="module-settings-meta">
                               <span className="module-settings-icon" aria-hidden="true">
@@ -183,6 +201,20 @@ export function ModuleSettingsPage() {
                               {locked && <span className="module-settings-lock">{TEXT.lockedLabel}</span>}
                             </div>
                           </th>
+                          <td className="module-settings-check-cell module-settings-public-cell">
+                            <input
+                              type="checkbox"
+                              checked={rule.isPublic}
+                              disabled={locked}
+                              title={
+                                locked
+                                  ? TEXT.lockedHelp
+                                  : `${definition.label} の一般公開を切り替え`
+                              }
+                              aria-label={`${definition.label} の一般公開を切り替え`}
+                              onChange={(event) => togglePublic(definition.id, event.target.checked)}
+                            />
+                          </td>
                           {memberTypeOptions.map((option) => (
                             <td key={`${definition.id}-${option.value}`} className="module-settings-check-cell">
                               <input

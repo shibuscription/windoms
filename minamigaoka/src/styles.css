@@ -2999,7 +2999,7 @@ body {
 .month-calendar-header {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   gap: 10px;
   margin-bottom: 12px;
 }
@@ -3021,23 +3021,95 @@ body {
 }
 
 .month-calendar-header-center {
-  flex: 0 0 auto;
-}
-
-.month-calendar-header-center h1 {
-  margin: 0;
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: center;
+  position: relative;
 }
 
 .month-calendar-nav {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.month-calendar-month-button {
+  border: 0;
+  background: transparent;
+  color: #0f172a;
+  padding: 4px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: clamp(1.25rem, 2.2vw, 1.7rem);
+  line-height: 1.1;
+}
+
+.month-calendar-month-button:hover,
+.month-calendar-month-button:focus-visible {
+  background: #eef2ff;
+  outline: none;
+}
+
+.month-picker-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(340px, calc(100vw - 48px));
+  border: 1px solid #d6dde8;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.16);
+  padding: 12px;
+  z-index: 20;
+}
+
+.month-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.month-picker-year-button {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 999px;
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+}
+
+.month-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.month-picker-month-button {
+  border: 1px solid #d6dde8;
+  background: #f8fafc;
+  color: #1f2937;
+  border-radius: 10px;
+  padding: 10px 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.month-picker-month-button.current {
+  border-color: #1d4ed8;
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 @media (max-width: 767px) {
   .month-calendar-header {
     display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    grid-template-columns: 1fr;
     align-items: center;
     row-gap: 8px;
     column-gap: 6px;
@@ -3049,24 +3121,28 @@ body {
   }
 
   .month-calendar-header-center {
-    grid-column: 2;
+    grid-column: 1;
     justify-self: center;
-  }
-
-  .month-calendar-header-right {
-    grid-column: 1 / -1;
-    justify-content: center;
     width: 100%;
   }
 
-  .month-calendar-header-right.month-calendar-nav {
-    flex-wrap: wrap;
-    row-gap: 6px;
+  .month-calendar-header-right {
+    grid-column: 1;
+    justify-content: flex-end;
+    width: 100%;
   }
 
-  .month-calendar-header-right .button {
+  .month-calendar-nav .button {
     padding: 6px 10px;
     font-size: 0.84rem;
+  }
+
+  .month-calendar-month-button {
+    font-size: 1.2rem;
+  }
+
+  .month-picker-popover {
+    width: min(320px, calc(100vw - 32px));
   }
 }
 
@@ -3806,6 +3882,49 @@ body {
   gap: 8px;
 }
 
+.log-toolbar-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ghost-button {
+  background: #eef2f7;
+  color: #334155;
+}
+
+.log-save-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 88px;
+  padding: 6px 10px;
+  border: 1px solid #d7e0e8;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.log-save-status.saving {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+
+.log-save-status.saved {
+  background: #f0fdf4;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.log-save-status.error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
 .log-two-cols {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -3914,7 +4033,7 @@ body {
 
 .main-instructor-row {
   display: grid;
-  grid-template-columns: minmax(9ch, max-content) 1fr;
+  grid-template-columns: minmax(9ch, max-content) auto 1fr;
   align-items: center;
   column-gap: 12px;
   padding: 6px 0;
@@ -3927,6 +4046,12 @@ body {
 
 .main-instructor-time {
   white-space: nowrap;
+}
+
+.main-instructor-plan {
+  white-space: nowrap;
+  color: #475569;
+  font-size: 0.9rem;
 }
 
 .main-instructor-check {
@@ -4188,6 +4313,17 @@ body {
   border-right: 0;
 }
 
+.duty-connected-wrap-compact {
+  border-width: 1px;
+}
+
+.duty-connected-cell-compact {
+  width: 54px;
+  height: 54px;
+  flex: 0 0 54px;
+  border-right-width: 1px;
+}
+
 .duty-stamp-circle {
   width: var(--stamp-circle-size);
   height: var(--stamp-circle-size);
@@ -4216,6 +4352,251 @@ body {
   color: #b91c1c;
   border-color: #b91c1c;
   opacity: 0.92;
+}
+
+.duty-stamp-preview {
+  width: 38px;
+  height: 38px;
+  cursor: default;
+}
+
+.duty-stamp-preview.stamped {
+  color: #b91c1c;
+  border-color: #b91c1c;
+  opacity: 0.92;
+}
+
+.duty-stamp-preview.unstamped {
+  color: #9ca3af;
+  border-color: #9ca3af;
+  opacity: 0.65;
+}
+
+.duty-stamp-preview.unassigned {
+  color: #94a3b8;
+  border-color: #cbd5e1;
+  opacity: 1;
+}
+
+.duty-section-compact .duty-connected-scroll {
+  overflow-x: auto;
+}
+
+.logs-list-page {
+  display: grid;
+  gap: 14px;
+}
+
+.logs-list-header h1 {
+  margin: 0;
+}
+
+.logs-list-header .muted {
+  margin: 6px 0 0;
+}
+
+.logs-list-month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.logs-list-nav-button {
+  min-width: 88px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+}
+
+.logs-list-nav-button:hover {
+  background: #f8fafc;
+}
+
+.logs-list-month-label {
+  font-size: 1rem;
+  color: #334155;
+}
+
+.logs-list-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.logs-list-card {
+  width: 100%;
+  border: 1px solid #d6dde8;
+  border-radius: 12px;
+  padding: 12px;
+  text-align: left;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  cursor: pointer;
+  color: #0f172a;
+}
+
+.logs-list-card.created {
+  background: #ffffff;
+}
+
+.logs-list-card.pending {
+  background: #f3f4f6;
+}
+
+.logs-list-card:disabled {
+  cursor: wait;
+  opacity: 0.78;
+}
+
+.logs-list-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.logs-list-date-block {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.logs-list-date {
+  font-size: 1rem;
+}
+
+.logs-list-weekday {
+  font-size: 0.86rem;
+}
+
+.logs-list-weekday.weekday {
+  color: #475569;
+}
+
+.logs-list-weekday.sat {
+  color: #2563eb;
+}
+
+.logs-list-weekday.sun {
+  color: #dc2626;
+}
+
+.logs-list-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.logs-list-status-badge.created {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.logs-list-status-badge.pending {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.logs-list-sessions {
+  display: grid;
+  gap: 6px;
+}
+
+.logs-list-session-row {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.logs-list-session-time {
+  color: #475569;
+  font-size: 0.86rem;
+  white-space: nowrap;
+}
+
+.logs-list-session-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.logs-list-session-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.logs-list-session-detail {
+  font-size: 0.92rem;
+  color: #0f172a;
+  min-width: 0;
+}
+
+.logs-list-session-badge.normal {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.logs-list-session-badge.self {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.logs-list-session-badge.event {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.logs-list-duty-block {
+  display: grid;
+  gap: 6px;
+}
+
+.logs-list-duty-block .duty-stamp-text {
+  font-size: 0.7rem;
+}
+
+.logs-list-duty-label {
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
+.logs-list-opening {
+  font-size: 0.84rem;
+  color: #475569;
+}
+
+.logs-list-empty {
+  padding: 18px 0 8px;
+}
+
+@media (max-width: 640px) {
+  .logs-list-month-nav {
+    flex-wrap: wrap;
+  }
+
+  .logs-list-session-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .logs-list-session-main {
+    gap: 6px;
+  }
 }
 
 .duty-stamp-note {
@@ -4260,11 +4641,6 @@ body {
     opacity: 0.92;
     filter: blur(0);
   }
-}
-
-.ghost-button {
-  background: #475569;
-  margin-bottom: 8px;
 }
 
 .field-grid {
@@ -5242,6 +5618,21 @@ textarea {
   margin: 0;
 }
 
+.members-inline-link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #1d4ed8;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.members-inline-link:hover,
+.members-inline-link:focus-visible {
+  color: #1e40af;
+}
+
 .members-auth-status {
   display: inline-flex;
   align-items: center;
@@ -5271,6 +5662,12 @@ textarea {
 .family-modal-panel,
 .family-vehicle-modal-panel {
   max-height: min(88vh, calc(100dvh - 32px));
+  overflow-y: auto;
+}
+
+.family-vehicle-detail-modal-panel {
+  width: min(560px, calc(100vw - 24px));
+  max-height: min(80vh, calc(100dvh - 32px));
   overflow-y: auto;
 }
 
@@ -5357,6 +5754,10 @@ textarea {
 .members-vehicles-list {
   display: grid;
   gap: 12px;
+}
+
+.members-vehicle-detail-list {
+  margin-top: 8px;
 }
 
 .members-vehicle-card {
@@ -5494,6 +5895,11 @@ textarea {
   text-align: left;
 }
 
+.module-settings-public-col {
+  min-width: 92px;
+  text-align: center;
+}
+
 .module-settings-check-col {
   min-width: 78px;
 }
@@ -5509,6 +5915,20 @@ textarea {
   font-size: 0.86rem;
   font-weight: 700;
   text-align: left;
+}
+
+.module-settings-row-private th,
+.module-settings-row-private td {
+  background: #f8fafc;
+}
+
+.module-settings-row-private .module-settings-meta {
+  color: #64748b;
+}
+
+.module-settings-row-private .module-settings-icon {
+  background: #e2e8f0;
+  color: #64748b;
 }
 
 .module-settings-module-cell {
@@ -5543,6 +5963,10 @@ textarea {
 .module-settings-check-cell {
   text-align: center;
   vertical-align: middle;
+}
+
+.module-settings-public-cell {
+  min-width: 92px;
 }
 
 .module-settings-check-cell input {

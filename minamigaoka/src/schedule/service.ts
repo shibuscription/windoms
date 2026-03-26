@@ -1,7 +1,7 @@
 import { collection, getDocs, onSnapshot } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, firebaseFunctionsRegion, firebaseProjectId, functions, hasFirebaseAppConfig } from "../config/firebase";
-import type { ScheduleDayDoc, SessionDoc } from "../types";
+import type { DemoRsvp, RsvpStatus, ScheduleDayDoc, SessionDoc } from "../types";
 
 type EditableSessionType = "normal" | "self" | "event";
 
@@ -16,6 +16,7 @@ export type SaveCalendarSessionInput = {
   location: string;
   assigneeFamilyId: string;
   note: string;
+  mainInstructorPlanned?: boolean | null;
 };
 
 type SaveCalendarSessionResponse = {
@@ -49,6 +50,12 @@ const normalizeSessionType = (value: unknown): EditableSessionType => {
   return "normal";
 };
 
+const normalizeOptionalBoolean = (value: unknown): boolean | null => {
+  if (value === true) return true;
+  if (value === false) return false;
+  return null;
+};
+
 const toSessionDoc = (id: string, value: Record<string, unknown>): SessionDoc => {
   const type = value.type === "self" || value.type === "event" ? value.type : "normal";
   const dutyRequirement = value.dutyRequirement === "watch" ? "watch" : "duty";
@@ -70,6 +77,7 @@ const toSessionDoc = (id: string, value: Record<string, unknown>): SessionDoc =>
     assigneeNameSnapshot:
       typeof value.assigneeNameSnapshot === "string" ? value.assigneeNameSnapshot : "",
     note: typeof value.note === "string" ? value.note : "",
+    mainInstructorPlanned: normalizeOptionalBoolean(value.mainInstructorPlanned),
     plannedInstructors: Array.isArray(value.plannedInstructors)
       ? value.plannedInstructors.filter((item): item is string => typeof item === "string")
       : [],
@@ -78,6 +86,23 @@ const toSessionDoc = (id: string, value: Record<string, unknown>): SessionDoc =>
       : [],
   };
 };
+
+const toDemoRsvps = (snapshotDocs: Awaited<ReturnType<typeof getDocs>>["docs"]): DemoRsvp[] =>
+  snapshotDocs
+    .map((rsvpDoc) => {
+      const value = rsvpDoc.data() as Record<string, unknown>;
+      const status: RsvpStatus =
+        value.status === "yes" || value.status === "maybe" || value.status === "no"
+          ? value.status
+          : "unknown";
+      return {
+        uid: rsvpDoc.id,
+        displayName:
+          typeof value.displayNameSnapshot === "string" ? value.displayNameSnapshot : rsvpDoc.id,
+        status,
+      };
+    })
+    .sort((left, right) => left.displayName.localeCompare(right.displayName, "ja"));
 
 const compareSessions = (left: SessionDoc, right: SessionDoc): number => {
   if (left.order !== right.order) {
@@ -107,9 +132,19 @@ export const subscribeScheduleDays = (
         const dayEntries = await Promise.all(
           snapshot.docs.map(async (dayDoc) => {
             const sessionsSnapshot = await getDocs(collection(db!, "scheduleDays", dayDoc.id, "sessions"));
-            const sessions = sessionsSnapshot.docs
-              .map((sessionDoc) => toSessionDoc(sessionDoc.id, sessionDoc.data() as Record<string, unknown>))
-              .sort(compareSessions);
+            const sessions = (
+              await Promise.all(
+                sessionsSnapshot.docs.map(async (sessionDoc) => {
+                  const rsvpsSnapshot = await getDocs(
+                    collection(db!, "scheduleDays", dayDoc.id, "sessions", sessionDoc.id, "rsvps"),
+                  );
+                  return {
+                    ...toSessionDoc(sessionDoc.id, sessionDoc.data() as Record<string, unknown>),
+                    demoRsvps: toDemoRsvps(rsvpsSnapshot.docs),
+                  };
+                }),
+              )
+            ).sort(compareSessions);
             const dayValue = dayDoc.data() as Record<string, unknown>;
             const day: ScheduleDayDoc = {
               defaultLocation:

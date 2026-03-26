@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { BirthdayCelebrationModal } from "../components/BirthdayCelebrationModal";
 import { getBirthdayCelebrants } from "../members/birthday";
@@ -24,6 +24,7 @@ import { makeSessionRelatedId, sortTodosOpenFirst } from "../utils/todoUtils";
 type CalendarPageProps = {
   data: DemoData;
   canManageSessions: boolean;
+  ensureDayLog: (date: string) => Promise<void>;
 };
 
 type EditableSessionType = "normal" | "self" | "event";
@@ -50,6 +51,7 @@ type SessionFormState = {
   location: string;
   assigneeFamilyId: string;
   note: string;
+  mainInstructorPlanned: "" | "true" | "false";
 };
 
 type FieldErrors = Partial<Record<keyof SessionFormState, string>>;
@@ -102,6 +104,29 @@ const resolveFamilyIdFromSnapshot = (families: FamilyRecord[], snapshot?: string
   const familyName = toFamilyName(snapshot);
   if (!familyName || familyName === "-") return "";
   return families.find((family) => toFamilyName(family.name) === familyName)?.id ?? "";
+};
+
+const resolveLegacyMainInstructorPlanned = (session: SessionDoc): boolean | null => {
+  if (typeof session.mainInstructorPlanned === "boolean") {
+    return session.mainInstructorPlanned;
+  }
+  const plannedInstructors = session.plannedInstructors ?? [];
+  if (plannedInstructors.includes("井野") || plannedInstructors.includes("井野先生")) {
+    return true;
+  }
+  return null;
+};
+
+const toMainInstructorPlanField = (value: boolean | null): "" | "true" | "false" => {
+  if (value === true) return "true";
+  if (value === false) return "false";
+  return "";
+};
+
+const fromMainInstructorPlanField = (value: "" | "true" | "false"): boolean | null => {
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return null;
 };
 
 const toMonthKey = (dateKey: string): string => dateKey.slice(0, 7);
@@ -200,6 +225,7 @@ const emptySessionForm = (date: string): SessionFormState => ({
   location: "",
   assigneeFamilyId: "",
   note: "",
+  mainInstructorPlanned: "",
 });
 
 const buildCreateSessionForm = (date: string, sessions: SessionDoc[]): SessionFormState => {
@@ -236,6 +262,7 @@ const toSessionForm = (date: string, session: SessionDoc, families: FamilyRecord
   assigneeFamilyId:
     session.assigneeFamilyId ?? resolveFamilyIdFromSnapshot(families, session.assigneeNameSnapshot),
   note: session.note ?? "",
+  mainInstructorPlanned: toMainInstructorPlanField(resolveLegacyMainInstructorPlanned(session)),
 });
 
 const validateSessionForm = (form: SessionFormState): FieldErrors => {
@@ -272,7 +299,7 @@ const getNextValidEndTime = (startTime: string, currentEndTime?: string): string
 const getSessionDisplayTitle = (session: SessionDoc): string =>
   session.type === "event" && session.eventName?.trim() ? session.eventName.trim() : typeLabel[session.type];
 
-export function CalendarPage({ data, canManageSessions }: CalendarPageProps) {
+export function CalendarPage({ data, canManageSessions, ensureDayLog }: CalendarPageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedDay, setSelectedDay] = useState<DaySelection | null>(null);
   const [dialog, setDialog] = useState<CalendarDialog | null>(null);
@@ -285,6 +312,7 @@ export function CalendarPage({ data, canManageSessions }: CalendarPageProps) {
   const [isSubmittingSession, setIsSubmittingSession] = useState(false);
   const [families, setFamilies] = useState<FamilyRecord[]>([]);
   const [members, setMembers] = useState<MemberRecord[]>([]);
+  const monthPickerRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
   const today = todayDateKey();
   const queryDate = searchParams.get("date") ?? "";
@@ -294,6 +322,8 @@ export function CalendarPage({ data, canManageSessions }: CalendarPageProps) {
   const derivedYm = validDate ? toMonthKey(validDate) : "";
   const monthKey = derivedYm || (isValidMonthKey(queryYm) ? queryYm : toMonthKey(today));
   const selectedDate = validDate && toMonthKey(validDate) === monthKey ? validDate : "";
+  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const [monthPickerYear, setMonthPickerYear] = useState<number>(() => Number(monthKey.slice(0, 4)));
   const calendarCells = useMemo(() => buildMonthCells(monthKey), [monthKey]);
 
   const familyOptions = useMemo(
@@ -334,6 +364,32 @@ export function CalendarPage({ data, canManageSessions }: CalendarPageProps) {
 
   useEffect(() => subscribeFamilies(setFamilies), []);
   useEffect(() => subscribeMembers(setMembers), []);
+  useEffect(() => {
+    setMonthPickerYear(Number(monthKey.slice(0, 4)));
+  }, [monthKey]);
+
+  useEffect(() => {
+    if (!isMonthPickerOpen) return undefined;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!monthPickerRef.current?.contains(event.target as Node)) {
+        setIsMonthPickerOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsMonthPickerOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMonthPickerOpen]);
 
   useEffect(() => {
     const next = new URLSearchParams();
@@ -438,6 +494,16 @@ export function CalendarPage({ data, canManageSessions }: CalendarPageProps) {
     syncSearchParams(toMonthKey(today), today);
   };
 
+  const toggleMonthPicker = () => {
+    setMonthPickerYear(Number(monthKey.slice(0, 4)));
+    setIsMonthPickerOpen((current) => !current);
+  };
+
+  const selectMonth = (month: number) => {
+    syncSearchParams(`${monthPickerYear}-${String(month).padStart(2, "0")}`);
+    setIsMonthPickerOpen(false);
+  };
+
   const openDay = (date: string, sessions: SessionDoc[]) => {
     syncSearchParams(monthKey, date);
     setSelectedDay({ date, sessions: sortSessions(sessions) });
@@ -450,6 +516,12 @@ export function CalendarPage({ data, canManageSessions }: CalendarPageProps) {
       return;
     }
     navigate(`/today?date=${selectedDay.date}`);
+  };
+
+  const openDayLogFromSheet = async () => {
+    if (!selectedDay || selectedDay.sessions.length === 0) return;
+    await ensureDayLog(selectedDay.date);
+    navigate(`/logs/${selectedDay.date}`);
   };
 
   const closeSheet = () => {
@@ -531,6 +603,7 @@ export function CalendarPage({ data, canManageSessions }: CalendarPageProps) {
         location: sessionForm.location,
         assigneeFamilyId: sessionForm.assigneeFamilyId,
         note: sessionForm.note,
+        mainInstructorPlanned: fromMainInstructorPlanField(sessionForm.mainInstructorPlanned),
       };
 
       if (sessionForm.sessionId) {
@@ -571,17 +644,66 @@ export function CalendarPage({ data, canManageSessions }: CalendarPageProps) {
             Todayへ
           </button>
         </div>
-        <div className="month-calendar-header-center">
-          <h1>カレンダー</h1>
+        <div className="month-calendar-header-center" ref={monthPickerRef}>
+          <div className="month-calendar-nav">
+            <button type="button" className="button button-small button-secondary" onClick={goPrevMonth}>
+              ← 前月
+            </button>
+            <button
+              type="button"
+              className="month-calendar-month-button"
+              onClick={toggleMonthPicker}
+              aria-haspopup="dialog"
+              aria-expanded={isMonthPickerOpen}
+              aria-label={`${monthLabel(monthKey)} を選択`}
+            >
+              <strong>{monthLabel(monthKey)}</strong>
+            </button>
+            <button type="button" className="button button-small button-secondary" onClick={goNextMonth}>
+              翌月 →
+            </button>
+          </div>
+          {isMonthPickerOpen && (
+            <div className="month-picker-popover" role="dialog" aria-label="年月選択">
+              <div className="month-picker-header">
+                <button
+                  type="button"
+                  className="month-picker-year-button"
+                  onClick={() => setMonthPickerYear((current) => current - 1)}
+                  aria-label="前年"
+                >
+                  ←
+                </button>
+                <strong>{monthPickerYear}年</strong>
+                <button
+                  type="button"
+                  className="month-picker-year-button"
+                  onClick={() => setMonthPickerYear((current) => current + 1)}
+                  aria-label="翌年"
+                >
+                  →
+                </button>
+              </div>
+              <div className="month-picker-grid">
+                {Array.from({ length: 12 }, (_, index) => {
+                  const month = index + 1;
+                  const pickerMonthKey = `${monthPickerYear}-${String(month).padStart(2, "0")}`;
+                  return (
+                    <button
+                      key={pickerMonthKey}
+                      type="button"
+                      className={`month-picker-month-button ${pickerMonthKey === monthKey ? "current" : ""}`}
+                      onClick={() => selectMonth(month)}
+                    >
+                      {month}月
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
-        <div className="month-calendar-header-right month-calendar-nav">
-          <button type="button" className="button button-small button-secondary" onClick={goPrevMonth}>
-            ← 前月
-          </button>
-          <strong>{monthLabel(monthKey)}</strong>
-          <button type="button" className="button button-small button-secondary" onClick={goNextMonth}>
-            翌月 →
-          </button>
+        <div className="month-calendar-header-right">
           <button type="button" className="button button-small button-secondary" onClick={goToday}>
             今日
           </button>
@@ -675,13 +797,15 @@ export function CalendarPage({ data, canManageSessions }: CalendarPageProps) {
                 <button type="button" className="button button-small" onClick={goToTodayFromSheet}>
                   Todayへ
                 </button>
-                <button
-                  type="button"
-                  className="button button-small button-secondary"
-                  onClick={() => navigate(`/logs/${selectedDay.date}`)}
-                >
-                  日誌へ
-                </button>
+                {selectedDay.sessions.length > 0 && (
+                  <button
+                    type="button"
+                    className="button button-small button-secondary"
+                    onClick={() => void openDayLogFromSheet()}
+                  >
+                    日誌へ
+                  </button>
+                )}
                 {canManageSessions && (
                   <button
                     type="button"
@@ -912,6 +1036,23 @@ export function CalendarPage({ data, canManageSessions }: CalendarPageProps) {
                   ))}
                 </datalist>
               )}
+            </label>
+
+            <label>
+              講師予定
+              <select
+                value={sessionForm.mainInstructorPlanned}
+                onChange={(event) =>
+                  handleSessionFieldChange(
+                    "mainInstructorPlanned",
+                    event.target.value as SessionFormState["mainInstructorPlanned"],
+                  )
+                }
+              >
+                <option value="">未設定</option>
+                <option value="true">来る</option>
+                <option value="false">来ない</option>
+              </select>
             </label>
 
             <label>

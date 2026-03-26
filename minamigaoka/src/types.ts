@@ -51,6 +51,7 @@ export type SessionDoc = {
   assignees: string[];
   assigneeNameSnapshot?: string;
   note?: string;
+  mainInstructorPlanned?: boolean | null;
   plannedInstructors?: string[];
   plannedSeniors?: string[];
   // demo-only: 本番想定の subcollection(rsvps/{uid}) の代替として画面表示に使う

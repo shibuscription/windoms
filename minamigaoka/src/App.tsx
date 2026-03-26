@@ -1,9 +1,10 @@
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { HomePage } from "./pages/HomePage";
 import { TodayPage } from "./pages/TodayPage";
 import { CalendarPage } from "./pages/CalendarPage";
 import { LogPage } from "./pages/LogPage";
+import { LogsListPage } from "./pages/LogsListPage";
 import { ActivityPlanPage } from "./pages/ActivityPlanPage";
 import { AttendancePage } from "./pages/AttendancePage";
 import { WatchPage } from "./pages/WatchPage";
@@ -39,7 +40,7 @@ import type {
   Score,
   Todo,
 } from "./types";
-import { formatDateYmd, formatWeekdayJa, isValidDateKey, todayDateKey, weekdayTone } from "./utils/date";
+import { formatDateYmd, formatTimeNoLeadingZero, formatWeekdayJa, todayDateKey, weekdayTone } from "./utils/date";
 import { resolveTodoRelatedSummary, sortTodos } from "./utils/todoUtils";
 import {
   getActivityPlanTargetMonthKey,
@@ -63,7 +64,14 @@ import {
   type ModuleVisibilitySettings,
 } from "./modules/menuVisibility";
 import { subscribeModuleVisibilitySettings } from "./modules/moduleVisibilityService";
+import {
+  ensureDayLog as ensureFirestoreDayLog,
+  saveDayLog as saveFirestoreDayLog,
+  saveSessionRsvps as saveFirestoreSessionRsvps,
+  subscribeDayLogs,
+} from "./journal/service";
 import { subscribeScheduleDays } from "./schedule/service";
+import { saveScore as saveFirestoreScore, subscribeScores } from "./scores/service";
 
 type MenuItem = {
   id: ModuleMenuId;
@@ -98,10 +106,29 @@ const toMenuRole = (role: MemberRole | "parent" | "admin"): DemoMenuRole => {
 const viewIsActive = (location: { pathname: string; search: string }, view: string) =>
   location.pathname === "/today" && new URLSearchParams(location.search).get("view") === view;
 
-const resolveLunchDate = (location: { pathname: string; search: string }, fallback: string): string => {
-  if (location.pathname !== "/today") return fallback;
-  const date = new URLSearchParams(location.search).get("date");
-  return date && isValidDateKey(date) ? date : fallback;
+const toFamilyName = (value?: string): string => {
+  const name = (value ?? "").trim();
+  if (!name || name === "-") return "";
+  if (name.includes(" ")) return name.split(" ")[0] || "";
+  if (name.includes("　")) return name.split("　")[0] || "";
+  return name.endsWith("家") ? name.slice(0, -1) : name;
+};
+
+const formatShortDateWithWeekday = (dateKey: string): string => {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  const weekday = date.toLocaleDateString("ja-JP", { weekday: "short" });
+  return `${month}/${String(day).padStart(2, "0")}(${weekday})`;
+};
+
+const isParentHeaderTarget = (
+  member: MemberRecord | null,
+  authRole?: AuthenticatedUser["role"],
+): boolean => {
+  if (member) {
+    return member.memberTypes.includes("parent") || member.role === "parent" || member.role === "officer";
+  }
+  return authRole === "parent" || authRole === "admin";
 };
 
 const resolvePageLabel = (pathname: string, search: string): string | null => {
@@ -116,7 +143,7 @@ const resolvePageLabel = (pathname: string, search: string): string | null => {
     return "Today";
   }
   if (pathname === "/calendar") return "カレンダー";
-  if (pathname.startsWith("/logs/")) return "当番日誌";
+  if (pathname === "/logs" || pathname.startsWith("/logs/")) return "当番日誌";
   if (pathname === "/todos") return "TODO";
   if (pathname === "/events" || pathname.startsWith("/events/")) return "イベント";
   if (pathname === "/activity-plan" || pathname === "/shift-survey") return "シフト作成";
@@ -135,7 +162,6 @@ const resolvePageLabel = (pathname: string, search: string): string | null => {
 };
 
 const menuSections = (
-  today: string,
   activityPlanBadgeText: string | undefined,
   role: DemoMenuRole,
   linkedMember: MemberRecord | null,
@@ -166,9 +192,9 @@ const menuSections = (
           id: "duty-log",
           label: "当番日誌",
           icon: "📝",
-          to: `/logs/${today}`,
+          to: "/logs",
           allowedRoles: ["parent", "admin"],
-          isActive: (location) => location.pathname.startsWith("/logs/"),
+          isActive: (location) => location.pathname === "/logs" || location.pathname.startsWith("/logs/"),
         },
         {
           id: "practice-log",
@@ -355,6 +381,7 @@ export function App() {
   const [data, setData] = useState<DemoData>(() => ({
     ...loadInitialData(),
     scheduleDays: {},
+    dayLogs: {},
   }));
   const [authUser, setAuthUser] = useState<AuthenticatedUser | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
@@ -363,6 +390,8 @@ export function App() {
   const [moduleVisibilitySettings, setModuleVisibilitySettings] = useState<ModuleVisibilitySettings>(() =>
     sanitizeModuleVisibilitySettings(undefined),
   );
+  const [isScoresLoading, setIsScoresLoading] = useState(true);
+  const [scoresLoadError, setScoresLoadError] = useState("");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [activeStatusPanel, setActiveStatusPanel] = useState<"notice" | "todo" | null>(
@@ -396,8 +425,8 @@ export function App() {
   const hasShiftSurveyTodo = isAdmin && activityPlanStatus === "SURVEY_OPEN" && unansweredCount > 0;
   const shiftSurveyPath = `/shift-survey?month=${activityPlanMonthKey}`;
   const visibleMenuSections = useMemo(
-    () => menuSections(today, activityPlanBadgeText, currentRole, linkedMember, moduleVisibilitySettings),
-    [today, activityPlanBadgeText, currentRole, linkedMember, moduleVisibilitySettings],
+    () => menuSections(activityPlanBadgeText, currentRole, linkedMember, moduleVisibilitySettings),
+    [activityPlanBadgeText, currentRole, linkedMember, moduleVisibilitySettings],
   );
 
   useEffect(() => subscribeModuleVisibilitySettings(setModuleVisibilitySettings), []);
@@ -497,6 +526,83 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (!hasFirebaseAppConfig) {
+      setData((prev) => ({
+        ...prev,
+        dayLogs: {},
+      }));
+      return undefined;
+    }
+
+    try {
+      return subscribeDayLogs(
+        (dayLogs) => {
+          setData((prev) => ({
+            ...prev,
+            dayLogs,
+          }));
+        },
+        () => {
+          setData((prev) => ({
+            ...prev,
+            dayLogs: {},
+          }));
+        },
+      );
+    } catch {
+      setData((prev) => ({
+        ...prev,
+        dayLogs: {},
+      }));
+      return undefined;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hasFirebaseAppConfig) {
+      setData((prev) => ({
+        ...prev,
+        scores: [],
+      }));
+      setIsScoresLoading(false);
+      setScoresLoadError("Firebase 設定が未完了のため、楽譜データを読み込めません。");
+      return undefined;
+    }
+
+    setIsScoresLoading(true);
+    setScoresLoadError("");
+
+    try {
+      return subscribeScores(
+        (scores) => {
+          setData((prev) => ({
+            ...prev,
+            scores,
+          }));
+          setIsScoresLoading(false);
+          setScoresLoadError("");
+        },
+        () => {
+          setData((prev) => ({
+            ...prev,
+            scores: [],
+          }));
+          setIsScoresLoading(false);
+          setScoresLoadError("楽譜データの読み込みに失敗しました。");
+        },
+      );
+    } catch {
+      setData((prev) => ({
+        ...prev,
+        scores: [],
+      }));
+      setIsScoresLoading(false);
+      setScoresLoadError("楽譜データの読み込みに失敗しました。");
+      return undefined;
+    }
+  }, []);
+
+  useEffect(() => {
     if (!isMenuOpen && !activeStatusPanel) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setIsMenuOpen(false);
@@ -554,71 +660,129 @@ export function App() {
   const historyNotifications = notifications.filter(
     (item) => item.read || item.type === "info",
   );
-  const nextDuty = {
-    label: "次の当番:",
-    date: "2/21(土)",
-    time: "9:00-12:00",
-  };
-  const lunchDate = resolveLunchDate(location, today);
-  const lunchPath = `/lunch?date=${lunchDate}`;
+  const showNextDuty = isParentHeaderTarget(linkedMember, authUser?.role);
+  const nextDutySession = useMemo(() => {
+    if (!showNextDuty) return null;
+    const familyId = linkedMember?.familyId?.trim() ?? "";
+    const familyName = toFamilyName(linkedMember?.familyName || linkedMember?.name || "");
+    if (!familyId && !familyName) return null;
+
+    return Object.entries(data.scheduleDays)
+      .filter(([dateKey]) => dateKey >= today)
+      .sort(([leftDate], [rightDate]) => leftDate.localeCompare(rightDate))
+      .flatMap(([dateKey, day]) =>
+        (day.sessions ?? [])
+          .filter((session) => {
+            if (session.dutyRequirement !== "duty") return false;
+            if (familyId && session.assigneeFamilyId === familyId) return true;
+            return familyName !== "" && toFamilyName(session.assigneeNameSnapshot) === familyName;
+          })
+          .map((session) => ({ dateKey, session })),
+      )
+      .sort((left, right) => {
+        if (left.dateKey !== right.dateKey) return left.dateKey.localeCompare(right.dateKey);
+        if (left.session.order !== right.session.order) return left.session.order - right.session.order;
+        return left.session.startTime.localeCompare(right.session.startTime);
+      })[0] ?? null;
+  }, [data.scheduleDays, linkedMember, showNextDuty, today]);
+  const nextDuty = useMemo(() => {
+    if (!showNextDuty) return null;
+    if (!nextDutySession) {
+      return {
+        label: "次の当番:",
+        date: "-",
+        time: "",
+      };
+    }
+    return {
+      label: "次の当番:",
+      date: formatShortDateWithWeekday(nextDutySession.dateKey),
+      time: `${formatTimeNoLeadingZero(nextDutySession.session.startTime)}-${formatTimeNoLeadingZero(nextDutySession.session.endTime)}`,
+    };
+  }, [nextDutySession, showNextDuty]);
+  const showLunchIcon = useMemo(() => {
+    if (!nextDutySession) return false;
+    const tone = weekdayTone(nextDutySession.dateKey);
+    return (tone === "sat" || tone === "sun") && nextDutySession.session.startTime >= "12:00";
+  }, [nextDutySession]);
+  const lunchPath = "/lunch";
   const usesWidePageLayout = location.pathname === "/settings/modules";
+
+  const updateDayLog = useCallback((date: string, updater: (prev: DayLog) => DayLog) => {
+    setData((prev) => {
+      const current = prev.dayLogs[date] ?? {
+        notes: "",
+        weather: "",
+        activities: [],
+        actualInstructors: [],
+        actualSeniors: [],
+        mainInstructorAttendance: {},
+        dutyStamps: {},
+      };
+      return {
+        ...prev,
+        dayLogs: {
+          ...prev.dayLogs,
+          [date]: updater(current),
+        },
+      };
+    });
+  }, []);
+
+  const saveDayLog = useCallback((date: string, dayLog: DayLog) => saveFirestoreDayLog(date, dayLog), []);
+
+  const ensureDayLog = useCallback((date: string) => ensureFirestoreDayLog(date), []);
+
+  const updateSessionRsvps = useCallback((date: string, sessionOrder: number, rsvps: DemoRsvp[]) => {
+    setData((prev) => {
+      const day = prev.scheduleDays[date];
+      if (!day) return prev;
+      return {
+        ...prev,
+        scheduleDays: {
+          ...prev.scheduleDays,
+          [date]: {
+            ...day,
+            sessions: day.sessions.map((session) =>
+              session.order === sessionOrder ? { ...session, demoRsvps: rsvps } : session,
+            ),
+          },
+        },
+      };
+    });
+  }, []);
+
+  const saveSessionRsvps = useCallback(
+    (date: string, sessionId: string, rsvps: DemoRsvp[]) =>
+      saveFirestoreSessionRsvps(date, sessionId, rsvps),
+    [],
+  );
+
+  const updateDemoDictionaries = useCallback((next: Partial<DemoData["demoDictionaries"]>) => {
+    setData((prev) => ({
+      ...prev,
+      demoDictionaries: {
+        instructors: Array.from(
+          new Set([...(prev.demoDictionaries.instructors ?? []), ...(next.instructors ?? [])]),
+        ),
+        seniors: Array.from(
+          new Set([...(prev.demoDictionaries.seniors ?? []), ...(next.seniors ?? [])]),
+        ),
+      },
+    }));
+  }, []);
 
   const context = useMemo(
     () => ({
       data,
-      updateDayLog: (date: string, updater: (prev: DayLog) => DayLog) => {
-        setData((prev) => {
-          const current = prev.dayLogs[date] ?? {
-            notes: "",
-            weather: "",
-            activities: [],
-            actualInstructors: [],
-            actualSeniors: [],
-            mainInstructorAttendance: {},
-            dutyStamps: {},
-          };
-          return {
-            ...prev,
-            dayLogs: {
-              ...prev.dayLogs,
-              [date]: updater(current),
-            },
-          };
-        });
-      },
-      updateSessionRsvps: (date: string, sessionOrder: number, rsvps: DemoRsvp[]) => {
-        setData((prev) => {
-          const day = prev.scheduleDays[date];
-          if (!day) return prev;
-          return {
-            ...prev,
-            scheduleDays: {
-              ...prev.scheduleDays,
-              [date]: {
-                ...day,
-                sessions: day.sessions.map((session) =>
-                  session.order === sessionOrder ? { ...session, demoRsvps: rsvps } : session,
-                ),
-              },
-            },
-          };
-        });
-      },
-      updateDemoDictionaries: (next: Partial<DemoData["demoDictionaries"]>) => {
-        setData((prev) => ({
-          ...prev,
-          demoDictionaries: {
-            instructors: Array.from(
-              new Set([...(prev.demoDictionaries.instructors ?? []), ...(next.instructors ?? [])]),
-            ),
-            seniors: Array.from(
-              new Set([...(prev.demoDictionaries.seniors ?? []), ...(next.seniors ?? [])]),
-            ),
-          },
-        }));
-      },
+      updateDayLog,
+      saveDayLog,
+      ensureDayLog,
+      updateSessionRsvps,
+      saveSessionRsvps,
+      updateDemoDictionaries,
     }),
-    [data],
+    [data, ensureDayLog, saveDayLog, saveSessionRsvps, updateDayLog, updateDemoDictionaries, updateSessionRsvps],
   );
 
   const updateTodos = (updater: (prev: Todo[]) => Todo[]) => {
@@ -719,21 +883,25 @@ export function App() {
           </picture>
         </Link>
         <div className="header-actions">
-          <div className="next-duty" aria-label={`${nextDuty.label} ${nextDuty.date} ${nextDuty.time}`}>
-            <span className="next-duty-label">{nextDuty.label}</span>
-            <span className="next-duty-date">{nextDuty.date}</span>
-            <span className="next-duty-time">{nextDuty.time}</span>
-          </div>
-          <button
-            type="button"
-            className="status-icon-button"
-            aria-label="お弁当"
-            onClick={() => navigate(lunchPath)}
-          >
-            <span className="status-icon-emoji" aria-hidden="true">
-              🍱
-            </span>
-          </button>
+          {nextDuty && (
+            <div className="next-duty" aria-label={`${nextDuty.label} ${nextDuty.date} ${nextDuty.time}`.trim()}>
+              <span className="next-duty-label">{nextDuty.label}</span>
+              <span className="next-duty-date">{nextDuty.date}</span>
+              {nextDuty.time ? <span className="next-duty-time">{nextDuty.time}</span> : null}
+            </div>
+          )}
+          {showLunchIcon && (
+            <button
+              type="button"
+              className="status-icon-button"
+              aria-label="お弁当"
+              onClick={() => navigate(lunchPath)}
+            >
+              <span className="status-icon-emoji" aria-hidden="true">
+                🍱
+              </span>
+            </button>
+          )}
           {statusButtons.map((item) => {
             const isActive = activeStatusPanel === item.id;
             return (
@@ -775,22 +943,27 @@ export function App() {
           <Route
             path="/today"
             element={
-              <TodayPage
-                data={context.data}
-                updateDayLog={context.updateDayLog}
-                currentUid={currentUid}
-                updateTodos={updateTodos}
-              />
+                <TodayPage
+                  data={context.data}
+                  ensureDayLog={context.ensureDayLog}
+                  currentUid={currentUid}
+                  updateTodos={updateTodos}
+                />
             }
           />
           <Route
             path="/calendar"
             element={
-              <CalendarPage
-                data={context.data}
-                canManageSessions={canManageCalendarSessions}
-              />
+                <CalendarPage
+                  data={context.data}
+                  canManageSessions={canManageCalendarSessions}
+                  ensureDayLog={context.ensureDayLog}
+                />
             }
+          />
+          <Route
+            path="/logs"
+            element={<LogsListPage data={context.data} ensureDayLog={context.ensureDayLog} />}
           />
           <Route
             path="/activity-plan"
@@ -861,7 +1034,10 @@ export function App() {
               <ScorePage
                 data={data}
                 updateScores={updateScores}
+                saveScore={saveFirestoreScore}
                 isAdmin={isAdmin}
+                isLoading={isScoresLoading}
+                loadError={scoresLoadError}
               />
             }
           />
@@ -889,8 +1065,14 @@ export function App() {
               <LogPage
                 data={context.data}
                 updateDayLog={context.updateDayLog}
+                saveDayLog={context.saveDayLog}
+                ensureDayLog={context.ensureDayLog}
                 updateSessionRsvps={context.updateSessionRsvps}
+                saveSessionRsvps={context.saveSessionRsvps}
                 updateDemoDictionaries={context.updateDemoDictionaries}
+                isScoresLoading={isScoresLoading}
+                scoresLoadError={scoresLoadError}
+                linkedMember={linkedMember}
               />
             }
           />

@@ -53,6 +53,12 @@ const generateTemporaryPassword = (): string => {
 const normalizeOptionalString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
+const normalizeOptionalBoolean = (value: unknown): boolean | null => {
+  if (value === true) return true;
+  if (value === false) return false;
+  return null;
+};
+
 const toFamilyDisplayName = (familyName: string): string => {
   const value = familyName.trim();
   if (!value) return "";
@@ -150,6 +156,7 @@ type CalendarSessionPayload = {
   assigneeFamilyId: string;
   assigneeNameSnapshot: string;
   note: string;
+  mainInstructorPlanned: boolean | null;
 };
 
 const parseCalendarSessionPayload = (
@@ -169,6 +176,7 @@ const parseCalendarSessionPayload = (
   const assigneeFamilyId = normalizeOptionalString(data.assigneeFamilyId);
   const assigneeNameSnapshot = normalizeOptionalString(data.assigneeNameSnapshot);
   const note = normalizeOptionalString(data.note);
+  const mainInstructorPlanned = normalizeOptionalBoolean(data.mainInstructorPlanned);
 
   assertCalendarDateKey(date);
   if (mode !== "create") {
@@ -203,6 +211,7 @@ const parseCalendarSessionPayload = (
     assigneeFamilyId,
     assigneeNameSnapshot,
     note,
+    mainInstructorPlanned,
   };
 };
 
@@ -673,6 +682,7 @@ export const createCalendarSession = onCall(async (request) => {
     assignees: [],
     assigneeNameSnapshot,
     note: payload.note,
+    mainInstructorPlanned: payload.mainInstructorPlanned,
     updatedAt: new Date(),
   });
 
@@ -722,6 +732,7 @@ export const updateCalendarSession = onCall(async (request) => {
     assigneeFamilyId: payload.assigneeFamilyId,
     assigneeNameSnapshot,
     note: payload.note,
+    mainInstructorPlanned: payload.mainInstructorPlanned,
     updatedAt: new Date(),
   };
 

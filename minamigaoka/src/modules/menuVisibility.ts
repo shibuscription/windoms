@@ -27,6 +27,7 @@ export type ModuleMenuId =
 export type ModuleSectionId = "activity" | "accounting" | "assets" | "settings";
 
 export type ModuleVisibilityRule = {
+  isPublic: boolean;
   memberTypes: MemberType[];
   adminRoles: AdminRole[];
   staffPermissions: StaffPermission[];
@@ -97,6 +98,7 @@ const buildDefaultRule = (definition: MenuModuleDefinition): ModuleVisibilityRul
   }
 
   return {
+    isPublic: true,
     memberTypes: Array.from(new Set(memberTypes)),
     adminRoles: Array.from(new Set(adminRoles)),
     staffPermissions: [],
@@ -130,6 +132,7 @@ export const sanitizeModuleVisibilitySettings = (value: unknown): ModuleVisibili
     if (rawRule && typeof rawRule === "object") {
       const rule = rawRule as Record<string, unknown>;
       result[definition.id] = {
+        isPublic: typeof rule.isPublic === "boolean" ? rule.isPublic : true,
         memberTypes: normalizeMemberTypes(rule.memberTypes),
         adminRoles: normalizeAdminRoles(rule.adminRoles),
         staffPermissions: normalizeStaffPermissions(rule.staffPermissions),
@@ -149,9 +152,10 @@ export const canAccessModuleBySettings = (
 ): boolean => {
   const definition = menuModuleDefinitions.find((item) => item.id === moduleId);
   if (!definition) return false;
+  const isAdminUser = member?.role === "admin" || member?.adminRole === "admin" || fallbackRole === "admin";
 
   if (definition.lockedToAdmin) {
-    return member?.role === "admin" || member?.adminRole === "admin" || fallbackRole === "admin";
+    return isAdminUser;
   }
 
   if (!definition.allowedRoles.includes(fallbackRole)) {
@@ -159,6 +163,10 @@ export const canAccessModuleBySettings = (
   }
 
   const rule = settings[moduleId] ?? defaultModuleVisibilitySettings[moduleId];
+  if (!rule.isPublic) {
+    return isAdminUser;
+  }
+
   if (!member) {
     return true;
   }
