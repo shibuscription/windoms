@@ -1068,6 +1068,12 @@ body {
   background: #eef6ff;
 }
 
+.event-card:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+  border-color: #60a5fa;
+}
+
 .event-card-top {
   display: flex;
   align-items: center;
@@ -1089,6 +1095,7 @@ body {
 .event-card-main {
   display: block;
   margin-top: 2px;
+  min-height: 100%;
 }
 
 .event-kind {
@@ -1197,16 +1204,6 @@ body {
 .event-card {
   position: relative;
   padding-top: 10px;
-}
-
-.event-card-main-button {
-  border: 0;
-  background: transparent;
-  padding: 0;
-  text-align: left;
-  cursor: pointer;
-  display: grid;
-  gap: 4px;
 }
 
 .event-card-actions {

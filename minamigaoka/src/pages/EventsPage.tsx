@@ -240,12 +240,14 @@ export function EventsPage({
   };
 
   const openCreateModal = () => {
+    if (!isManager) return;
     setEditingEventId("__new__");
     setFormDraft(createInitialDraft());
     setFormErrors({});
   };
 
   const openEditModal = (event: EventRecord) => {
+    if (!isManager) return;
     setEditingEventId(event.id);
     setFormDraft({
       title: event.title,
@@ -270,6 +272,7 @@ export function EventsPage({
   };
 
   const saveEventDraft = async () => {
+    if (!isManager) return;
     const errors = validateForm();
     setFormErrors(errors);
     if (errors.title || errors.eventSortDate) return;
@@ -303,7 +306,7 @@ export function EventsPage({
   };
 
   const toggleEventState = async () => {
-    if (!selectedEvent) return;
+    if (!isManager || !selectedEvent) return;
     try {
       await saveEvent({
         ...selectedEvent,
@@ -315,7 +318,7 @@ export function EventsPage({
   };
 
   const confirmDelete = async () => {
-    if (!deleteTargetEvent) return;
+    if (!isManager || !deleteTargetEvent) return;
     try {
       await deleteEvent(deleteTargetEvent.id);
       if (selectedEvent?.id === deleteTargetEvent.id) {
@@ -329,7 +332,7 @@ export function EventsPage({
   };
 
   const bindSessionToEvent = async (sessionId: string) => {
-    if (!selectedEvent) return;
+    if (!isManager || !selectedEvent) return;
     const mergedSessionIds = Array.from(new Set([...linkedSessions.map((session) => session.id), sessionId]));
     try {
       await saveEvent({
@@ -344,7 +347,7 @@ export function EventsPage({
     };
 
   const confirmUnlinkSession = async () => {
-    if (!selectedEvent || !unlinkTargetSession) return;
+    if (!isManager || !selectedEvent || !unlinkTargetSession) return;
     const nextSessionIds = linkedSessions
       .filter((session) => session.id !== unlinkTargetSession.id)
       .map((session) => session.id);
@@ -397,8 +400,20 @@ export function EventsPage({
 
       <div className="events-list">
         {visibleEvents.map((item) => (
-          <article key={item.id} className="event-card">
-            <button type="button" className="event-card-main-button" onClick={() => navigate(`/events/${item.id}`)}>
+          <article
+            key={item.id}
+            className="event-card"
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate(`/events/${item.id}`)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                navigate(`/events/${item.id}`);
+              }
+            }}
+          >
+            <div className="event-card-main">
               <div className="event-card-top">
                 <span className="event-date">{toDateLabel(item.eventSortDate)}</span>
                 <span className="event-card-badges">
@@ -406,10 +421,8 @@ export function EventsPage({
                   <span className="event-kind">{item.kind}</span>
                 </span>
               </div>
-              <div className="event-card-main">
-                <strong>{item.title}</strong>
-              </div>
-            </button>
+              <strong>{item.title}</strong>
+            </div>
             {isManager && (
               <div className="event-card-actions">
                 <button
@@ -420,6 +433,7 @@ export function EventsPage({
                     event.stopPropagation();
                     openEditModal(item);
                   }}
+                  onKeyDown={(event) => event.stopPropagation()}
                 >
                   ✏️
                 </button>
@@ -431,6 +445,7 @@ export function EventsPage({
                     event.stopPropagation();
                     setDeleteTargetId(item.id);
                   }}
+                  onKeyDown={(event) => event.stopPropagation()}
                 >
                   🗑️
                 </button>
@@ -499,13 +514,15 @@ export function EventsPage({
               <button type="button" className="button button-small button-secondary" onClick={() => navigate("/todos")}>
                 TODOページへ
               </button>
-              <button
-                type="button"
-                className={`button button-small ${selectedEvent.state === "done" ? "events-reopen-button" : "events-complete-button"}`}
-                onClick={() => void toggleEventState()}
-              >
-                {selectedEvent.state === "done" ? "進行中に戻す" : "完了にする"}
-              </button>
+              {isManager && (
+                <button
+                  type="button"
+                  className={`button button-small ${selectedEvent.state === "done" ? "events-reopen-button" : "events-complete-button"}`}
+                  onClick={() => void toggleEventState()}
+                >
+                  {selectedEvent.state === "done" ? "進行中に戻す" : "完了にする"}
+                </button>
+              )}
             </div>
           </section>
         </div>
