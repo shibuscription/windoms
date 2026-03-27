@@ -104,7 +104,6 @@ export function MemberDirectoryPage() {
   return (
     <section className="card members-page">
       <h1>メンバー</h1>
-      <p className="muted">クラブ内の人を見るための画面です。設定や認証の管理機能は含みません。</p>
       {pageError && <p className="field-error">{pageError}</p>}
       {isLoading && <p className="muted">読み込み中...</p>}
 

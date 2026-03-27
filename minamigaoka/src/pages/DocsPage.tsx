@@ -128,8 +128,6 @@ export function DocsListPage({ isAdmin }: DocsListPageProps) {
           </button>
         )}
       </div>
-      <p className="muted">Dropbox等の実体資料は外部管理。ここでは要点メモを管理します。</p>
-
       <section className="docs-filters">
         <label className="docs-filter-field">
           検索

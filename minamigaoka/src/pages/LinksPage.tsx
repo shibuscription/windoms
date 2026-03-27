@@ -212,7 +212,6 @@ export function LinksPage({ menuRole }: LinksPageProps) {
           </button>
         )}
       </div>
-      <p className="muted">外部サービスへの導線です。</p>
       {feedback && <p className="links-feedback">{feedback}</p>}
       {isLoading && <p className="muted">リンク集を読み込み中です。</p>}
       {!isLoading && loadError && <p className="field-error">{loadError}</p>}

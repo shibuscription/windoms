@@ -137,7 +137,6 @@ export function LogsListPage({ data, ensureDayLog }: LogsListPageProps) {
       <div className="logs-list-header">
         <div>
           <h1>当番日誌</h1>
-          <p className="muted">セッションがある日だけを表示します。未作成の日もここからそのまま開けます。</p>
         </div>
       </div>
 
