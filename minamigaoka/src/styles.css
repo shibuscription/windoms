@@ -3586,12 +3586,19 @@ body {
   gap: 8px;
 }
 
+.calendar-day-sheet-event-link-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
 .session-event-detail-link {
   flex: 0 0 auto;
   color: #2563eb;
   font-size: 0.8rem;
   text-decoration: none;
   white-space: nowrap;
+  padding: 4px 0;
 }
 
 .session-event-detail-link:hover,

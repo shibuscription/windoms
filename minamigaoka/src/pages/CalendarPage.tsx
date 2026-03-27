@@ -873,18 +873,7 @@ export function CalendarPage({ data, canManageSessions, ensureDayLog }: Calendar
                           {formatTimeNoLeadingZero(session.startTime)}-{formatTimeNoLeadingZero(session.endTime)}
                         </p>
                         {session.type === "event" && session.eventName?.trim() && (
-                          <div className="calendar-day-sheet-meta calendar-day-sheet-event-row">
-                            <span>{session.eventName}</span>
-                            {session.id && eventIdBySessionId.get(session.id) && (
-                              <Link
-                                to={`/events/${eventIdBySessionId.get(session.id)}`}
-                                className="session-event-detail-link"
-                                onClick={(event) => event.stopPropagation()}
-                              >
-                                イベント詳細
-                              </Link>
-                            )}
-                          </div>
+                          <p className="calendar-day-sheet-meta">{session.eventName}</p>
                         )}
                       <p className="calendar-day-sheet-label kv-row">
                         <span className="kv-key">{assigneeRoleLabel(session)}:</span>
@@ -902,11 +891,11 @@ export function CalendarPage({ data, canManageSessions, ensureDayLog }: Calendar
                           <span className="kv-val">{session.note}</span>
                         </p>
                       )}
-                      <p className="calendar-day-sheet-meta kv-row">
-                        <span className="kv-key">出欠:</span>
-                        <span className="kv-val">
-                          <button
-                            type="button"
+                        <p className="calendar-day-sheet-meta kv-row">
+                          <span className="kv-key">出欠:</span>
+                          <span className="kv-val">
+                            <button
+                              type="button"
                             className="attendance-trigger"
                             onClick={() => setAttendanceSession(session)}
                           >
@@ -914,9 +903,20 @@ export function CalendarPage({ data, canManageSessions, ensureDayLog }: Calendar
                             <span className="count-maybe">△{counts.maybe}</span>
                             <span className="count-no">×{counts.no}</span>
                             <span className="count-unknown">ー{counts.unknown}</span>
-                          </button>
-                        </span>
-                      </p>
+                            </button>
+                          </span>
+                        </p>
+                        {session.id && eventIdBySessionId.get(session.id) && (
+                          <div className="calendar-day-sheet-event-link-row">
+                            <Link
+                              to={`/events/${eventIdBySessionId.get(session.id)}`}
+                              className="session-event-detail-link"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              イベント詳細
+                            </Link>
+                          </div>
+                        )}
                     </div>
                   </article>
                 );
