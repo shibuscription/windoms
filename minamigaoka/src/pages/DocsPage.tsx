@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import type { DemoData, DocCategory, DocMemo } from "../types";
+import { createDocMemo, deleteDocMemo, saveDocMemo, subscribeDocs } from "../docs/service";
+import type { DocCategory, DocMemo } from "../types";
 import { renderMarkdownToHtml } from "../utils/markdown";
 
 const DOC_CATEGORIES: DocCategory[] = [
@@ -13,12 +14,7 @@ const DOC_CATEGORIES: DocCategory[] = [
   "その他",
 ];
 
-type DocsPageProps = {
-  data: DemoData;
-  updateDocs: (updater: (prev: DocMemo[]) => DocMemo[]) => void;
-};
-
-type DocsEditorProps = DocsPageProps & {
+type DocsEditorProps = {
   mode: "new" | "edit";
 };
 
@@ -62,11 +58,41 @@ const parseTags = (value: string): string[] =>
     ),
   );
 
-export function DocsListPage({ data }: DocsPageProps) {
+const useDocsCollection = () => {
+  const [docs, setDocs] = useState<DocMemo[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+
+  useEffect(() => {
+    try {
+      return subscribeDocs(
+        (items) => {
+          setDocs(items);
+          setIsLoading(false);
+          setLoadError("");
+        },
+        (error) => {
+          setDocs([]);
+          setIsLoading(false);
+          setLoadError(error.message || "資料データの読み込みに失敗しました。");
+        },
+      );
+    } catch (error) {
+      setDocs([]);
+      setIsLoading(false);
+      setLoadError(error instanceof Error ? error.message : "資料データの読み込みに失敗しました。");
+      return undefined;
+    }
+  }, []);
+
+  return { docs, isLoading, loadError };
+};
+
+export function DocsListPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
-  const docs = data.docs ?? [];
+  const { docs, isLoading, loadError } = useDocsCollection();
 
   const filteredDocs = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -115,54 +141,94 @@ export function DocsListPage({ data }: DocsPageProps) {
         </label>
       </section>
 
+      {isLoading && <p className="muted">資料を読み込み中です。</p>}
+      {!isLoading && loadError && <p className="field-error">{loadError}</p>}
+
       <div className="docs-list">
-        {filteredDocs.map((doc) => (
-          <button
-            key={doc.id}
-            type="button"
-            className="docs-card"
-            onClick={() => navigate(`/docs/${doc.id}`)}
-          >
-            <div className="docs-card-top">
-              <strong>{doc.title}</strong>
-              {doc.pinned && <span className="docs-pin">PIN</span>}
-            </div>
-            <p className="docs-card-meta">
-              <span>{doc.category ?? "カテゴリ未設定"}</span>
-              <span>更新: {formatDateTime(doc.updatedAt)}</span>
-            </p>
-            {doc.tags && doc.tags.length > 0 && (
-              <div className="docs-tags">
-                {doc.tags.map((tag) => (
-                  <span key={tag} className="docs-tag">
-                    #{tag}
-                  </span>
-                ))}
+        {!isLoading &&
+          !loadError &&
+          filteredDocs.map((doc) => (
+            <button
+              key={doc.id}
+              type="button"
+              className="docs-card"
+              onClick={() => navigate(`/docs/${doc.id}`)}
+            >
+              <div className="docs-card-top">
+                <strong>{doc.title}</strong>
+                {doc.pinned && <span className="docs-pin">PIN</span>}
               </div>
-            )}
-          </button>
-        ))}
-        {filteredDocs.length === 0 && <p className="muted">該当するメモはありません。</p>}
+              <p className="docs-card-meta">
+                <span>{doc.category ?? "カテゴリ未設定"}</span>
+                <span>更新: {formatDateTime(doc.updatedAt)}</span>
+              </p>
+              {doc.tags && doc.tags.length > 0 && (
+                <div className="docs-tags">
+                  {doc.tags.map((tag) => (
+                    <span key={tag} className="docs-tag">
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </button>
+          ))}
+        {!isLoading && !loadError && filteredDocs.length === 0 && (
+          <p className="muted">該当するメモはありません。</p>
+        )}
       </div>
     </section>
   );
 }
 
-export function DocsEditorPage({ data, updateDocs, mode }: DocsEditorProps) {
+export function DocsEditorPage({ mode }: DocsEditorProps) {
   const navigate = useNavigate();
   const { id } = useParams();
-  const source = mode === "edit" ? data.docs.find((item) => item.id === id) : null;
-  const [title, setTitle] = useState(source?.title ?? "");
-  const [body, setBody] = useState(source?.body ?? "");
-  const [category, setCategory] = useState<DocCategory | "">((source?.category as DocCategory) ?? "");
-  const [tagsInput, setTagsInput] = useState(source?.tags?.join(", ") ?? "");
-  const [pinned, setPinned] = useState(Boolean(source?.pinned));
+  const { docs, isLoading, loadError } = useDocsCollection();
+  const source = mode === "edit" ? docs.find((item) => item.id === id) ?? null : null;
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [category, setCategory] = useState<DocCategory | "">("");
+  const [tagsInput, setTagsInput] = useState("");
+  const [pinned, setPinned] = useState(false);
   const [isPreview, setIsPreview] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [errors, setErrors] = useState<{ title?: string; body?: string }>({});
+
+  useEffect(() => {
+    if (!source) return;
+    setTitle(source.title);
+    setBody(source.body);
+    setCategory((source.category as DocCategory) ?? "");
+    setTagsInput(source.tags?.join(", ") ?? "");
+    setPinned(Boolean(source.pinned));
+  }, [source]);
+
   const handleCancel = () => {
     navigate(-1);
   };
+
+  if (mode === "edit" && isLoading) {
+    return (
+      <section className="card docs-page">
+        <h1>資料</h1>
+        <p className="muted">資料を読み込み中です。</p>
+      </section>
+    );
+  }
+
+  if (mode === "edit" && loadError) {
+    return (
+      <section className="card docs-page">
+        <h1>資料</h1>
+        <p className="field-error">{loadError}</p>
+        <button type="button" className="button" onClick={() => navigate("/docs")}>
+          一覧へ戻る
+        </button>
+      </section>
+    );
+  }
 
   if (mode === "edit" && !source) {
     return (
@@ -176,8 +242,9 @@ export function DocsEditorPage({ data, updateDocs, mode }: DocsEditorProps) {
     );
   }
 
-  const save = () => {
+  const save = async () => {
     setIsSaving(true);
+    setSaveError("");
     const nextErrors: { title?: string; body?: string } = {};
     if (!title.trim()) nextErrors.title = "タイトルは必須です";
     if (!body.trim()) nextErrors.body = "本文は必須です";
@@ -187,22 +254,33 @@ export function DocsEditorPage({ data, updateDocs, mode }: DocsEditorProps) {
       return;
     }
 
-    const nextId = mode === "edit" ? source!.id : `doc-${Date.now()}`;
-    const now = new Date().toISOString();
-    const nextDoc: DocMemo = {
-      id: nextId,
-      title: title.trim(),
-      body,
-      category: category || undefined,
-      tags: parseTags(tagsInput),
-      pinned,
-      updatedAt: now,
-    };
+    try {
+      if (mode === "edit" && source) {
+        await saveDocMemo({
+          ...source,
+          title: title.trim(),
+          body,
+          category: category || undefined,
+          tags: parseTags(tagsInput),
+          pinned,
+        });
+        navigate(`/docs/${source.id}`);
+        return;
+      }
 
-    updateDocs((prev) =>
-      mode === "edit" ? prev.map((item) => (item.id === nextId ? nextDoc : item)) : [nextDoc, ...prev],
-    );
-    navigate(`/docs/${nextId}`);
+      const nextId = await createDocMemo({
+        title: title.trim(),
+        body,
+        category: category || undefined,
+        tags: parseTags(tagsInput),
+        pinned,
+      });
+      navigate(`/docs/${nextId}`);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "保存に失敗しました。");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -296,6 +374,8 @@ export function DocsEditorPage({ data, updateDocs, mode }: DocsEditorProps) {
         </label>
       )}
 
+      {saveError && <p className="field-error">{saveError}</p>}
+
       <div className="modal-actions">
         <button
           type="button"
@@ -305,7 +385,7 @@ export function DocsEditorPage({ data, updateDocs, mode }: DocsEditorProps) {
         >
           キャンセル
         </button>
-        <button type="button" className="button" onClick={save} disabled={isSaving}>
+        <button type="button" className="button" onClick={() => void save()} disabled={isSaving}>
           {isSaving ? "保存中..." : "保存"}
         </button>
       </div>
@@ -313,10 +393,35 @@ export function DocsEditorPage({ data, updateDocs, mode }: DocsEditorProps) {
   );
 }
 
-export function DocsDetailPage({ data }: DocsPageProps) {
+export function DocsDetailPage() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const doc = data.docs.find((item) => item.id === id);
+  const { docs, isLoading, loadError } = useDocsCollection();
+  const doc = docs.find((item) => item.id === id);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  if (isLoading) {
+    return (
+      <section className="card docs-page">
+        <h1>資料</h1>
+        <p className="muted">資料を読み込み中です。</p>
+      </section>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <section className="card docs-page">
+        <h1>資料</h1>
+        <p className="field-error">{loadError}</p>
+        <button type="button" className="button" onClick={() => navigate("/docs")}>
+          一覧へ戻る
+        </button>
+      </section>
+    );
+  }
 
   if (!doc) {
     return (
@@ -329,6 +434,18 @@ export function DocsDetailPage({ data }: DocsPageProps) {
       </section>
     );
   }
+
+  const confirmDelete = async () => {
+    setIsDeleting(true);
+    setDeleteError("");
+    try {
+      await deleteDocMemo(doc.id);
+      navigate("/docs");
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : "削除に失敗しました。");
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <section className="card docs-page">
@@ -359,7 +476,31 @@ export function DocsDetailPage({ data }: DocsPageProps) {
         <button type="button" className="button" onClick={() => navigate(`/docs/${doc.id}/edit`)}>
           編集
         </button>
+        <button type="button" className="button button-secondary" onClick={() => setIsDeleteOpen(true)}>
+          削除
+        </button>
       </div>
+
+      {isDeleteOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal-panel">
+            <button className="modal-close" type="button" onClick={() => setIsDeleteOpen(false)} aria-label="閉じる" title="閉じる">
+              ×
+            </button>
+            <h3>資料を削除しますか？</h3>
+            <p className="modal-summary">{doc.title}</p>
+            {deleteError && <p className="field-error">{deleteError}</p>}
+            <div className="modal-actions">
+              <button type="button" className="button button-secondary" onClick={() => setIsDeleteOpen(false)} disabled={isDeleting}>
+                キャンセル
+              </button>
+              <button type="button" className="button" onClick={() => void confirmDelete()} disabled={isDeleting}>
+                {isDeleting ? "削除中..." : "削除"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

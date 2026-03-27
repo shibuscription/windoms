@@ -30,7 +30,6 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import type {
   DayLog,
   DemoData,
-  DocMemo,
   DemoRsvp,
   EventRecord,
   Instrument,
@@ -883,13 +882,6 @@ export function App() {
 
   const deleteEvent = useCallback((eventId: string) => deleteFirestoreEvent(eventId), []);
 
-  const updateDocs = (updater: (prev: DocMemo[]) => DocMemo[]) => {
-    setData((prev) => ({
-      ...prev,
-      docs: updater(prev.docs),
-    }));
-  };
-
   const updatePurchaseRequests = (updater: (prev: PurchaseRequest[]) => PurchaseRequest[]) => {
     setData((prev) => ({
       ...prev,
@@ -1117,10 +1109,10 @@ export function App() {
               />
             }
           />
-          <Route path="/docs" element={<DocsListPage data={data} updateDocs={updateDocs} />} />
-          <Route path="/docs/new" element={<DocsEditorPage data={data} updateDocs={updateDocs} mode="new" />} />
-          <Route path="/docs/:id" element={<DocsDetailPage data={data} updateDocs={updateDocs} />} />
-          <Route path="/docs/:id/edit" element={<DocsEditorPage data={data} updateDocs={updateDocs} mode="edit" />} />
+          <Route path="/docs" element={<DocsListPage />} />
+          <Route path="/docs/new" element={<DocsEditorPage mode="new" />} />
+          <Route path="/docs/:id" element={<DocsDetailPage />} />
+          <Route path="/docs/:id/edit" element={<DocsEditorPage mode="edit" />} />
           <Route
             path="/purchases"
             element={

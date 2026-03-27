@@ -1,31 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createLinkItem, deleteLinkItem, saveLinkItem, subscribeLinks } from "../links/service";
+import type { ExternalLinkItem, LinkRole, LinkType } from "../types";
 
 type DemoMenuRole = "child" | "parent" | "admin";
-type LinkType = "photo" | "sns" | "admin";
-type LinkRole = "all" | "officer";
-
-type ExternalLinkItem = {
-  id: string;
-  title: string;
-  url: string;
-  type: LinkType;
-  role: LinkRole;
-  ogTitle?: string;
-  ogImageUrl?: string;
-  faviconUrl?: string;
-  host?: string;
-};
-
-const linkItems: ExternalLinkItem[] = [
-  { id: "photo-google", title: "Googleフォト", url: "https://photos.app.goo.gl/afyMZUo7YKrSaNHo9", type: "photo", role: "all" },
-  { id: "sns-mamabrass-poppo", title: "ママブラス ぽっぽ（Instagram）", url: "https://www.instagram.com/mamabrass_poppo", type: "sns", role: "all" },
-  { id: "sns-tono-wind", title: "東濃ウインドオーケストラ（Instagram）", url: "https://www.instagram.com/to_no_wind", type: "sns", role: "all" },
-  { id: "sns-tokisho", title: "岐阜県立土岐商業高等学校吹奏楽団（Instagram）", url: "https://www.instagram.com/tokisho_w.e", type: "sns", role: "all" },
-  { id: "sns-x-tajimi", title: "多治見高校吹奏楽部（X）", url: "https://x.com/tajimibrass", type: "sns", role: "all" },
-  { id: "sns-gifu-fed", title: "岐阜県吹奏楽連盟", url: "https://www.ajba.or.jp/gifu/", type: "sns", role: "all" },
-  { id: "admin-facility", title: "多治見市公共施設予約システム", url: "https://www2.pf489.com/tajimi/webR/", type: "admin", role: "officer" },
-  { id: "admin-spoan", title: "スポあんネット", url: "https://www.spokyo.jp/", type: "admin", role: "officer" },
-];
 
 const iconForType: Record<LinkType, string> = {
   photo: "🖼️",
@@ -59,28 +36,53 @@ type LinksPageProps = {
 };
 
 export function LinksPage({ menuRole }: LinksPageProps) {
-  const role = menuRole;
-  const isOfficer = role === "admin";
-  const [items, setItems] = useState<ExternalLinkItem[]>(linkItems);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const isOfficer = menuRole === "admin";
+  const [items, setItems] = useState<ExternalLinkItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [editingId, setEditingId] = useState<string | "__new__" | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [form, setForm] = useState<LinkFormDraft>({
     title: "",
     url: "",
     type: "sns",
-    role: "all"
+    role: "all",
   });
   const [errors, setErrors] = useState<LinkFormErrors>({});
 
+  useEffect(() => {
+    try {
+      return subscribeLinks(
+        (nextItems) => {
+          setItems(nextItems);
+          setIsLoading(false);
+          setLoadError("");
+        },
+        (error) => {
+          setItems([]);
+          setIsLoading(false);
+          setLoadError(error.message || "リンク集の読み込みに失敗しました。");
+        },
+      );
+    } catch (error) {
+      setItems([]);
+      setIsLoading(false);
+      setLoadError(error instanceof Error ? error.message : "リンク集の読み込みに失敗しました。");
+      return undefined;
+    }
+  }, []);
+
   const visible = useMemo(
     () => items.filter((item) => item.role === "all" || isOfficer),
-    [items, isOfficer]
+    [items, isOfficer],
   );
   const officerLinks = visible.filter((item) => item.role === "officer");
   const sharedLinks = visible.filter((item) => item.role === "all");
 
-  const editingItem = editingId ? items.find((item) => item.id === editingId) ?? null : null;
+  const editingItem = editingId && editingId !== "__new__" ? items.find((item) => item.id === editingId) ?? null : null;
   const deleteTarget = deleteTargetId ? items.find((item) => item.id === deleteTargetId) ?? null : null;
   const isEditMode = Boolean(editingItem);
 
@@ -93,6 +95,7 @@ export function LinksPage({ menuRole }: LinksPageProps) {
     setEditingId("__new__");
     setForm({ title: "", url: "", type: "sns", role: "all" });
     setErrors({});
+    setSubmitError("");
   };
 
   const openEdit = (item: ExternalLinkItem) => {
@@ -101,14 +104,17 @@ export function LinksPage({ menuRole }: LinksPageProps) {
       title: item.title,
       url: item.url,
       type: item.type,
-      role: item.role
+      role: item.role,
     });
     setErrors({});
+    setSubmitError("");
   };
 
   const closeEditor = () => {
     setEditingId(null);
     setErrors({});
+    setSubmitError("");
+    setIsSubmitting(false);
   };
 
   const validateForm = (): LinkFormErrors => {
@@ -123,47 +129,50 @@ export function LinksPage({ menuRole }: LinksPageProps) {
     return next;
   };
 
-  const submitEditor = () => {
+  const submitEditor = async () => {
     const nextErrors = validateForm();
     setErrors(nextErrors);
+    setSubmitError("");
     if (nextErrors.title || nextErrors.url) return;
 
-    if (isEditMode && editingItem) {
-      setItems((current) =>
-        current.map((item) =>
-          item.id === editingItem.id
-            ? {
-                ...item,
-                title: form.title.trim(),
-                url: form.url.trim(),
-                type: form.type,
-                role: form.role
-              }
-            : item
-        )
-      );
-      closeEditor();
-      showFeedback("リンクを更新しました");
-      return;
-    }
+    setIsSubmitting(true);
+    try {
+      if (isEditMode && editingItem) {
+        await saveLinkItem({
+          ...editingItem,
+          title: form.title.trim(),
+          url: form.url.trim(),
+          type: form.type,
+          role: form.role,
+        });
+        closeEditor();
+        showFeedback("リンクを更新しました");
+        return;
+      }
 
-    const nextItem: ExternalLinkItem = {
-      id: `custom-${Date.now()}`,
-      title: form.title.trim(),
-      url: form.url.trim(),
-      type: form.type,
-      role: form.role
-    };
-    setItems((current) => [nextItem, ...current]);
-    closeEditor();
-    showFeedback("追加しました");
+      await createLinkItem({
+        title: form.title.trim(),
+        url: form.url.trim(),
+        type: form.type,
+        role: form.role,
+      });
+      closeEditor();
+      showFeedback("追加しました");
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "リンクの保存に失敗しました。");
+      setIsSubmitting(false);
+    }
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!deleteTarget) return;
-    setItems((current) => current.filter((item) => item.id !== deleteTarget.id));
-    setDeleteTargetId(null);
-    showFeedback("リンクを削除しました");
+    try {
+      await deleteLinkItem(deleteTarget.id);
+      setDeleteTargetId(null);
+      showFeedback("リンクを削除しました");
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "リンクの削除に失敗しました。");
+    }
   };
 
   const renderLinkCard = (item: ExternalLinkItem, officerCard = false) => (
@@ -201,17 +210,27 @@ export function LinksPage({ menuRole }: LinksPageProps) {
       </div>
       <p className="muted">外部サービスへの導線です。</p>
       {feedback && <p className="links-feedback">{feedback}</p>}
+      {isLoading && <p className="muted">リンク集を読み込み中です。</p>}
+      {!isLoading && loadError && <p className="field-error">{loadError}</p>}
 
-      <div className="links-list">
-        {sharedLinks.map((item) => renderLinkCard(item))}
-      </div>
-
-      {officerLinks.length > 0 && (
+      {!isLoading && !loadError && (
         <>
-          <h2 className="links-officer-heading">役員専用</h2>
           <div className="links-list">
-            {officerLinks.map((item) => renderLinkCard(item, true))}
+            {sharedLinks.map((item) => renderLinkCard(item))}
           </div>
+
+          {officerLinks.length > 0 && (
+            <>
+              <h2 className="links-officer-heading">役員専用</h2>
+              <div className="links-list">
+                {officerLinks.map((item) => renderLinkCard(item, true))}
+              </div>
+            </>
+          )}
+
+          {sharedLinks.length === 0 && officerLinks.length === 0 && (
+            <p className="muted">表示できるリンクはありません。seed 実行後に再度確認してください。</p>
+          )}
         </>
       )}
 
@@ -263,10 +282,11 @@ export function LinksPage({ menuRole }: LinksPageProps) {
                 <option value="officer">officer</option>
               </select>
             </label>
+            {submitError && <p className="field-error">{submitError}</p>}
             <div className="modal-actions">
-              <button type="button" className="button button-secondary" onClick={closeEditor}>キャンセル</button>
-              <button type="button" className="button" onClick={submitEditor}>
-                {isEditMode ? "保存" : "追加"}
+              <button type="button" className="button button-secondary" onClick={closeEditor} disabled={isSubmitting}>キャンセル</button>
+              <button type="button" className="button" onClick={() => void submitEditor()} disabled={isSubmitting}>
+                {isSubmitting ? "保存中..." : isEditMode ? "保存" : "追加"}
               </button>
             </div>
           </div>
@@ -279,11 +299,12 @@ export function LinksPage({ menuRole }: LinksPageProps) {
             <button className="modal-close" type="button" onClick={() => setDeleteTargetId(null)} aria-label="閉じる" title="閉じる">×</button>
             <h3>リンクを削除しますか？</h3>
             <p className="modal-summary">{deleteTarget.title}</p>
+            {submitError && <p className="field-error">{submitError}</p>}
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={() => setDeleteTargetId(null)}>
                 キャンセル
               </button>
-              <button type="button" className="button" onClick={confirmDelete}>
+              <button type="button" className="button" onClick={() => void confirmDelete()}>
                 削除
               </button>
             </div>

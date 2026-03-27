@@ -260,6 +260,22 @@ export type DocMemo = {
   updatedAt: string;
 };
 
+export type LinkType = "photo" | "sns" | "admin";
+
+export type LinkRole = "all" | "officer";
+
+export type ExternalLinkItem = {
+  id: string;
+  title: string;
+  url: string;
+  type: LinkType;
+  role: LinkRole;
+  ogTitle?: string;
+  ogImageUrl?: string;
+  faviconUrl?: string;
+  host?: string;
+};
+
 export type DemoData = {
   scheduleDays: Record<string, ScheduleDayDoc>;
   dayLogs: Record<string, DayLog>;
