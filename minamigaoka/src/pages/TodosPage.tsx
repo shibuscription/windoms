@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { DemoData, RelatedType, Todo } from "../types";
+import type { MemberRecord } from "../members/types";
+import { subscribeMembers } from "../members/service";
+import { sortMembersForDisplay } from "../members/permissions";
 import {
   buildSessionChoices,
   parseSessionRelatedId,
   resolveTodoRelatedSummary,
   sortTodos,
 } from "../utils/todoUtils";
-import { toDemoFamilyName } from "../utils/demoName";
+import { todayDateKey } from "../utils/date";
 
 type TodosPageProps = {
   data: DemoData;
@@ -67,9 +70,11 @@ const applyDraft = (source: Todo, draft: TodoDraft): Todo => ({
 
 export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }: TodosPageProps) {
   const navigate = useNavigate();
+  const today = todayDateKey();
   const [isMobileFilterMode, setIsMobileFilterMode] = useState<boolean>(() =>
     window.matchMedia("(max-width: 760px)").matches,
   );
+  const [members, setMembers] = useState<MemberRecord[]>([]);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("open");
   const [assigneeFilter, setAssigneeFilter] = useState<AssigneeFilter>("all");
@@ -85,19 +90,40 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
 
   const userOptions = useMemo(
     () =>
-      Object.values(data.users)
-        .map((user) => ({ uid: user.uid, name: toDemoFamilyName(user.displayName, user.uid) }))
-        .sort((a, b) => a.name.localeCompare(b.name, "ja")),
-    [data.users],
+      sortMembersForDisplay(members, "all")
+        .map((member) => ({
+          uid: member.authUid || member.id,
+          name: member.displayName || member.name || member.id,
+        }))
+        .filter((member) => member.uid !== currentUid),
+    [currentUid, members],
   );
   const eventOptions = useMemo(
-    () =>
-      [...data.events]
+    () => {
+      const futureEventTitles = new Set(
+        Object.entries(data.scheduleDays)
+          .filter(([dateKey]) => dateKey >= today)
+          .flatMap(([, day]) =>
+            day.sessions
+              .filter((session) => session.type === "event" && session.eventName?.trim())
+              .map((session) => session.eventName!.trim()),
+          ),
+      );
+      return [...data.events]
+        .filter((event) => futureEventTitles.has(event.title))
         .map((event) => ({ id: event.id, label: event.title }))
-        .sort((a, b) => a.label.localeCompare(b.label, "ja")),
-    [data.events],
+        .sort((a, b) => a.label.localeCompare(b.label, "ja"));
+    },
+    [data.events, data.scheduleDays, today],
   );
-  const sessionOptions = useMemo(() => buildSessionChoices(data), [data]);
+  const sessionOptions = useMemo(
+    () =>
+      buildSessionChoices(data).filter((option) => {
+        const parsed = parseSessionRelatedId(option.id);
+        return parsed ? parsed.dateKey >= today : false;
+      }),
+    [data, today],
+  );
   const filterActiveCount =
     (statusFilter !== "open" ? 1 : 0) +
     (assigneeFilter !== "all" ? 1 : 0) +
@@ -112,10 +138,12 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
     return () => mq.removeEventListener("change", sync);
   }, []);
 
+  useEffect(() => subscribeMembers(setMembers), []);
+
   const validateDraft = (draft: TodoDraft): TodoFormErrors => {
     const errors: TodoFormErrors = {};
     if (!draft.title.trim()) errors.title = "タイトルは必須です";
-    if (draft.relatedType !== "none" && !draft.relatedId) errors.relatedId = "紐づきを選択してください";
+    if (draft.relatedType !== "none" && !draft.relatedId) errors.relatedId = "紐付け先を選択してください";
     return errors;
   };
 
@@ -142,7 +170,8 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
 
   const userNameByUid = (uid: string | null): string => {
     if (!uid) return "未アサイン";
-    return toDemoFamilyName(data.users[uid]?.displayName ?? uid, uid);
+    const member = members.find((item) => (item.authUid || item.id) === uid);
+    return member?.displayName || member?.name || uid;
   };
 
   const updateDraftRelationType = (
@@ -322,7 +351,7 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
               </select>
             </label>
             <label>
-              紐づき
+              紐付け
               <select value={relatedFilter} onChange={(event) => setRelatedFilter(event.target.value as RelatedFilter)}>
                 <option value="all">すべて</option>
                 <option value="session">予定</option>
@@ -351,7 +380,7 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
       </section>
 
       {editingId && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setEditingId(null)}>
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="modal-panel todos-edit-modal" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setEditingId(null)}>
               ×
@@ -395,7 +424,7 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
                 </select>
               </label>
               <label>
-                紐づき種別
+                紐付け種別
                 <select value={editDraft.relatedType} onChange={(event) => updateDraftRelationType(setEditDraft, event.target.value as RelatedInputType)}>
                   <option value="none">なし</option>
                   <option value="session">予定</option>
@@ -405,7 +434,7 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
             </div>
             {editDraft.relatedType !== "none" && (
               <label>
-                紐づき先
+                紐付け先
                 <select value={editDraft.relatedId} onChange={(event) => setEditDraft((prev) => ({ ...prev, relatedId: event.target.value }))}>
                   <option value="">選択してください</option>
                   {(editDraft.relatedType === "session" ? sessionOptions : eventOptions).map((option) => (
@@ -430,7 +459,7 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
       )}
 
       {isAddModalOpen && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setIsAddModalOpen(false)}>
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="modal-panel todos-edit-modal" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsAddModalOpen(false)}>
               ×
@@ -471,7 +500,7 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
             </div>
             <div className="field-grid">
               <label>
-                紐づき種別
+                紐付け種別
                 <select
                   value={createDraftState.relatedType}
                   onChange={(event) =>
@@ -485,7 +514,7 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
               </label>
               {createDraftState.relatedType !== "none" && (
                 <label>
-                  紐づき先
+                  紐付け先
                   <select
                     value={createDraftState.relatedId}
                     onChange={(event) =>
@@ -521,7 +550,7 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setRelatedDetailTodoId(null)}>
               ×
             </button>
-            <h3>紐づき先詳細</h3>
+            <h3>紐付け先詳細</h3>
             <p className="modal-context">{relatedDetailTodo.title}</p>
             {relatedDetail.type === "event" && (
               <>
