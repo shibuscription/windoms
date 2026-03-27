@@ -92,6 +92,7 @@ export type DayLog = {
 
 export type RelatedType = "event" | "session";
 export type TodoKind = "shared" | "private";
+export type TodoSharedScope = "parent" | "officer" | "child";
 
 export type RelatedRef = {
   type: RelatedType;
@@ -114,6 +115,7 @@ export type EventRecord = {
 export type Todo = {
   id: string;
   kind: TodoKind;
+  sharedScope?: TodoSharedScope;
   title: string;
   completed: boolean;
   createdAt: string;

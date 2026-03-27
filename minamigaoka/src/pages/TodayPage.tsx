@@ -15,12 +15,14 @@ import {
   todayDateKey,
   weekdayTone,
 } from "../utils/date";
-import { makeSessionRelatedId, sortTodosOpenFirst } from "../utils/todoUtils";
+import { canViewSharedTodo, makeSessionRelatedId, sortTodosOpenFirst } from "../utils/todoUtils";
 
 type TodayPageProps = {
   data: DemoData;
   ensureDayLog: (date: string) => Promise<void>;
   currentUid: string;
+  linkedMember: MemberRecord | null;
+  authRole?: "parent" | "admin" | null;
   saveTodo: (todo: Todo) => Promise<void>;
 };
 
@@ -113,7 +115,7 @@ const countAttendanceRows = (rows: AttendanceRow[]) => ({
 const getSessionDisplayTitle = (session: SessionDoc): string =>
   session.type === "event" && session.eventName?.trim() ? session.eventName.trim() : typeLabel[session.type];
 
-export function TodayPage({ data, ensureDayLog, currentUid, saveTodo }: TodayPageProps) {
+export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRole, saveTodo }: TodayPageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [selectedSession, setSelectedSession] = useState<SessionDoc | null>(null);
@@ -232,10 +234,14 @@ export function TodayPage({ data, ensureDayLog, currentUid, saveTodo }: TodayPag
     const relatedId = makeSessionRelatedId(date, selectedSession.order);
     return sortTodosOpenFirst(
       data.todos.filter(
-        (todo) => todo.kind === "shared" && todo.related?.type === "session" && todo.related.id === relatedId,
+        (todo) =>
+          todo.kind === "shared" &&
+          todo.related?.type === "session" &&
+          todo.related.id === relatedId &&
+          canViewSharedTodo(todo, linkedMember, authRole),
       ),
     );
-  }, [data.todos, date, selectedSession]);
+  }, [authRole, data.todos, date, linkedMember, selectedSession]);
   const birthdayCelebrants = useMemo(() => getBirthdayCelebrants(members, date), [date, members]);
 
   const hasSessions = sessions.length > 0;

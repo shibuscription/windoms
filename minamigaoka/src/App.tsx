@@ -41,7 +41,13 @@ import type {
   Todo,
 } from "./types";
 import { formatDateYmd, formatTimeNoLeadingZero, formatWeekdayJa, todayDateKey, weekdayTone } from "./utils/date";
-import { resolveTodoRelatedSummary, sortTodos } from "./utils/todoUtils";
+import {
+  canViewSharedTodo,
+  getVisibleSharedScopesForRole,
+  resolveTodoAudienceRole,
+  resolveTodoRelatedSummary,
+  sortTodos,
+} from "./utils/todoUtils";
 import {
   getActivityPlanTargetMonthKey,
   readActivityPlanStatus,
@@ -693,14 +699,30 @@ export function App() {
   }, [location.pathname, location.search]);
 
   const unreadNotificationCount = notifications.filter((item) => !item.read).length;
+  const selfTodoKeys = useMemo(
+    () =>
+      new Set(
+        [currentUid, linkedMember?.id, linkedMember?.authUid]
+          .filter((value): value is string => Boolean(value && value.trim()))
+          .map((value) => value.trim()),
+      ),
+    [currentUid, linkedMember],
+  );
+  const todoAudienceRole = resolveTodoAudienceRole(linkedMember, authUser?.role);
+  const canViewSharedTodos = getVisibleSharedScopesForRole(todoAudienceRole).length > 0;
   const sharedInboxTodos = useMemo(
     () =>
       sortTodos(
         data.todos.filter(
-          (todo) => todo.kind === "shared" && todo.assigneeUid === currentUid && !todo.completed,
+          (todo) =>
+            todo.kind === "shared" &&
+            !!todo.assigneeUid &&
+            selfTodoKeys.has(todo.assigneeUid) &&
+            !todo.completed &&
+            canViewSharedTodo(todo, linkedMember, authUser?.role),
         ),
       ),
-    [data.todos, currentUid],
+    [authUser?.role, data.todos, linkedMember, selfTodoKeys],
   );
   const privateInboxTodos = useMemo(
     () =>
@@ -1007,6 +1029,8 @@ export function App() {
                   data={context.data}
                   ensureDayLog={context.ensureDayLog}
                   currentUid={currentUid}
+                  linkedMember={linkedMember}
+                  authRole={authUser?.role ?? null}
                   saveTodo={saveTodo}
                 />
             }
@@ -1018,6 +1042,8 @@ export function App() {
                   data={context.data}
                   canManageSessions={canManageCalendarSessions}
                   ensureDayLog={context.ensureDayLog}
+                  linkedMember={linkedMember}
+                  authRole={authUser?.role ?? null}
                 />
             }
           />
@@ -1051,6 +1077,8 @@ export function App() {
               <EventsPage
                 data={data}
                 currentUid={currentUid}
+                linkedMember={linkedMember}
+                authRole={authUser?.role ?? null}
                 saveTodo={saveTodo}
                 createEvent={createEvent}
                 saveEvent={saveEvent}
@@ -1065,6 +1093,8 @@ export function App() {
               <EventsPage
                 data={data}
                 currentUid={currentUid}
+                linkedMember={linkedMember}
+                authRole={authUser?.role ?? null}
                 saveTodo={saveTodo}
                 createEvent={createEvent}
                 saveEvent={saveEvent}
@@ -1080,6 +1110,7 @@ export function App() {
                 data={data}
                 currentUid={currentUid}
                 linkedMember={linkedMember}
+                authRole={authUser?.role ?? null}
                 createTodo={createTodo}
                 saveTodo={saveTodo}
                 deleteTodo={deleteTodo}
@@ -1376,7 +1407,7 @@ export function App() {
                     {privateInboxTodos.length === 0 && <li>個人TODOはありません</li>}
                   </ul>
                 </div>
-                <div className="status-todo-section">
+                {canViewSharedTodos && <div className="status-todo-section">
                   <h3>共有TODO（自分担当）</h3>
                   <ul className="status-panel-list">
                     {sharedInboxTodos.map((item) => {
@@ -1431,7 +1462,7 @@ export function App() {
                       TODOページを開く
                     </button>
                   </div>
-                </div>
+                </div>}
                 {hasShiftSurveyTodo && (
                   <div className="status-todo-section">
                     <h3>アンケート</h3>

@@ -10,7 +10,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { db, hasFirebaseAppConfig } from "../config/firebase";
-import type { RelatedRef, Todo, TodoKind } from "../types";
+import type { RelatedRef, Todo, TodoKind, TodoSharedScope } from "../types";
 
 const todosCollection = db ? collection(db, "todos") : null;
 
@@ -32,10 +32,13 @@ const toRelatedRef = (value: unknown): RelatedRef | null => {
 };
 
 const toTodoKind = (value: unknown): TodoKind => (value === "private" ? "private" : "shared");
+const toTodoSharedScope = (value: unknown): TodoSharedScope | undefined =>
+  value === "parent" || value === "officer" || value === "child" ? value : undefined;
 
 const toTodo = (id: string, value: Record<string, unknown>): Todo => ({
   id,
   kind: toTodoKind(value.kind),
+  sharedScope: toTodoSharedScope(value.sharedScope),
   title: typeof value.title === "string" ? value.title : "",
   completed: value.completed === true,
   createdAt:
@@ -51,6 +54,7 @@ const toTodo = (id: string, value: Record<string, unknown>): Todo => ({
 
 const toPayload = (todo: Omit<Todo, "id">) => ({
   kind: todo.kind,
+  sharedScope: todo.kind === "shared" ? todo.sharedScope ?? null : null,
   title: todo.title.trim(),
   completed: todo.completed,
   createdAt: todo.createdAt,

@@ -19,12 +19,14 @@ import {
   isValidDateKey,
   todayDateKey,
 } from "../utils/date";
-import { makeSessionRelatedId, sortTodosOpenFirst } from "../utils/todoUtils";
+import { canViewSharedTodo, makeSessionRelatedId, sortTodosOpenFirst } from "../utils/todoUtils";
 
 type CalendarPageProps = {
   data: DemoData;
   canManageSessions: boolean;
   ensureDayLog: (date: string) => Promise<void>;
+  linkedMember: MemberRecord | null;
+  authRole?: "parent" | "admin" | null;
 };
 
 type EditableSessionType = "normal" | "self" | "event";
@@ -299,7 +301,13 @@ const getNextValidEndTime = (startTime: string, currentEndTime?: string): string
 const getSessionDisplayTitle = (session: SessionDoc): string =>
   session.type === "event" && session.eventName?.trim() ? session.eventName.trim() : typeLabel[session.type];
 
-export function CalendarPage({ data, canManageSessions, ensureDayLog }: CalendarPageProps) {
+export function CalendarPage({
+  data,
+  canManageSessions,
+  ensureDayLog,
+  linkedMember,
+  authRole,
+}: CalendarPageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedDay, setSelectedDay] = useState<DaySelection | null>(null);
   const [dialog, setDialog] = useState<CalendarDialog | null>(null);
@@ -469,10 +477,14 @@ export function CalendarPage({ data, canManageSessions, ensureDayLog }: Calendar
     const relatedId = makeSessionRelatedId(selectedDay.date, attendanceSession.order);
     return sortTodosOpenFirst(
       data.todos.filter(
-        (todo) => todo.kind === "shared" && todo.related?.type === "session" && todo.related.id === relatedId,
+        (todo) =>
+          todo.kind === "shared" &&
+          todo.related?.type === "session" &&
+          todo.related.id === relatedId &&
+          canViewSharedTodo(todo, linkedMember, authRole),
       ),
     );
-  }, [attendanceSession, data.todos, selectedDay]);
+  }, [attendanceSession, authRole, data.todos, linkedMember, selectedDay]);
   const birthdayCelebrants = useMemo(
     () => (birthdayModalDate ? getBirthdayCelebrants(members, birthdayModalDate) : []),
     [birthdayModalDate, members],

@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { DemoData, RelatedType, Todo, TodoKind } from "../types";
+import type { DemoData, RelatedType, Todo, TodoKind, TodoSharedScope } from "../types";
 import type { MemberRecord } from "../members/types";
 import { subscribeMembers } from "../members/service";
 import { sortMembersForDisplay } from "../members/permissions";
 import {
   buildSessionChoices,
+  canMemberBeAssignedToSharedScope,
+  canViewSharedTodo,
+  getCreatableSharedScopesForRole,
+  getTodoKindOptionsForRole,
   parseSessionRelatedId,
+  resolveTodoAudienceRole,
   resolveTodoRelatedSummary,
   sortTodos,
   sortTodosOpenFirst,
@@ -17,6 +22,7 @@ type TodosPageProps = {
   data: DemoData;
   currentUid: string;
   linkedMember: MemberRecord | null;
+  authRole?: "parent" | "admin" | null;
   createTodo: (todo: Omit<Todo, "id">) => Promise<void>;
   saveTodo: (todo: Todo) => Promise<void>;
   deleteTodo: (todoId: string) => Promise<void>;
@@ -31,6 +37,7 @@ type TodoFormErrors = { title?: string; relatedId?: string };
 
 type TodoDraft = {
   kind: TodoKind;
+  sharedScope: TodoSharedScope;
   title: string;
   completed: boolean;
   dueDate: string;
@@ -39,8 +46,15 @@ type TodoDraft = {
   relatedId: string;
 };
 
-const createDraft = (): TodoDraft => ({
-  kind: "shared",
+const sharedScopeLabels: Record<TodoSharedScope, string> = {
+  parent: "保護者",
+  officer: "役員",
+  child: "子ども",
+};
+
+const createDraft = (kind: TodoKind = "shared", sharedScope: TodoSharedScope = "parent"): TodoDraft => ({
+  kind,
+  sharedScope,
   title: "",
   completed: false,
   dueDate: "",
@@ -51,6 +65,7 @@ const createDraft = (): TodoDraft => ({
 
 const draftFromTodo = (todo: Todo): TodoDraft => ({
   kind: todo.kind,
+  sharedScope: todo.sharedScope ?? "parent",
   title: todo.title,
   completed: todo.completed,
   dueDate: todo.dueDate ?? "",
@@ -72,6 +87,7 @@ const normalizeDraftForKind = (draft: TodoDraft): TodoDraft =>
 const applyDraft = (source: Todo, draft: TodoDraft): Todo => ({
   ...source,
   kind: draft.kind,
+  sharedScope: draft.kind === "shared" ? draft.sharedScope : undefined,
   title: draft.title.trim(),
   completed: draft.completed,
   createdByUid: source.createdByUid ?? null,
@@ -90,6 +106,7 @@ export function TodosPage({
   data,
   currentUid,
   linkedMember,
+  authRole,
   createTodo,
   saveTodo,
   deleteTodo,
@@ -123,6 +140,21 @@ export function TodosPage({
       ),
     [currentUid, linkedMember],
   );
+  const todoAudienceRole = useMemo(
+    () => resolveTodoAudienceRole(linkedMember, authRole),
+    [authRole, linkedMember],
+  );
+  const creatableSharedScopes = useMemo(
+    () => getCreatableSharedScopesForRole(todoAudienceRole),
+    [todoAudienceRole],
+  );
+  const todoKindOptions = useMemo(
+    () => getTodoKindOptionsForRole(todoAudienceRole),
+    [todoAudienceRole],
+  );
+  const canCreateSharedTodos = creatableSharedScopes.length > 0;
+  const defaultSharedScope = creatableSharedScopes[0] ?? "parent";
+  const showSharedScopeSelector = creatableSharedScopes.length > 1;
   const userOptions = useMemo(
     () =>
       sortMembersForDisplay(members, "all").map((member) => {
@@ -134,6 +166,22 @@ export function TodosPage({
         };
       }),
     [members, selfMemberKeys],
+  );
+  const createAssigneeOptions = useMemo(
+    () =>
+      userOptions.filter((user) => {
+        const member = members.find((item) => (item.authUid || item.id) === user.uid);
+        return member ? canMemberBeAssignedToSharedScope(member, createDraftState.sharedScope) : false;
+      }),
+    [createDraftState.sharedScope, members, userOptions],
+  );
+  const editAssigneeOptions = useMemo(
+    () =>
+      userOptions.filter((user) => {
+        const member = members.find((item) => (item.authUid || item.id) === user.uid);
+        return member ? canMemberBeAssignedToSharedScope(member, editDraft.sharedScope) : false;
+      }),
+    [editDraft.sharedScope, members, userOptions],
   );
   const eventOptions = useMemo(
     () => {
@@ -157,6 +205,18 @@ export function TodosPage({
     (assigneeFilter !== "all" ? 1 : 0) +
     (relatedFilter !== "all" ? 1 : 0);
   const shouldShowFilterBody = !isMobileFilterMode || isMobileFilterOpen;
+  const normalizeDraftForAudience = (draft: TodoDraft): TodoDraft => {
+    const nextKind = todoKindOptions.includes(draft.kind) ? draft.kind : todoKindOptions[0];
+    const nextScope =
+      nextKind === "shared" && creatableSharedScopes.includes(draft.sharedScope)
+        ? draft.sharedScope
+        : defaultSharedScope;
+    return normalizeDraftForKind({
+      ...draft,
+      kind: nextKind,
+      sharedScope: nextScope,
+    });
+  };
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 760px)");
@@ -167,6 +227,15 @@ export function TodosPage({
   }, []);
 
   useEffect(() => subscribeMembers(setMembers), []);
+
+  useEffect(() => {
+    const nextTab = todoKindOptions[0] === "shared" ? "shared" : "private";
+    if (!todoKindOptions.includes(activeTab)) {
+      setActiveTab(nextTab);
+    }
+    setCreateDraftState((prev) => normalizeDraftForAudience(prev));
+    setEditDraft((prev) => normalizeDraftForAudience(prev));
+  }, [activeTab, creatableSharedScopes, defaultSharedScope, todoKindOptions]);
 
   const validateDraft = (draft: TodoDraft): TodoFormErrors => {
     const errors: TodoFormErrors = {};
@@ -181,7 +250,7 @@ export function TodosPage({
     if (statusFilter === "open" && todo.completed) return false;
     if (statusFilter === "done" && !todo.completed) return false;
     if (assigneeFilter === "unassigned" && todo.assigneeUid !== null) return false;
-    if (assigneeFilter === "me" && todo.assigneeUid !== currentUid) return false;
+    if (assigneeFilter === "me" && (!todo.assigneeUid || !selfMemberKeys.has(todo.assigneeUid))) return false;
     if (relatedFilter === "none" && todo.related) return false;
     if (relatedFilter === "event" && todo.related?.type !== "event") return false;
     if (relatedFilter === "session" && todo.related?.type !== "session") return false;
@@ -189,8 +258,14 @@ export function TodosPage({
   };
 
   const sharedTodos = useMemo(
-    () => data.todos.filter((todo) => todo.kind === "shared" && passFilters(todo)),
-    [data.todos, statusFilter, assigneeFilter, relatedFilter],
+    () =>
+      data.todos.filter(
+        (todo) =>
+          todo.kind === "shared" &&
+          canViewSharedTodo(todo, linkedMember, authRole) &&
+          passFilters(todo),
+      ),
+    [assigneeFilter, authRole, data.todos, linkedMember, relatedFilter, statusFilter],
   );
   const filteredTodos = useMemo(() => sortTodos(sharedTodos), [sharedTodos]);
   const unassignedTodos = useMemo(
@@ -256,13 +331,14 @@ export function TodosPage({
   );
 
   const handleCreateTodo = async () => {
-    const normalizedDraft = normalizeDraftForKind(createDraftState);
+    const normalizedDraft = normalizeDraftForAudience(createDraftState);
     const errors = validateDraft(normalizedDraft);
     setCreateErrors(errors);
     if (errors.title || errors.relatedId) return;
     const now = new Date().toISOString();
     const next: Omit<Todo, "id"> = {
       kind: normalizedDraft.kind,
+      sharedScope: normalizedDraft.kind === "shared" ? normalizedDraft.sharedScope : undefined,
       title: normalizedDraft.title.trim(),
       completed: normalizedDraft.completed,
       createdAt: now,
@@ -278,14 +354,14 @@ export function TodosPage({
             },
     };
     await createTodo(next);
-    setCreateDraftState(createDraft());
+    setCreateDraftState(createDraft(todoKindOptions[0], defaultSharedScope));
     setCreateErrors({});
     setIsAddModalOpen(false);
   };
 
   const startEdit = (todo: Todo) => {
     setEditingId(todo.id);
-    setEditDraft(draftFromTodo(todo));
+    setEditDraft(normalizeDraftForAudience(draftFromTodo(todo)));
     setEditErrors({});
   };
 
@@ -293,7 +369,7 @@ export function TodosPage({
     if (!editingId) return;
     const base = data.todos.find((item) => item.id === editingId);
     if (!base) return;
-    const normalizedDraft = normalizeDraftForKind(editDraft);
+    const normalizedDraft = normalizeDraftForAudience(editDraft);
     const errors = validateDraft(normalizedDraft);
     setEditErrors(errors);
     if (errors.title || errors.relatedId) return;
@@ -309,7 +385,7 @@ export function TodosPage({
   const assigneeActionLabel = (todo: Todo): string | null => {
     if (todo.kind !== "shared") return null;
     if (todo.assigneeUid === null) return "引き取る";
-    if (todo.assigneeUid !== currentUid) return "引き継ぐ";
+    if (!selfMemberKeys.has(todo.assigneeUid)) return "引き継ぐ";
     return null;
   };
 
@@ -392,7 +468,7 @@ export function TodosPage({
           aria-label="追加"
           title="追加"
           onClick={() => {
-            setCreateDraftState(createDraft());
+            setCreateDraftState(createDraft(todoKindOptions[0], defaultSharedScope));
             setCreateErrors({});
             setIsAddModalOpen(true);
           }}
@@ -401,24 +477,26 @@ export function TodosPage({
         </button>
       </div>
 
-      <div className="events-tabs" role="tablist" aria-label="TODO種別">
-        <button
-          type="button"
-          className={`members-tab ${activeTab === "shared" ? "active" : ""}`}
-          onClick={() => setActiveTab("shared")}
-        >
-          共有TODO
-        </button>
-        <button
-          type="button"
-          className={`members-tab ${activeTab === "private" ? "active" : ""}`}
-          onClick={() => setActiveTab("private")}
-        >
-          個人TODO
-        </button>
-      </div>
+      {todoKindOptions.length > 1 && (
+        <div className="events-tabs" role="tablist" aria-label="TODO種別">
+          <button
+            type="button"
+            className={`members-tab ${activeTab === "shared" ? "active" : ""}`}
+            onClick={() => setActiveTab("shared")}
+          >
+            共有TODO
+          </button>
+          <button
+            type="button"
+            className={`members-tab ${activeTab === "private" ? "active" : ""}`}
+            onClick={() => setActiveTab("private")}
+          >
+            個人TODO
+          </button>
+        </div>
+      )}
 
-      {activeTab === "shared" ? (
+      {activeTab === "shared" && canCreateSharedTodos ? (
         <>
           <section className="todos-filters">
             <div className="todos-filter-header">
@@ -495,19 +573,45 @@ export function TodosPage({
               ×
             </button>
             <h3>TODO編集</h3>
-            <div className="todo-form-section">
-              <span className="todo-form-label">種別</span>
-              {renderKindToggle(
-                editDraft.kind,
-                (next) => setEditDraft((prev) => normalizeDraftForKind({ ...prev, kind: next })),
-                "TODO種別",
-              )}
-            </div>
+            {todoKindOptions.length > 1 && (
+              <div className="todo-form-section">
+                <span className="todo-form-label">種別</span>
+                {renderKindToggle(
+                  editDraft.kind,
+                  (next) =>
+                    setEditDraft((prev) =>
+                      normalizeDraftForAudience({ ...prev, kind: next, sharedScope: defaultSharedScope }),
+                    ),
+                  "TODO種別",
+                )}
+              </div>
+            )}
             <label>
               タイトル
               <input value={editDraft.title} onChange={(event) => setEditDraft((prev) => ({ ...prev, title: event.target.value }))} />
               {editErrors.title && <span className="field-error">{editErrors.title}</span>}
             </label>
+            {editDraft.kind === "shared" && showSharedScopeSelector && (
+              <label>
+                共有範囲
+                <select
+                  value={editDraft.sharedScope}
+                  onChange={(event) =>
+                    setEditDraft((prev) => ({
+                      ...prev,
+                      sharedScope: event.target.value as TodoSharedScope,
+                      assigneeUid: "",
+                    }))
+                  }
+                >
+                  {creatableSharedScopes.map((scope) => (
+                    <option key={scope} value={scope}>
+                      {sharedScopeLabels[scope]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <div className={`todo-modal-grid ${editDraft.kind === "shared" ? "shared" : "private"}`}>
               <label>
                 期限
@@ -521,7 +625,7 @@ export function TodosPage({
                     onChange={(event) => setEditDraft((prev) => ({ ...prev, assigneeUid: event.target.value }))}
                   >
                     <option value="">未アサイン</option>
-                    {userOptions.map((user) => (
+                    {editAssigneeOptions.map((user) => (
                       <option key={user.uid} value={user.uid}>
                         {user.name}
                       </option>
@@ -587,14 +691,19 @@ export function TodosPage({
               ×
             </button>
             <h3>TODO追加</h3>
-            <div className="todo-form-section">
-              <span className="todo-form-label">種別</span>
-              {renderKindToggle(
-                createDraftState.kind,
-                (next) => setCreateDraftState((prev) => normalizeDraftForKind({ ...prev, kind: next })),
-                "TODO種別",
-              )}
-            </div>
+            {todoKindOptions.length > 1 && (
+              <div className="todo-form-section">
+                <span className="todo-form-label">種別</span>
+                {renderKindToggle(
+                  createDraftState.kind,
+                  (next) =>
+                    setCreateDraftState((prev) =>
+                      normalizeDraftForAudience({ ...prev, kind: next, sharedScope: defaultSharedScope }),
+                    ),
+                  "TODO種別",
+                )}
+              </div>
+            )}
             <label>
               タイトル
               <input
@@ -603,6 +712,27 @@ export function TodosPage({
               />
               {createErrors.title && <span className="field-error">{createErrors.title}</span>}
             </label>
+            {createDraftState.kind === "shared" && showSharedScopeSelector && (
+              <label>
+                共有範囲
+                <select
+                  value={createDraftState.sharedScope}
+                  onChange={(event) =>
+                    setCreateDraftState((prev) => ({
+                      ...prev,
+                      sharedScope: event.target.value as TodoSharedScope,
+                      assigneeUid: "",
+                    }))
+                  }
+                >
+                  {creatableSharedScopes.map((scope) => (
+                    <option key={scope} value={scope}>
+                      {sharedScopeLabels[scope]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <div className={`todo-modal-grid ${createDraftState.kind === "shared" ? "shared" : "private"}`}>
               <label>
                 期限
@@ -620,7 +750,7 @@ export function TodosPage({
                     onChange={(event) => setCreateDraftState((prev) => ({ ...prev, assigneeUid: event.target.value }))}
                   >
                     <option value="">未アサイン</option>
-                    {userOptions.map((user) => (
+                    {createAssigneeOptions.map((user) => (
                       <option key={user.uid} value={user.uid}>
                         {user.name}
                       </option>

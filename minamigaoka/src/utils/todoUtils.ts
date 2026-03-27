@@ -1,4 +1,5 @@
-import type { DemoData, Todo } from "../types";
+import type { MemberRecord } from "../members/types";
+import type { DemoData, Todo, TodoKind, TodoSharedScope } from "../types";
 
 const SESSION_REF_PREFIX = "session:";
 
@@ -98,4 +99,87 @@ export const buildSessionChoices = (
   });
   rows.sort((a, b) => `${a.dateKey}:${a.order}`.localeCompare(`${b.dateKey}:${b.order}`));
   return rows.map((row) => ({ id: row.id, label: row.label }));
+};
+
+export type TodoAudienceRole = "child" | "parent" | "officer" | "admin" | "private-only";
+
+const hasMemberType = (member: MemberRecord | null, type: "parent" | "child" | "teacher" | "obog"): boolean =>
+  Boolean(member?.memberTypes?.includes(type));
+
+export const resolveTodoAudienceRole = (
+  linkedMember: MemberRecord | null,
+  fallbackRole?: "parent" | "admin" | null,
+): TodoAudienceRole => {
+  if (linkedMember?.adminRole === "admin" || linkedMember?.role === "admin" || fallbackRole === "admin") {
+    return "admin";
+  }
+  if (linkedMember?.adminRole === "officer" || linkedMember?.role === "officer") {
+    return "officer";
+  }
+  if (linkedMember?.role === "child" || hasMemberType(linkedMember, "child")) {
+    return "child";
+  }
+  if (linkedMember?.role === "parent" || hasMemberType(linkedMember, "parent") || fallbackRole === "parent") {
+    return "parent";
+  }
+  if (linkedMember?.role === "teacher" || hasMemberType(linkedMember, "teacher") || hasMemberType(linkedMember, "obog")) {
+    return "private-only";
+  }
+  return "parent";
+};
+
+export const getVisibleSharedScopesForRole = (role: TodoAudienceRole): TodoSharedScope[] => {
+  switch (role) {
+    case "admin":
+      return ["parent", "officer", "child"];
+    case "officer":
+      return ["parent", "officer"];
+    case "parent":
+      return ["parent"];
+    case "child":
+      return ["child"];
+    default:
+      return [];
+  }
+};
+
+export const getCreatableSharedScopesForRole = (role: TodoAudienceRole): TodoSharedScope[] => {
+  switch (role) {
+    case "admin":
+      return ["parent", "officer", "child"];
+    case "officer":
+      return ["parent", "officer"];
+    case "parent":
+      return ["parent"];
+    case "child":
+      return ["child"];
+    default:
+      return [];
+  }
+};
+
+export const getTodoKindOptionsForRole = (role: TodoAudienceRole): TodoKind[] =>
+  getCreatableSharedScopesForRole(role).length > 0 ? ["shared", "private"] : ["private"];
+
+export const canViewSharedTodo = (
+  todo: Todo,
+  linkedMember: MemberRecord | null,
+  fallbackRole?: "parent" | "admin" | null,
+): boolean => {
+  if (todo.kind !== "shared" || !todo.sharedScope) return false;
+  return getVisibleSharedScopesForRole(resolveTodoAudienceRole(linkedMember, fallbackRole)).includes(todo.sharedScope);
+};
+
+export const canMemberBeAssignedToSharedScope = (
+  member: MemberRecord,
+  scope: TodoSharedScope,
+): boolean => {
+  const isAdmin = member.adminRole === "admin" || member.role === "admin";
+  const isOfficer = member.adminRole === "officer" || member.role === "officer";
+  const isChild = member.role === "child" || hasMemberType(member, "child");
+  const isParent = member.role === "parent" || hasMemberType(member, "parent");
+
+  if (scope === "child") return isChild;
+  if (scope === "parent") return isParent || isOfficer || isAdmin;
+  return isOfficer || isAdmin;
 };

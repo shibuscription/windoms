@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import type { MemberRecord } from "../members/types";
 import type { DemoData, EventKind, EventRecord, SessionDoc, Todo } from "../types";
-import { sortTodosOpenFirst } from "../utils/todoUtils";
+import { canViewSharedTodo, sortTodosOpenFirst } from "../utils/todoUtils";
 import { todayDateKey } from "../utils/date";
 import { toDemoFamilyName } from "../utils/demoName";
 
@@ -73,6 +74,8 @@ const compareLinkedSessions = (left: LinkedSession, right: LinkedSession): numbe
 type EventsPageProps = {
   data: DemoData;
   currentUid: string;
+  linkedMember: MemberRecord | null;
+  authRole?: "parent" | "admin" | null;
   saveTodo: (todo: Todo) => Promise<void>;
   createEvent: (event: Omit<EventRecord, "id">) => Promise<void>;
   saveEvent: (event: EventRecord) => Promise<void>;
@@ -83,6 +86,8 @@ type EventsPageProps = {
 export function EventsPage({
   data,
   currentUid,
+  linkedMember,
+  authRole,
   saveTodo,
   createEvent,
   saveEvent,
@@ -205,10 +210,14 @@ export function EventsPage({
     if (!selectedEvent) return [] as Todo[];
     return sortTodosOpenFirst(
       data.todos.filter(
-        (todo) => todo.kind === "shared" && todo.related?.type === "event" && todo.related.id === selectedEvent.id,
+        (todo) =>
+          todo.kind === "shared" &&
+          todo.related?.type === "event" &&
+          todo.related.id === selectedEvent.id &&
+          canViewSharedTodo(todo, linkedMember, authRole),
       ),
     );
-  }, [data.todos, selectedEvent]);
+  }, [authRole, data.todos, linkedMember, selectedEvent]);
 
   const showFeedback = (message: string) => {
     setFeedback(message);
