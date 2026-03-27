@@ -2333,6 +2333,66 @@ body {
   width: min(640px, calc(100vw - 24px));
 }
 
+.todo-form-section {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.todo-form-label {
+  font-size: 0.95rem;
+  color: #334155;
+}
+
+.todo-kind-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.todo-kind-button {
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.todo-kind-button.active {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #fff;
+}
+
+.todo-modal-grid {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.todo-modal-grid.shared {
+  grid-template-columns: 1fr 1fr;
+}
+
+.todo-modal-grid.private {
+  grid-template-columns: minmax(0, 240px);
+}
+
+.todo-modal-grid-spacer {
+  min-height: 1px;
+}
+
+.todo-completed-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.todo-completed-toggle input {
+  width: auto;
+}
+
 .todos-related-modal {
   width: min(540px, calc(100vw - 24px));
 }
@@ -5104,6 +5164,7 @@ textarea {
   }
 
   .field-grid,
+  .todo-modal-grid.shared,
   .split,
   .activity-form,
   .log-two-cols,

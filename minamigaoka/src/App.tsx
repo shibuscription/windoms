@@ -1048,6 +1048,7 @@ export function App() {
               <TodosPage
                 data={data}
                 currentUid={currentUid}
+                linkedMember={linkedMember}
                 createTodo={createTodo}
                 saveTodo={saveTodo}
                 deleteTodo={deleteTodo}

@@ -16,6 +16,7 @@ import { todayDateKey } from "../utils/date";
 type TodosPageProps = {
   data: DemoData;
   currentUid: string;
+  linkedMember: MemberRecord | null;
   createTodo: (todo: Omit<Todo, "id">) => Promise<void>;
   saveTodo: (todo: Todo) => Promise<void>;
   deleteTodo: (todoId: string) => Promise<void>;
@@ -85,7 +86,14 @@ const applyDraft = (source: Todo, draft: TodoDraft): Todo => ({
         },
 });
 
-export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }: TodosPageProps) {
+export function TodosPage({
+  data,
+  currentUid,
+  linkedMember,
+  createTodo,
+  saveTodo,
+  deleteTodo,
+}: TodosPageProps) {
   const navigate = useNavigate();
   const today = todayDateKey();
   const [isMobileFilterMode, setIsMobileFilterMode] = useState<boolean>(() =>
@@ -106,14 +114,26 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [relatedDetailTodoId, setRelatedDetailTodoId] = useState<string | null>(null);
 
+  const selfMemberKeys = useMemo(
+    () =>
+      new Set(
+        [currentUid, linkedMember?.id, linkedMember?.authUid]
+          .filter((value): value is string => Boolean(value && value.trim()))
+          .map((value) => value.trim()),
+      ),
+    [currentUid, linkedMember],
+  );
   const userOptions = useMemo(
     () =>
-      sortMembersForDisplay(members, "all")
-        .map((member) => ({
-          uid: member.authUid || member.id,
-          name: `${member.displayName || member.name || member.id}${(member.authUid || member.id) === currentUid ? "（自分）" : ""}`,
-        })),
-    [currentUid, members],
+      sortMembersForDisplay(members, "all").map((member) => {
+        const optionUid = member.authUid || member.id;
+        const isSelf = selfMemberKeys.has(optionUid) || selfMemberKeys.has(member.id) || selfMemberKeys.has(member.authUid);
+        return {
+          uid: optionUid,
+          name: `${member.displayName || member.name || member.id}${isSelf ? "（自分）" : ""}`,
+        };
+      }),
+    [members, selfMemberKeys],
   );
   const eventOptions = useMemo(
     () => {
@@ -216,6 +236,33 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
       relatedId: nextType === "none" ? "" : prev.relatedType === nextType ? prev.relatedId : "",
     }));
   };
+
+  const renderKindToggle = (
+    value: TodoKind,
+    onChange: (next: TodoKind) => void,
+    groupLabel: string,
+  ) => (
+    <div className="todo-kind-group" role="radiogroup" aria-label={groupLabel}>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={value === "shared"}
+        className={`todo-kind-button ${value === "shared" ? "active" : ""}`}
+        onClick={() => onChange("shared")}
+      >
+        共有TODO
+      </button>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={value === "private"}
+        className={`todo-kind-button ${value === "private" ? "active" : ""}`}
+        onClick={() => onChange("private")}
+      >
+        個人TODO
+      </button>
+    </div>
+  );
 
   const handleCreateTodo = async () => {
     const normalizedDraft = normalizeDraftForKind(createDraftState);
@@ -457,58 +504,44 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
               ×
             </button>
             <h3>TODO編集</h3>
-            <label>
-              種別
-              <select
-                value={editDraft.kind}
-                onChange={(event) =>
-                  setEditDraft((prev) =>
-                    normalizeDraftForKind({ ...prev, kind: event.target.value as TodoKind }),
-                  )
-                }
-              >
-                <option value="shared">共有TODO</option>
-                <option value="private">個人TODO</option>
-              </select>
-            </label>
+            <div className="todo-form-section">
+              <span className="todo-form-label">種別</span>
+              {renderKindToggle(
+                editDraft.kind,
+                (next) => setEditDraft((prev) => normalizeDraftForKind({ ...prev, kind: next })),
+                "TODO種別",
+              )}
+            </div>
             <label>
               タイトル
               <input value={editDraft.title} onChange={(event) => setEditDraft((prev) => ({ ...prev, title: event.target.value }))} />
               {editErrors.title && <span className="field-error">{editErrors.title}</span>}
             </label>
-            <div className="field-grid">
-              <label>
-                完了
-                <select
-                  value={editDraft.completed ? "done" : "open"}
-                  onChange={(event) => setEditDraft((prev) => ({ ...prev, completed: event.target.value === "done" }))}
-                >
-                  <option value="open">未完了</option>
-                  <option value="done">完了</option>
-                </select>
-              </label>
+            <div className={`todo-modal-grid ${editDraft.kind === "shared" ? "shared" : "private"}`}>
               <label>
                 期限
                 <input type="date" value={editDraft.dueDate} onChange={(event) => setEditDraft((prev) => ({ ...prev, dueDate: event.target.value }))} />
               </label>
+              {editDraft.kind === "shared" && (
+                <label>
+                  担当
+                  <select
+                    value={editDraft.assigneeUid}
+                    onChange={(event) => setEditDraft((prev) => ({ ...prev, assigneeUid: event.target.value }))}
+                  >
+                    <option value="">未アサイン</option>
+                    {userOptions.map((user) => (
+                      <option key={user.uid} value={user.uid}>
+                        {user.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
             </div>
             {editDraft.kind === "shared" && (
               <>
-                <div className="field-grid">
-                  <label>
-                    担当
-                    <select
-                      value={editDraft.assigneeUid}
-                      onChange={(event) => setEditDraft((prev) => ({ ...prev, assigneeUid: event.target.value }))}
-                    >
-                      <option value="">未アサイン</option>
-                      {userOptions.map((user) => (
-                        <option key={user.uid} value={user.uid}>
-                          {user.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                <div className="todo-modal-grid shared">
                   <label>
                     紐付け種別
                     <select value={editDraft.relatedType} onChange={(event) => updateDraftRelationType(setEditDraft, event.target.value as RelatedInputType)}>
@@ -517,23 +550,33 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
                       <option value="event">イベント</option>
                     </select>
                   </label>
+                  {editDraft.relatedType !== "none" ? (
+                    <label>
+                      紐付け先
+                      <select value={editDraft.relatedId} onChange={(event) => setEditDraft((prev) => ({ ...prev, relatedId: event.target.value }))}>
+                        <option value="">選択してください</option>
+                        {(editDraft.relatedType === "session" ? sessionOptions : eventOptions).map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      {editErrors.relatedId && <span className="field-error">{editErrors.relatedId}</span>}
+                    </label>
+                  ) : (
+                    <div className="todo-modal-grid-spacer" aria-hidden="true" />
+                  )}
                 </div>
-                {editDraft.relatedType !== "none" && (
-                  <label>
-                    紐付け先
-                    <select value={editDraft.relatedId} onChange={(event) => setEditDraft((prev) => ({ ...prev, relatedId: event.target.value }))}>
-                      <option value="">選択してください</option>
-                      {(editDraft.relatedType === "session" ? sessionOptions : eventOptions).map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    {editErrors.relatedId && <span className="field-error">{editErrors.relatedId}</span>}
-                  </label>
-                )}
               </>
             )}
+            <label className="todo-completed-toggle">
+              <input
+                type="checkbox"
+                checked={editDraft.completed}
+                onChange={(event) => setEditDraft((prev) => ({ ...prev, completed: event.target.checked }))}
+              />
+              <span>完了にする</span>
+            </label>
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={() => setEditingId(null)}>
                 キャンセル
@@ -553,20 +596,14 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
               ×
             </button>
             <h3>TODO追加</h3>
-            <label>
-              種別
-              <select
-                value={createDraftState.kind}
-                onChange={(event) =>
-                  setCreateDraftState((prev) =>
-                    normalizeDraftForKind({ ...prev, kind: event.target.value as TodoKind }),
-                  )
-                }
-              >
-                <option value="shared">共有TODO</option>
-                <option value="private">個人TODO</option>
-              </select>
-            </label>
+            <div className="todo-form-section">
+              <span className="todo-form-label">種別</span>
+              {renderKindToggle(
+                createDraftState.kind,
+                (next) => setCreateDraftState((prev) => normalizeDraftForKind({ ...prev, kind: next })),
+                "TODO種別",
+              )}
+            </div>
             <label>
               タイトル
               <input
@@ -575,7 +612,7 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
               />
               {createErrors.title && <span className="field-error">{createErrors.title}</span>}
             </label>
-            <div className="field-grid">
+            <div className={`todo-modal-grid ${createDraftState.kind === "shared" ? "shared" : "private"}`}>
               <label>
                 期限
                 <input
@@ -584,24 +621,26 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
                   onChange={(event) => setCreateDraftState((prev) => ({ ...prev, dueDate: event.target.value }))}
                 />
               </label>
+              {createDraftState.kind === "shared" && (
+                <label>
+                  担当
+                  <select
+                    value={createDraftState.assigneeUid}
+                    onChange={(event) => setCreateDraftState((prev) => ({ ...prev, assigneeUid: event.target.value }))}
+                  >
+                    <option value="">未アサイン</option>
+                    {userOptions.map((user) => (
+                      <option key={user.uid} value={user.uid}>
+                        {user.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
             </div>
             {createDraftState.kind === "shared" && (
               <>
-                <div className="field-grid">
-                  <label>
-                    担当
-                    <select
-                      value={createDraftState.assigneeUid}
-                      onChange={(event) => setCreateDraftState((prev) => ({ ...prev, assigneeUid: event.target.value }))}
-                    >
-                      <option value="">未アサイン</option>
-                      {userOptions.map((user) => (
-                        <option key={user.uid} value={user.uid}>
-                          {user.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                <div className="todo-modal-grid shared">
                   <label>
                     紐付け種別
                     <select
@@ -615,9 +654,7 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
                       <option value="event">イベント</option>
                     </select>
                   </label>
-                </div>
-                <div className="field-grid">
-                  {createDraftState.relatedType !== "none" && (
+                  {createDraftState.relatedType !== "none" ? (
                     <label>
                       紐付け先
                       <select
@@ -635,6 +672,8 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
                       </select>
                       {createErrors.relatedId && <span className="field-error">{createErrors.relatedId}</span>}
                     </label>
+                  ) : (
+                    <div className="todo-modal-grid-spacer" aria-hidden="true" />
                   )}
                 </div>
               </>
