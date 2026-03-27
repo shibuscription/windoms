@@ -1109,10 +1109,16 @@ export function App() {
               />
             }
           />
-          <Route path="/docs" element={<DocsListPage />} />
-          <Route path="/docs/new" element={<DocsEditorPage mode="new" />} />
-          <Route path="/docs/:id" element={<DocsDetailPage />} />
-          <Route path="/docs/:id/edit" element={<DocsEditorPage mode="edit" />} />
+          <Route path="/docs" element={<DocsListPage isAdmin={isAdmin} />} />
+          <Route
+            path="/docs/new"
+            element={isAdmin ? <DocsEditorPage mode="new" isAdmin={isAdmin} /> : <Navigate to="/docs" replace />}
+          />
+          <Route path="/docs/:id" element={<DocsDetailPage isAdmin={isAdmin} />} />
+          <Route
+            path="/docs/:id/edit"
+            element={isAdmin ? <DocsEditorPage mode="edit" isAdmin={isAdmin} /> : <Navigate to="/docs" replace />}
+          />
           <Route
             path="/purchases"
             element={

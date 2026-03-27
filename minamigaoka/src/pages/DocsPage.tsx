@@ -16,6 +16,15 @@ const DOC_CATEGORIES: DocCategory[] = [
 
 type DocsEditorProps = {
   mode: "new" | "edit";
+  isAdmin: boolean;
+};
+
+type DocsListPageProps = {
+  isAdmin: boolean;
+};
+
+type DocsDetailPageProps = {
+  isAdmin: boolean;
 };
 
 const formatDateTime = (value: string): string => {
@@ -88,7 +97,7 @@ const useDocsCollection = () => {
   return { docs, isLoading, loadError };
 };
 
-export function DocsListPage() {
+export function DocsListPage({ isAdmin }: DocsListPageProps) {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
@@ -107,15 +116,17 @@ export function DocsListPage() {
     <section className="card docs-page">
       <div className="docs-header">
         <h1>資料</h1>
-        <button
-          type="button"
-          className="links-add-button"
-          onClick={() => navigate("/docs/new")}
-          aria-label="追加"
-          title="追加"
-        >
-          ＋ 追加
-        </button>
+        {isAdmin && (
+          <button
+            type="button"
+            className="links-add-button"
+            onClick={() => navigate("/docs/new")}
+            aria-label="追加"
+            title="追加"
+          >
+            ＋ 追加
+          </button>
+        )}
       </div>
       <p className="muted">Dropbox等の実体資料は外部管理。ここでは要点メモを管理します。</p>
 
@@ -181,7 +192,7 @@ export function DocsListPage() {
   );
 }
 
-export function DocsEditorPage({ mode }: DocsEditorProps) {
+export function DocsEditorPage({ mode, isAdmin }: DocsEditorProps) {
   const navigate = useNavigate();
   const { id } = useParams();
   const { docs, isLoading, loadError } = useDocsCollection();
@@ -195,6 +206,15 @@ export function DocsEditorPage({ mode }: DocsEditorProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [errors, setErrors] = useState<{ title?: string; body?: string }>({});
+
+  useEffect(() => {
+    if (isAdmin) return;
+    if (mode === "edit" && id) {
+      navigate(`/docs/${id}`, { replace: true });
+      return;
+    }
+    navigate("/docs", { replace: true });
+  }, [id, isAdmin, mode, navigate]);
 
   useEffect(() => {
     if (!source) return;
@@ -243,6 +263,7 @@ export function DocsEditorPage({ mode }: DocsEditorProps) {
   }
 
   const save = async () => {
+    if (!isAdmin) return;
     setIsSaving(true);
     setSaveError("");
     const nextErrors: { title?: string; body?: string } = {};
@@ -393,7 +414,7 @@ export function DocsEditorPage({ mode }: DocsEditorProps) {
   );
 }
 
-export function DocsDetailPage() {
+export function DocsDetailPage({ isAdmin }: DocsDetailPageProps) {
   const navigate = useNavigate();
   const { id } = useParams();
   const { docs, isLoading, loadError } = useDocsCollection();
@@ -436,6 +457,7 @@ export function DocsDetailPage() {
   }
 
   const confirmDelete = async () => {
+    if (!isAdmin) return;
     setIsDeleting(true);
     setDeleteError("");
     try {
@@ -473,15 +495,19 @@ export function DocsDetailPage() {
         <button type="button" className="button button-secondary" onClick={() => navigate("/docs")}>
           一覧へ
         </button>
-        <button type="button" className="button" onClick={() => navigate(`/docs/${doc.id}/edit`)}>
-          編集
-        </button>
-        <button type="button" className="button button-secondary" onClick={() => setIsDeleteOpen(true)}>
-          削除
-        </button>
+        {isAdmin && (
+          <>
+            <button type="button" className="button" onClick={() => navigate(`/docs/${doc.id}/edit`)}>
+              編集
+            </button>
+            <button type="button" className="button button-secondary" onClick={() => setIsDeleteOpen(true)}>
+              削除
+            </button>
+          </>
+        )}
       </div>
 
-      {isDeleteOpen && (
+      {isAdmin && isDeleteOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className="modal-panel">
             <button className="modal-close" type="button" onClick={() => setIsDeleteOpen(false)} aria-label="閉じる" title="閉じる">

@@ -92,6 +92,7 @@ export function LinksPage({ menuRole }: LinksPageProps) {
   };
 
   const openCreate = () => {
+    if (!isOfficer) return;
     setEditingId("__new__");
     setForm({ title: "", url: "", type: "sns", role: "all" });
     setErrors({});
@@ -99,6 +100,7 @@ export function LinksPage({ menuRole }: LinksPageProps) {
   };
 
   const openEdit = (item: ExternalLinkItem) => {
+    if (!isOfficer) return;
     setEditingId(item.id);
     setForm({
       title: item.title,
@@ -130,6 +132,7 @@ export function LinksPage({ menuRole }: LinksPageProps) {
   };
 
   const submitEditor = async () => {
+    if (!isOfficer) return;
     const nextErrors = validateForm();
     setErrors(nextErrors);
     setSubmitError("");
@@ -165,6 +168,7 @@ export function LinksPage({ menuRole }: LinksPageProps) {
   };
 
   const confirmDelete = async () => {
+    if (!isOfficer) return;
     if (!deleteTarget) return;
     try {
       await deleteLinkItem(deleteTarget.id);
