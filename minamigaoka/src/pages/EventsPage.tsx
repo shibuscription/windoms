@@ -1,24 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import type { DemoData, Todo } from "../types";
+import type { DemoData, EventKind, EventRecord, SessionDoc, Todo } from "../types";
 import { sortTodosOpenFirst } from "../utils/todoUtils";
 import { todayDateKey } from "../utils/date";
 import { toDemoFamilyName } from "../utils/demoName";
 
 type DemoMenuRole = "child" | "parent" | "admin";
-type EventKind = "コンクール" | "演奏会" | "合同練習" | "その他";
-type EventState = "active" | "done";
 type SessionType = "normal" | "self" | "event";
-
-type DemoEvent = {
-  id: string;
-  title: string;
-  kind: EventKind;
-  state: EventState;
-  eventSortDate: string;
-  memo?: string;
-  sessionIds?: string[];
-};
 
 type LinkedSession = {
   id: string;
@@ -36,7 +24,7 @@ type EventFormDraft = {
   kind: EventKind;
   eventSortDate: string;
   memo: string;
-  state: EventState;
+  state: EventRecord["state"];
 };
 
 type EventFormErrors = {
@@ -45,97 +33,6 @@ type EventFormErrors = {
 };
 
 const canManageEvents = (menuRole: DemoMenuRole): boolean => menuRole === "admin";
-
-const demoEvents: DemoEvent[] = [
-  {
-    id: "teiki-2026",
-    title: "定期演奏会",
-    kind: "演奏会",
-    state: "active",
-    eventSortDate: "2026-03-20",
-    memo: "会場入り 8:30。打楽器搬入あり。",
-    sessionIds: ["s-2026-03-20-am", "s-2026-03-20-pm"],
-  },
-  {
-    id: "touki-2026",
-    title: "陶器まつり屋外演奏",
-    kind: "演奏会",
-    state: "active",
-    eventSortDate: "2026-02-23",
-    memo: "雨天時は体育館演奏へ切替予定。",
-    sessionIds: ["s-2026-02-23-pm"],
-  },
-  {
-    id: "camp-2025",
-    title: "夏合宿",
-    kind: "合同練習",
-    state: "done",
-    eventSortDate: "2025-08-10",
-    memo: "持ち物リストを再利用予定。",
-    sessionIds: ["s-2025-08-10-am", "s-2025-08-11-am"],
-  },
-  {
-    id: "parent-meeting-2025",
-    title: "保護者会",
-    kind: "その他",
-    state: "done",
-    eventSortDate: "2025-12-14",
-    memo: "次年度予算案説明。",
-    sessionIds: [],
-  },
-];
-
-
-const linkedSessionsMap: Record<string, LinkedSession> = {
-  "s-2026-03-20-am": {
-    id: "s-2026-03-20-am",
-    date: "2026-03-20",
-    startTime: "09:00",
-    endTime: "12:00",
-    type: "event",
-    eventName: "定期演奏会（午前リハ）",
-    location: "文化会館",
-    dutyName: "渋谷",
-  },
-  "s-2026-03-20-pm": {
-    id: "s-2026-03-20-pm",
-    date: "2026-03-20",
-    startTime: "13:00",
-    endTime: "16:00",
-    type: "event",
-    eventName: "定期演奏会（本番）",
-    location: "文化会館",
-    dutyName: "瀬古",
-  },
-  "s-2026-02-23-pm": {
-    id: "s-2026-02-23-pm",
-    date: "2026-02-23",
-    startTime: "13:00",
-    endTime: "16:00",
-    type: "event",
-    eventName: "陶器まつり屋外演奏",
-    location: "本町オリベストリート",
-    dutyName: "-",
-  },
-  "s-2025-08-10-am": {
-    id: "s-2025-08-10-am",
-    date: "2025-08-10",
-    startTime: "09:00",
-    endTime: "12:00",
-    type: "normal",
-    location: "合宿所ホール",
-    dutyName: "中村",
-  },
-  "s-2025-08-11-am": {
-    id: "s-2025-08-11-am",
-    date: "2025-08-11",
-    startTime: "09:00",
-    endTime: "12:00",
-    type: "self",
-    location: "合宿所ホール",
-    dutyName: "今井",
-  },
-};
 
 const toDateLabel = (dateKey: string): string => dateKey.replace(/-/g, "/");
 const typeLabel: Record<SessionType, string> = {
@@ -159,15 +56,41 @@ const createInitialDraft = (): EventFormDraft => ({
   state: "active",
 });
 
+const normalizeText = (value?: string): string => (value ?? "").trim();
+
+const toLinkedSession = (date: string, session: SessionDoc): LinkedSession => ({
+  id: session.id ?? `session:${date}:${session.order}`,
+  date,
+  startTime: session.startTime,
+  endTime: session.endTime,
+  type: session.type,
+  eventName: session.eventName,
+  location: session.location,
+  dutyName: session.assigneeNameSnapshot || "-",
+});
+
+const compareLinkedSessions = (left: LinkedSession, right: LinkedSession): number =>
+  `${left.date}-${left.startTime}-${left.id}`.localeCompare(`${right.date}-${right.startTime}-${right.id}`);
+
 type EventsPageProps = {
   data: DemoData;
   currentUid: string;
   saveTodo: (todo: Todo) => Promise<void>;
+  createEvent: (event: Omit<EventRecord, "id">) => Promise<void>;
+  saveEvent: (event: EventRecord) => Promise<void>;
+  deleteEvent: (eventId: string) => Promise<void>;
   menuRole: DemoMenuRole;
 };
 
-export function EventsPage({ data, currentUid, saveTodo, menuRole }: EventsPageProps) {
-  const [events, setEvents] = useState<DemoEvent[]>(demoEvents);
+export function EventsPage({
+  data,
+  currentUid,
+  saveTodo,
+  createEvent,
+  saveEvent,
+  deleteEvent,
+  menuRole,
+}: EventsPageProps) {
   const [activeTab, setActiveTab] = useState<"active" | "done">("active");
   const [isLinkedSessionsModalOpen, setIsLinkedSessionsModalOpen] = useState(false);
   const [isSessionBindModalOpen, setIsSessionBindModalOpen] = useState(false);
@@ -184,44 +107,70 @@ export function EventsPage({ data, currentUid, saveTodo, menuRole }: EventsPageP
   const [selectedDoneYear, setSelectedDoneYear] = useState<number>(defaultClubYear);
 
   const isManager = canManageEvents(menuRole);
-  const selectedEvent = eventId ? events.find((item) => item.id === eventId) ?? null : null;
-  const editingEvent = editingEventId && editingEventId !== "__new__" ? events.find((item) => item.id === editingEventId) ?? null : null;
-  const deleteTargetEvent = deleteTargetId ? events.find((item) => item.id === deleteTargetId) ?? null : null;
+  const selectedEvent = eventId ? data.events.find((item) => item.id === eventId) ?? null : null;
+  const editingEvent =
+    editingEventId && editingEventId !== "__new__"
+      ? data.events.find((item) => item.id === editingEventId) ?? null
+      : null;
+  const deleteTargetEvent = deleteTargetId ? data.events.find((item) => item.id === deleteTargetId) ?? null : null;
   const isCreateMode = editingEventId === "__new__";
-  const linkedSessions = useMemo(
-    () =>
-      (selectedEvent?.sessionIds ?? [])
-        .map((id) => linkedSessionsMap[id])
-        .filter((item): item is LinkedSession => Boolean(item)),
-    [selectedEvent],
-  );
-  const unlinkTargetSession = unlinkTargetSessionId
-    ? linkedSessions.find((item) => item.id === unlinkTargetSessionId) ?? null
-    : null;
-  const bindableEventSessions = useMemo(
-    () =>
-      Object.values(linkedSessionsMap)
+
+  const allEventSessions = useMemo(() => {
+    const rows: LinkedSession[] = [];
+    Object.entries(data.scheduleDays).forEach(([date, day]) => {
+      day.sessions
         .filter((session) => session.type === "event")
-        .sort((a, b) =>
-          `${a.date}-${a.startTime}`.localeCompare(`${b.date}-${b.startTime}`),
-        ),
-    [],
+        .forEach((session) => {
+          rows.push(toLinkedSession(date, session));
+        });
+    });
+    return rows.sort(compareLinkedSessions);
+  }, [data.scheduleDays]);
+
+  const linkedSessions = useMemo(() => {
+    if (!selectedEvent) return [] as LinkedSession[];
+
+    const explicitIds = new Set((selectedEvent.sessionIds ?? []).filter((id) => id.trim().length > 0));
+    const normalizedTitle = normalizeText(selectedEvent.title);
+
+    const rows = allEventSessions.filter((session) => {
+      if (explicitIds.size > 0 && explicitIds.has(session.id)) {
+        return true;
+      }
+      return explicitIds.size === 0 && normalizeText(session.eventName) === normalizedTitle;
+    });
+
+    return rows.sort(compareLinkedSessions);
+  }, [allEventSessions, selectedEvent]);
+
+  const linkedSessionIds = useMemo(() => new Set(linkedSessions.map((session) => session.id)), [linkedSessions]);
+
+  const unlinkTargetSession =
+    unlinkTargetSessionId ? linkedSessions.find((item) => item.id === unlinkTargetSessionId) ?? null : null;
+
+  const bindableEventSessions = useMemo(
+    () => allEventSessions.filter((session) => !linkedSessionIds.has(session.id)),
+    [allEventSessions, linkedSessionIds],
   );
 
   const activeEvents = useMemo(
     () =>
-      events
+      [...data.events]
         .filter((item) => item.state === "active")
-        .sort((a, b) => a.eventSortDate.localeCompare(b.eventSortDate)),
-    [events],
+        .sort((a, b) =>
+          `${a.eventSortDate}-${a.title}`.localeCompare(`${b.eventSortDate}-${b.title}`, "ja"),
+        ),
+    [data.events],
   );
 
   const doneEvents = useMemo(
     () =>
-      events
+      [...data.events]
         .filter((item) => item.state === "done")
-        .sort((a, b) => b.eventSortDate.localeCompare(a.eventSortDate)),
-    [events],
+        .sort((a, b) =>
+          `${b.eventSortDate}-${b.title}`.localeCompare(`${a.eventSortDate}-${a.title}`, "ja"),
+        ),
+    [data.events],
   );
 
   const doneYears = useMemo(
@@ -230,12 +179,25 @@ export function EventsPage({ data, currentUid, saveTodo, menuRole }: EventsPageP
     [doneEvents],
   );
 
+  useEffect(() => {
+    if (doneYears.length === 0) {
+      if (selectedDoneYear !== defaultClubYear) {
+        setSelectedDoneYear(defaultClubYear);
+      }
+      return;
+    }
+    if (!doneYears.includes(selectedDoneYear)) {
+      setSelectedDoneYear(doneYears[0]);
+    }
+  }, [defaultClubYear, doneYears, selectedDoneYear]);
+
   const filteredDoneEvents = useMemo(
     () => doneEvents.filter((item) => clubYearFromDateKey(item.eventSortDate) === selectedDoneYear),
     [doneEvents, selectedDoneYear],
   );
 
   const visibleEvents = activeTab === "active" ? activeEvents : filteredDoneEvents;
+
   const eventRelatedTodos = useMemo(() => {
     if (!selectedEvent) return [] as Todo[];
     return sortTodosOpenFirst(
@@ -250,6 +212,10 @@ export function EventsPage({ data, currentUid, saveTodo, menuRole }: EventsPageP
     window.setTimeout(() => {
       setFeedback((current) => (current === message ? null : current));
     }, 1800);
+  };
+
+  const showFailure = (message: string) => {
+    setFeedback(message);
   };
 
   const closeDetail = () => {
@@ -276,7 +242,7 @@ export function EventsPage({ data, currentUid, saveTodo, menuRole }: EventsPageP
     setFormErrors({});
   };
 
-  const openEditModal = (event: DemoEvent) => {
+  const openEditModal = (event: EventRecord) => {
     setEditingEventId(event.id);
     setFormDraft({
       title: event.title,
@@ -300,71 +266,95 @@ export function EventsPage({ data, currentUid, saveTodo, menuRole }: EventsPageP
     return errors;
   };
 
-  const saveEvent = () => {
+  const saveEventDraft = async () => {
     const errors = validateForm();
     setFormErrors(errors);
     if (errors.title || errors.eventSortDate) return;
 
-    if (isCreateMode) {
-      const next: DemoEvent = {
-        id: `event-${Date.now()}`,
-        title: formDraft.title.trim(),
-        kind: formDraft.kind,
-        state: formDraft.state,
-        eventSortDate: formDraft.eventSortDate,
-        memo: formDraft.memo.trim(),
-        sessionIds: [],
-      };
-      setEvents((current) => [next, ...current]);
+    try {
+      if (isCreateMode) {
+        await createEvent({
+          title: formDraft.title.trim(),
+          kind: formDraft.kind,
+          state: formDraft.state,
+          eventSortDate: formDraft.eventSortDate,
+          memo: formDraft.memo.trim() || undefined,
+          sessionIds: [],
+        });
+      } else if (editingEvent) {
+        await saveEvent({
+          ...editingEvent,
+          title: formDraft.title.trim(),
+          kind: formDraft.kind,
+          state: formDraft.state,
+          eventSortDate: formDraft.eventSortDate,
+          memo: formDraft.memo.trim() || undefined,
+        });
+      }
+
       closeEditModal();
       showFeedback("保存しました");
-      return;
+    } catch {
+      showFailure("保存に失敗しました");
     }
-
-    if (!editingEvent) return;
-    setEvents((current) =>
-      current.map((item) =>
-        item.id === editingEvent.id
-          ? {
-              ...item,
-              title: formDraft.title.trim(),
-              kind: formDraft.kind,
-              state: formDraft.state,
-              eventSortDate: formDraft.eventSortDate,
-              memo: formDraft.memo.trim(),
-            }
-          : item,
-      ),
-    );
-    closeEditModal();
-    showFeedback("保存しました");
   };
 
-  const toggleEventState = () => {
+  const toggleEventState = async () => {
     if (!selectedEvent) return;
-    setEvents((current) =>
-      current.map((item) =>
-        item.id === selectedEvent.id
-          ? { ...item, state: item.state === "active" ? "done" : "active" }
-          : item,
-      ),
-    );
-  };
-
-  const confirmDelete = () => {
-    if (!deleteTargetEvent) return;
-    setEvents((current) => current.filter((item) => item.id !== deleteTargetEvent.id));
-    if (selectedEvent?.id === deleteTargetEvent.id) {
-      closeDetail();
+    try {
+      await saveEvent({
+        ...selectedEvent,
+        state: selectedEvent.state === "active" ? "done" : "active",
+      });
+    } catch {
+      showFailure("状態更新に失敗しました");
     }
-    setDeleteTargetId(null);
-    showFeedback("削除しました");
   };
 
-  const confirmUnlinkSession = () => {
-    if (!unlinkTargetSession) return;
-    setUnlinkTargetSessionId(null);
-    showFeedback("解除は未実装です");
+  const confirmDelete = async () => {
+    if (!deleteTargetEvent) return;
+    try {
+      await deleteEvent(deleteTargetEvent.id);
+      if (selectedEvent?.id === deleteTargetEvent.id) {
+        closeDetail();
+      }
+      setDeleteTargetId(null);
+      showFeedback("削除しました");
+    } catch {
+      showFailure("削除に失敗しました");
+    }
+  };
+
+  const bindSessionToEvent = async (sessionId: string) => {
+    if (!selectedEvent) return;
+    const mergedSessionIds = Array.from(new Set([...linkedSessions.map((session) => session.id), sessionId]));
+    try {
+      await saveEvent({
+        ...selectedEvent,
+        sessionIds: mergedSessionIds,
+      });
+      showFeedback("紐づけました");
+      setIsSessionBindModalOpen(false);
+    } catch {
+      showFailure("紐づけに失敗しました");
+    }
+  };
+
+  const confirmUnlinkSession = async () => {
+    if (!selectedEvent || !unlinkTargetSession) return;
+    const nextSessionIds = linkedSessions
+      .filter((session) => session.id !== unlinkTargetSession.id)
+      .map((session) => session.id);
+    try {
+      await saveEvent({
+        ...selectedEvent,
+        sessionIds: nextSessionIds,
+      });
+      setUnlinkTargetSessionId(null);
+      showFeedback("解除しました");
+    } catch {
+      showFailure("解除に失敗しました");
+    }
   };
 
   return (
@@ -393,7 +383,7 @@ export function EventsPage({ data, currentUid, saveTodo, menuRole }: EventsPageP
         <label className="events-year-filter">
           <span>年度</span>
           <select value={selectedDoneYear} onChange={(event) => setSelectedDoneYear(Number(event.target.value))}>
-            {doneYears.map((year) => (
+            {(doneYears.length > 0 ? doneYears : [defaultClubYear]).map((year) => (
               <option key={year} value={year}>
                 {clubYearLabel(year)}
               </option>
@@ -462,7 +452,7 @@ export function EventsPage({ data, currentUid, saveTodo, menuRole }: EventsPageP
             </p>
             {selectedEvent.memo && <p className="muted">{selectedEvent.memo}</p>}
             <button type="button" className="events-linked-summary" onClick={() => setIsLinkedSessionsModalOpen(true)}>
-              紐づき予定: {selectedEvent.sessionIds?.length ?? 0}件
+              紐づき予定: {linkedSessions.length}件
             </button>
             <section className="related-todos-block">
               <h4>関連TODO</h4>
@@ -509,7 +499,7 @@ export function EventsPage({ data, currentUid, saveTodo, menuRole }: EventsPageP
               <button
                 type="button"
                 className={`button button-small ${selectedEvent.state === "done" ? "events-reopen-button" : "events-complete-button"}`}
-                onClick={toggleEventState}
+                onClick={() => void toggleEventState()}
               >
                 {selectedEvent.state === "done" ? "進行中に戻す" : "完了にする"}
               </button>
@@ -610,7 +600,7 @@ export function EventsPage({ data, currentUid, saveTodo, menuRole }: EventsPageP
                       <button
                         type="button"
                         className="button button-small button-secondary"
-                        onClick={() => showFeedback("紐づけは未実装です")}
+                        onClick={() => void bindSessionToEvent(session.id)}
                       >
                         紐づける
                       </button>
@@ -620,7 +610,6 @@ export function EventsPage({ data, currentUid, saveTodo, menuRole }: EventsPageP
               ))}
               {bindableEventSessions.length === 0 && <p className="muted">紐づけ可能なイベント予定はありません。</p>}
             </div>
-            <p className="muted">保存処理は Phase 2 で対応予定です。</p>
             <div className="modal-actions">
               <button type="button" className="button button-small" onClick={() => setIsSessionBindModalOpen(false)}>
                 閉じる
@@ -640,12 +629,11 @@ export function EventsPage({ data, currentUid, saveTodo, menuRole }: EventsPageP
             <p className="modal-summary">
               {toDateLabel(unlinkTargetSession.date)} {unlinkTargetSession.startTime}-{unlinkTargetSession.endTime}
             </p>
-            <p className="muted">保存処理は未実装です。</p>
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={() => setUnlinkTargetSessionId(null)}>
                 キャンセル
               </button>
-              <button type="button" className="button events-danger-button" onClick={confirmUnlinkSession}>
+              <button type="button" className="button events-danger-button" onClick={() => void confirmUnlinkSession()}>
                 解除
               </button>
             </div>
@@ -689,7 +677,7 @@ export function EventsPage({ data, currentUid, saveTodo, menuRole }: EventsPageP
             </label>
             <label>
               状態
-              <select value={formDraft.state} onChange={(event) => setFormDraft((current) => ({ ...current, state: event.target.value as EventState }))}>
+              <select value={formDraft.state} onChange={(event) => setFormDraft((current) => ({ ...current, state: event.target.value as EventRecord["state"] }))}>
                 <option value="active">進行中</option>
                 <option value="done">完了</option>
               </select>
@@ -698,7 +686,7 @@ export function EventsPage({ data, currentUid, saveTodo, menuRole }: EventsPageP
               <button type="button" className="button button-secondary" onClick={closeEditModal}>
                 キャンセル
               </button>
-              <button type="button" className="button" onClick={saveEvent}>
+              <button type="button" className="button" onClick={() => void saveEventDraft()}>
                 保存
               </button>
             </div>
@@ -719,7 +707,7 @@ export function EventsPage({ data, currentUid, saveTodo, menuRole }: EventsPageP
               <button type="button" className="button button-secondary" onClick={() => setDeleteTargetId(null)}>
                 キャンセル
               </button>
-              <button type="button" className="button events-danger-button" onClick={confirmDelete}>
+              <button type="button" className="button events-danger-button" onClick={() => void confirmDelete()}>
                 削除
               </button>
             </div>

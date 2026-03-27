@@ -98,6 +98,19 @@ export type RelatedRef = {
   id: string;
 };
 
+export type EventKind = "コンクール" | "演奏会" | "合同練習" | "その他";
+export type EventState = "active" | "done";
+
+export type EventRecord = {
+  id: string;
+  title: string;
+  kind: EventKind;
+  state: EventState;
+  eventSortDate: string;
+  memo?: string;
+  sessionIds?: string[];
+};
+
 export type Todo = {
   id: string;
   kind: TodoKind;
@@ -205,11 +218,6 @@ export type QuoCard = {
   memo?: string;
 };
 
-export type DemoEventSummary = {
-  id: string;
-  title: string;
-};
-
 export type Score = {
   id: string;
   no: number;
@@ -258,7 +266,7 @@ export type DemoData = {
   members: Record<string, DemoMember>;
   users: Record<string, DemoUser>;
   households: Record<string, Household>;
-  events: DemoEventSummary[];
+  events: EventRecord[];
   todos: Todo[];
   purchaseRequests: PurchaseRequest[];
   reimbursements: Reimbursement[];

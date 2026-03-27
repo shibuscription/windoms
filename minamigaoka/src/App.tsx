@@ -32,6 +32,7 @@ import type {
   DemoData,
   DocMemo,
   DemoRsvp,
+  EventRecord,
   Instrument,
   LunchRecord,
   PurchaseRequest,
@@ -64,6 +65,12 @@ import {
   type ModuleVisibilitySettings,
 } from "./modules/menuVisibility";
 import { subscribeModuleVisibilitySettings } from "./modules/moduleVisibilityService";
+import {
+  createEvent as createFirestoreEvent,
+  deleteEvent as deleteFirestoreEvent,
+  saveEvent as saveFirestoreEvent,
+  subscribeEvents,
+} from "./events/service";
 import {
   ensureDayLog as ensureFirestoreDayLog,
   saveDayLog as saveFirestoreDayLog,
@@ -533,6 +540,35 @@ export function App() {
 
   useEffect(() => {
     if (!hasFirebaseAppConfig) {
+      return undefined;
+    }
+
+    try {
+      return subscribeEvents(
+        (events) => {
+          setData((prev) => ({
+            ...prev,
+            events,
+          }));
+        },
+        () => {
+          setData((prev) => ({
+            ...prev,
+            events: [],
+          }));
+        },
+      );
+    } catch {
+      setData((prev) => ({
+        ...prev,
+        events: [],
+      }));
+      return undefined;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hasFirebaseAppConfig) {
       setData((prev) => ({
         ...prev,
         scheduleDays: {},
@@ -841,6 +877,12 @@ export function App() {
 
   const deleteTodo = useCallback((todoId: string) => deleteFirestoreTodo(todoId), []);
 
+  const createEvent = useCallback((event: Omit<EventRecord, "id">) => createFirestoreEvent(event), []);
+
+  const saveEvent = useCallback((event: EventRecord) => saveFirestoreEvent(event), []);
+
+  const deleteEvent = useCallback((eventId: string) => deleteFirestoreEvent(eventId), []);
+
   const updateDocs = (updater: (prev: DocMemo[]) => DocMemo[]) => {
     setData((prev) => ({
       ...prev,
@@ -1036,11 +1078,31 @@ export function App() {
           />
           <Route
             path="/events"
-            element={<EventsPage data={data} currentUid={currentUid} saveTodo={saveTodo} menuRole={currentRole} />}
+            element={
+              <EventsPage
+                data={data}
+                currentUid={currentUid}
+                saveTodo={saveTodo}
+                createEvent={createEvent}
+                saveEvent={saveEvent}
+                deleteEvent={deleteEvent}
+                menuRole={currentRole}
+              />
+            }
           />
           <Route
             path="/events/:eventId"
-            element={<EventsPage data={data} currentUid={currentUid} saveTodo={saveTodo} menuRole={currentRole} />}
+            element={
+              <EventsPage
+                data={data}
+                currentUid={currentUid}
+                saveTodo={saveTodo}
+                createEvent={createEvent}
+                saveEvent={saveEvent}
+                deleteEvent={deleteEvent}
+                menuRole={currentRole}
+              />
+            }
           />
           <Route
             path="/todos"

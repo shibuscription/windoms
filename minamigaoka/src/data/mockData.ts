@@ -1,4 +1,4 @@
-import type { DemoData, ScheduleDayDoc, SessionDoc } from "../types";
+import type { DemoData, EventRecord, ScheduleDayDoc, SessionDoc } from "../types";
 import { shiftDateKey, todayDateKey } from "../utils/date";
 import { makeSessionRelatedId } from "../utils/todoUtils";
 
@@ -146,11 +146,43 @@ const buildMar2026ScheduleDays = (): Record<string, ScheduleDayDoc> => {
   return result;
 };
 
-const demoEvents = [
-  { id: "teiki-2026", title: "定期演奏会" },
-  { id: "touki-2026", title: "陶器まつり屋外演奏" },
-  { id: "camp-2025", title: "夏合宿" },
-  { id: "parent-meeting-2025", title: "保護者会" },
+const demoEvents: EventRecord[] = [
+  {
+    id: "teiki-2026",
+    title: "定期演奏会",
+    kind: "演奏会",
+    state: "active",
+    eventSortDate: "2026-03-20",
+    memo: "会場入り 8:30。打楽器搬入あり。",
+    sessionIds: [],
+  },
+  {
+    id: "touki-2026",
+    title: "陶器まつり屋外演奏",
+    kind: "演奏会",
+    state: "active",
+    eventSortDate: "2026-02-23",
+    memo: "雨天時は体育館演奏へ切替予定。",
+    sessionIds: [],
+  },
+  {
+    id: "camp-2025",
+    title: "夏合宿",
+    kind: "合同練習",
+    state: "done",
+    eventSortDate: "2025-08-10",
+    memo: "持ち物リストを再利用予定。",
+    sessionIds: [],
+  },
+  {
+    id: "parent-meeting-2025",
+    title: "保護者会",
+    kind: "その他",
+    state: "done",
+    eventSortDate: "2025-12-14",
+    memo: "次年度予算案説明。",
+    sessionIds: [],
+  },
 ];
 
 const demoTodos: DemoData["todos"] = [

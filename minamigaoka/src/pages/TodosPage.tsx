@@ -137,21 +137,12 @@ export function TodosPage({
   );
   const eventOptions = useMemo(
     () => {
-      const futureEventTitles = new Set(
-        Object.entries(data.scheduleDays)
-          .filter(([dateKey]) => dateKey >= today)
-          .flatMap(([, day]) =>
-            day.sessions
-              .filter((session) => session.type === "event" && session.eventName?.trim())
-              .map((session) => session.eventName!.trim()),
-          ),
-      );
       return [...data.events]
-        .filter((event) => futureEventTitles.has(event.title))
+        .filter((event) => event.eventSortDate >= today)
         .map((event) => ({ id: event.id, label: event.title }))
         .sort((a, b) => a.label.localeCompare(b.label, "ja"));
     },
-    [data.events, data.scheduleDays, today],
+    [data.events, today],
   );
   const sessionOptions = useMemo(
     () =>
