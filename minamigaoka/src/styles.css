@@ -3581,6 +3581,28 @@ body {
   color: #7e1459;
 }
 
+.session-subtitle-row,
+.calendar-day-sheet-event-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.session-event-detail-link {
+  flex: 0 0 auto;
+  color: #2563eb;
+  font-size: 0.8rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.session-event-detail-link:hover,
+.session-event-detail-link:focus-visible {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
 .shift-role {
   color: #1f2937;
 }

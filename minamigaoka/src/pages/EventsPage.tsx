@@ -56,8 +56,6 @@ const createInitialDraft = (): EventFormDraft => ({
   state: "active",
 });
 
-const normalizeText = (value?: string): string => (value ?? "").trim();
-
 const toLinkedSession = (date: string, session: SessionDoc): LinkedSession => ({
   id: session.id ?? `session:${date}:${session.order}`,
   date,
@@ -131,26 +129,31 @@ export function EventsPage({
     if (!selectedEvent) return [] as LinkedSession[];
 
     const explicitIds = new Set((selectedEvent.sessionIds ?? []).filter((id) => id.trim().length > 0));
-    const normalizedTitle = normalizeText(selectedEvent.title);
-
-    const rows = allEventSessions.filter((session) => {
-      if (explicitIds.size > 0 && explicitIds.has(session.id)) {
-        return true;
-      }
-      return explicitIds.size === 0 && normalizeText(session.eventName) === normalizedTitle;
-    });
+    const rows = allEventSessions.filter((session) => explicitIds.has(session.id));
 
     return rows.sort(compareLinkedSessions);
   }, [allEventSessions, selectedEvent]);
 
   const linkedSessionIds = useMemo(() => new Set(linkedSessions.map((session) => session.id)), [linkedSessions]);
 
+  const otherEventLinkedSessionIds = useMemo(() => {
+    if (!selectedEvent) return new Set<string>();
+    return new Set(
+      data.events
+        .filter((item) => item.id !== selectedEvent.id)
+        .flatMap((item) => (item.sessionIds ?? []).filter((sessionId) => sessionId.trim().length > 0)),
+    );
+  }, [data.events, selectedEvent]);
+
   const unlinkTargetSession =
     unlinkTargetSessionId ? linkedSessions.find((item) => item.id === unlinkTargetSessionId) ?? null : null;
 
   const bindableEventSessions = useMemo(
-    () => allEventSessions.filter((session) => !linkedSessionIds.has(session.id)),
-    [allEventSessions, linkedSessionIds],
+    () =>
+      allEventSessions.filter(
+        (session) => !linkedSessionIds.has(session.id) && !otherEventLinkedSessionIds.has(session.id),
+      ),
+    [allEventSessions, linkedSessionIds, otherEventLinkedSessionIds],
   );
 
   const activeEvents = useMemo(
@@ -333,12 +336,12 @@ export function EventsPage({
         ...selectedEvent,
         sessionIds: mergedSessionIds,
       });
-      showFeedback("紐づけました");
-      setIsSessionBindModalOpen(false);
-    } catch {
-      showFailure("紐づけに失敗しました");
-    }
-  };
+        showFeedback("紐付けました");
+        setIsSessionBindModalOpen(false);
+      } catch {
+        showFailure("紐付けに失敗しました");
+      }
+    };
 
   const confirmUnlinkSession = async () => {
     if (!selectedEvent || !unlinkTargetSession) return;
@@ -451,9 +454,9 @@ export function EventsPage({
               <span className={`event-status ${selectedEvent.state}`}>{selectedEvent.state === "done" ? "完了" : "進行中"}</span>
             </p>
             {selectedEvent.memo && <p className="muted">{selectedEvent.memo}</p>}
-            <button type="button" className="events-linked-summary" onClick={() => setIsLinkedSessionsModalOpen(true)}>
-              紐づき予定: {linkedSessions.length}件
-            </button>
+              <button type="button" className="events-linked-summary" onClick={() => setIsLinkedSessionsModalOpen(true)}>
+                紐付け予定: {linkedSessions.length}件
+              </button>
             <section className="related-todos-block">
               <h4>関連TODO</h4>
               <div className="related-todos-list">
@@ -515,7 +518,7 @@ export function EventsPage({
               ×
             </button>
             <div className="events-linked-header">
-              <h3>紐づき予定</h3>
+                <h3>紐付け予定</h3>
               {isManager && (
                 <button
                   type="button"
@@ -562,7 +565,7 @@ export function EventsPage({
                   </div>
                 </article>
               ))}
-              {linkedSessions.length === 0 && <p className="muted">紐づき予定はありません。</p>}
+              {linkedSessions.length === 0 && <p className="muted">紐付け予定はありません。</p>}
             </div>
             <div className="modal-actions">
               <button type="button" className="button button-small" onClick={() => setIsLinkedSessionsModalOpen(false)}>
@@ -579,9 +582,9 @@ export function EventsPage({
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsSessionBindModalOpen(false)}>
               ×
             </button>
-            <h3>イベント予定を選択</h3>
-            <p className="modal-context">{selectedEvent.title}</p>
-            <div className="calendar-day-sheet-list">
+              <h3>イベント予定を選択</h3>
+              <p className="modal-context">{selectedEvent.title}</p>
+              <div className="calendar-day-sheet-list">
               {bindableEventSessions.map((session) => (
                 <article key={`bind-${session.id}`} className="session-card event">
                   <span className="session-type-badge event">イベント</span>
@@ -608,7 +611,7 @@ export function EventsPage({
                   </div>
                 </article>
               ))}
-              {bindableEventSessions.length === 0 && <p className="muted">紐づけ可能なイベント予定はありません。</p>}
+              {bindableEventSessions.length === 0 && <p className="muted">紐付け可能なイベント予定はありません。</p>}
             </div>
             <div className="modal-actions">
               <button type="button" className="button button-small" onClick={() => setIsSessionBindModalOpen(false)}>

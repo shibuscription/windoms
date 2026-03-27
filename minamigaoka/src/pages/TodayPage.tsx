@@ -133,6 +133,17 @@ export function TodayPage({ data, ensureDayLog, currentUid, saveTodo }: TodayPag
   const day = data.scheduleDays[date];
   const dayDefaultLocation = day?.defaultLocation;
   const noticeText = day?.notice?.trim() ?? "";
+  const eventIdBySessionId = useMemo(() => {
+    const map = new Map<string, string>();
+    data.events.forEach((event) => {
+      (event.sessionIds ?? []).forEach((sessionId) => {
+        if (sessionId.trim()) {
+          map.set(sessionId, event.id);
+        }
+      });
+    });
+    return map;
+  }, [data.events]);
 
   useEffect(() => {
     try {
@@ -402,14 +413,25 @@ export function TodayPage({ data, ensureDayLog, currentUid, saveTodo }: TodayPag
           {sessions.map((session, index) => {
             const counts = countAttendanceRows(attendanceRowsByOrder[session.order] ?? []);
             return (
-              <article key={`${session.order}-${index}`} className={`session-card ${session.type}`}>
-                <span className={`session-type-badge ${session.type}`}>{typeLabel[session.type]}</span>
-                <div className="session-time">
-                  {formatTimeNoLeadingZero(session.startTime)} - {formatTimeNoLeadingZero(session.endTime)}
-                </div>
-                {session.type === "event" && session.eventName?.trim() && (
-                  <div className="session-subtitle">{session.eventName}</div>
-                )}
+                <article key={`${session.order}-${index}`} className={`session-card ${session.type}`}>
+                  <span className={`session-type-badge ${session.type}`}>{typeLabel[session.type]}</span>
+                  <div className="session-time">
+                    {formatTimeNoLeadingZero(session.startTime)} - {formatTimeNoLeadingZero(session.endTime)}
+                  </div>
+                  {session.type === "event" && session.eventName?.trim() && (
+                    <div className="session-subtitle-row">
+                      <div className="session-subtitle">{session.eventName}</div>
+                      {session.id && eventIdBySessionId.get(session.id) && (
+                        <Link
+                          to={`/events/${eventIdBySessionId.get(session.id)}`}
+                          className="session-event-detail-link"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          イベント詳細
+                        </Link>
+                      )}
+                    </div>
+                  )}
                 <div className="kv-row">
                   <span className="kv-key">{dutyLabel[session.dutyRequirement]}:</span>
                   <span className="kv-val shift-role">{toFamilyName(session.assigneeNameSnapshot)}</span>

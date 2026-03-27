@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { BirthdayCelebrationModal } from "../components/BirthdayCelebrationModal";
 import { getBirthdayCelebrants } from "../members/birthday";
 import {
@@ -310,6 +310,17 @@ export function CalendarPage({ data, canManageSessions, ensureDayLog }: Calendar
   const [sessionErrors, setSessionErrors] = useState<FieldErrors>({});
   const [sessionSubmitError, setSessionSubmitError] = useState("");
   const [isSubmittingSession, setIsSubmittingSession] = useState(false);
+  const eventIdBySessionId = useMemo(() => {
+    const map = new Map<string, string>();
+    data.events.forEach((event) => {
+      (event.sessionIds ?? []).forEach((sessionId) => {
+        if (sessionId.trim()) {
+          map.set(sessionId, event.id);
+        }
+      });
+    });
+    return map;
+  }, [data.events]);
   const [families, setFamilies] = useState<FamilyRecord[]>([]);
   const [members, setMembers] = useState<MemberRecord[]>([]);
   const monthPickerRef = useRef<HTMLDivElement | null>(null);
@@ -858,12 +869,23 @@ export function CalendarPage({ data, canManageSessions, ensureDayLog }: Calendar
                       </div>
                     )}
                     <div className="calendar-day-sheet-main session-card-body">
-                      <p className="calendar-day-sheet-time session-time">
-                        {formatTimeNoLeadingZero(session.startTime)}-{formatTimeNoLeadingZero(session.endTime)}
-                      </p>
-                      {session.type === "event" && session.eventName?.trim() && (
-                        <p className="calendar-day-sheet-meta">{session.eventName}</p>
-                      )}
+                        <p className="calendar-day-sheet-time session-time">
+                          {formatTimeNoLeadingZero(session.startTime)}-{formatTimeNoLeadingZero(session.endTime)}
+                        </p>
+                        {session.type === "event" && session.eventName?.trim() && (
+                          <div className="calendar-day-sheet-meta calendar-day-sheet-event-row">
+                            <span>{session.eventName}</span>
+                            {session.id && eventIdBySessionId.get(session.id) && (
+                              <Link
+                                to={`/events/${eventIdBySessionId.get(session.id)}`}
+                                className="session-event-detail-link"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                イベント詳細
+                              </Link>
+                            )}
+                          </div>
+                        )}
                       <p className="calendar-day-sheet-label kv-row">
                         <span className="kv-key">{assigneeRoleLabel(session)}:</span>
                         <span className="kv-val shift-role">{toFamilyName(session.assigneeNameSnapshot)}</span>
