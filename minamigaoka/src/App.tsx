@@ -90,7 +90,6 @@ type MenuItem = {
   label: string;
   icon: string;
   to: string;
-  allowedRoles: DemoMenuRole[];
   badgeText?: string;
   isActive: (location: { pathname: string; search: string }) => boolean;
 };
@@ -175,7 +174,6 @@ const resolvePageLabel = (pathname: string, search: string): string | null => {
 
 const menuSections = (
   activityPlanBadgeText: string | undefined,
-  role: DemoMenuRole,
   linkedMember: MemberRecord | null,
   moduleVisibilitySettings: ModuleVisibilitySettings,
 ): MenuSection[] => {
@@ -189,7 +187,6 @@ const menuSections = (
           label: "Today",
           icon: "📅",
           to: "/today",
-          allowedRoles: ["child", "parent", "admin"],
           isActive: (location) => location.pathname === "/today" && !location.search,
         },
         {
@@ -197,7 +194,6 @@ const menuSections = (
           label: "カレンダー",
           icon: "🗓️",
           to: "/calendar",
-          allowedRoles: ["child", "parent", "admin"],
           isActive: (location) => location.pathname === "/calendar",
         },
         {
@@ -205,7 +201,6 @@ const menuSections = (
           label: "当番日誌",
           icon: "📝",
           to: "/logs",
-          allowedRoles: ["parent", "admin"],
           isActive: (location) => location.pathname === "/logs" || location.pathname.startsWith("/logs/"),
         },
         {
@@ -213,7 +208,6 @@ const menuSections = (
           label: "練習日誌",
           icon: "✍️",
           to: "/today?view=practice-log",
-          allowedRoles: ["child", "parent", "admin"],
           isActive: (location) => viewIsActive(location, "practice-log"),
         },
         {
@@ -221,7 +215,6 @@ const menuSections = (
           label: "宿題",
           icon: "📘",
           to: "/today?view=homework",
-          allowedRoles: ["child", "parent", "admin"],
           isActive: (location) => viewIsActive(location, "homework"),
         },
         {
@@ -229,7 +222,6 @@ const menuSections = (
           label: "TODO",
           icon: "✅",
           to: "/todos",
-          allowedRoles: ["parent", "admin"],
           isActive: (location) => location.pathname === "/todos",
         },
         {
@@ -237,7 +229,6 @@ const menuSections = (
           label: "イベント",
           icon: "🎪",
           to: "/events",
-          allowedRoles: ["child", "parent", "admin"],
           isActive: (location) => location.pathname.startsWith("/events"),
         },
         {
@@ -245,7 +236,6 @@ const menuSections = (
           label: "シフト作成",
           icon: "🧭",
           to: "/activity-plan",
-          allowedRoles: ["admin"],
           badgeText: activityPlanBadgeText,
           isActive: (location) => location.pathname === "/activity-plan",
         },
@@ -260,7 +250,6 @@ const menuSections = (
           label: "購入依頼",
           icon: "🛍️",
           to: "/purchases",
-          allowedRoles: ["parent", "admin"],
           isActive: (location) => location.pathname.startsWith("/purchases"),
         },
         {
@@ -268,7 +257,6 @@ const menuSections = (
           label: "立替",
           icon: "🧾",
           to: "/reimbursements",
-          allowedRoles: ["parent", "admin"],
           isActive: (location) => location.pathname.startsWith("/reimbursements"),
         },
         {
@@ -276,7 +264,6 @@ const menuSections = (
           label: "お弁当",
           icon: "🍱",
           to: "/lunch",
-          allowedRoles: ["parent", "admin"],
           isActive: (location) => location.pathname.startsWith("/lunch"),
         },
         {
@@ -284,7 +271,6 @@ const menuSections = (
           label: "会計",
           icon: "💰",
           to: "/accounting",
-          allowedRoles: ["admin"],
           isActive: (location) => location.pathname.startsWith("/accounting"),
         },
       ],
@@ -298,7 +284,6 @@ const menuSections = (
           label: "楽器",
           icon: "🎷",
           to: "/instruments",
-          allowedRoles: ["child", "parent", "admin"],
           isActive: (location) => location.pathname.startsWith("/instruments"),
         },
         {
@@ -306,7 +291,6 @@ const menuSections = (
           label: "楽譜",
           icon: "🎼",
           to: "/scores",
-          allowedRoles: ["child", "parent", "admin"],
           isActive: (location) => location.pathname.startsWith("/scores"),
         },
         {
@@ -314,7 +298,6 @@ const menuSections = (
           label: "資料",
           icon: "📁",
           to: "/docs",
-          allowedRoles: ["child", "parent", "admin"],
           isActive: (location) =>
             location.pathname === "/docs" || location.pathname.startsWith("/docs/"),
         },
@@ -323,7 +306,6 @@ const menuSections = (
           label: "メンバー",
           icon: "👥",
           to: "/members",
-          allowedRoles: ["child", "parent", "admin"],
           isActive: (location) => location.pathname === "/members",
         },
         {
@@ -331,7 +313,6 @@ const menuSections = (
           label: "リンク集",
           icon: "🔗",
           to: "/links",
-          allowedRoles: ["child", "parent", "admin"],
           isActive: (location) => location.pathname === "/links",
         },
       ],
@@ -345,7 +326,6 @@ const menuSections = (
           label: "設定",
           icon: "⚙️",
           to: "/settings",
-          allowedRoles: ["child", "parent", "admin"],
           isActive: (location) => location.pathname === "/settings",
         },
         {
@@ -353,7 +333,6 @@ const menuSections = (
           label: "メンバー管理",
           icon: "🛠️",
           to: "/settings/members",
-          allowedRoles: ["admin"],
           isActive: (location) => location.pathname === "/settings/members",
         },
         {
@@ -361,7 +340,6 @@ const menuSections = (
           label: "モジュール管理",
           icon: "🧩",
           to: "/settings/modules",
-          allowedRoles: ["admin"],
           isActive: (location) => location.pathname === "/settings/modules",
         },
       ],
@@ -381,8 +359,7 @@ const menuSections = (
       ...section,
       items: section.items.filter(
         (item) =>
-          item.allowedRoles.includes(role) &&
-          canAccessModuleBySettings(item.id, linkedMember, role, moduleVisibilitySettings) &&
+          canAccessModuleBySettings(item.id, linkedMember, moduleVisibilitySettings) &&
           moduleDefinitionsById[item.id] !== undefined,
       ),
     }))
@@ -441,8 +418,8 @@ export function App() {
   const hasShiftSurveyTodo = isAdmin && activityPlanStatus === "SURVEY_OPEN" && unansweredCount > 0;
   const shiftSurveyPath = `/shift-survey?month=${activityPlanMonthKey}`;
   const visibleMenuSections = useMemo(
-    () => menuSections(activityPlanBadgeText, currentRole, linkedMember, moduleVisibilitySettings),
-    [activityPlanBadgeText, currentRole, linkedMember, moduleVisibilitySettings],
+    () => menuSections(activityPlanBadgeText, linkedMember, moduleVisibilitySettings),
+    [activityPlanBadgeText, linkedMember, moduleVisibilitySettings],
   );
 
   useEffect(() => subscribeModuleVisibilitySettings(setModuleVisibilitySettings), []);

@@ -40,35 +40,49 @@ export type MenuModuleDefinition = {
   label: string;
   icon: string;
   sectionId: ModuleSectionId;
-  allowedRoles: DemoMenuRole[];
+  defaultAudienceRoles: DemoMenuRole[];
   lockedToAdmin?: boolean;
 };
 
 export const menuModuleDefinitions: MenuModuleDefinition[] = [
-  { id: "today", label: "Today", icon: "🏠", sectionId: "activity", allowedRoles: ["child", "parent", "admin"] },
-  { id: "calendar", label: "カレンダー", icon: "🗓️", sectionId: "activity", allowedRoles: ["child", "parent", "admin"] },
-  { id: "duty-log", label: "当番日誌", icon: "📝", sectionId: "activity", allowedRoles: ["parent", "admin"] },
-  { id: "practice-log", label: "練習日誌", icon: "🎺", sectionId: "activity", allowedRoles: ["child", "parent", "admin"] },
-  { id: "homework", label: "宿題", icon: "📚", sectionId: "activity", allowedRoles: ["child", "parent", "admin"] },
-  { id: "todo", label: "TODO", icon: "✅", sectionId: "activity", allowedRoles: ["parent", "admin"] },
-  { id: "event", label: "イベント", icon: "🎪", sectionId: "activity", allowedRoles: ["child", "parent", "admin"] },
-  { id: "shift-create", label: "シフト作成", icon: "🧭", sectionId: "activity", allowedRoles: ["admin"] },
-  { id: "purchase-request", label: "購入依頼", icon: "🛒", sectionId: "accounting", allowedRoles: ["parent", "admin"] },
-  { id: "reimbursement", label: "立替", icon: "💴", sectionId: "accounting", allowedRoles: ["parent", "admin"] },
-  { id: "lunch", label: "お弁当", icon: "🍱", sectionId: "accounting", allowedRoles: ["parent", "admin"] },
-  { id: "accounting", label: "会計", icon: "💰", sectionId: "accounting", allowedRoles: ["admin"] },
-  { id: "instruments", label: "楽器", icon: "🎷", sectionId: "assets", allowedRoles: ["child", "parent", "admin"] },
-  { id: "scores", label: "楽譜", icon: "🎼", sectionId: "assets", allowedRoles: ["child", "parent", "admin"] },
-  { id: "docs", label: "資料", icon: "📄", sectionId: "assets", allowedRoles: ["child", "parent", "admin"] },
-  { id: "members", label: "メンバー", icon: "👥", sectionId: "assets", allowedRoles: ["child", "parent", "admin"] },
-  { id: "links", label: "リンク集", icon: "🔗", sectionId: "assets", allowedRoles: ["child", "parent", "admin"] },
-  { id: "settings", label: "設定", icon: "⚙️", sectionId: "settings", allowedRoles: ["child", "parent", "admin"] },
+  { id: "today", label: "Today", icon: "🏠", sectionId: "activity", defaultAudienceRoles: ["child", "parent", "admin"] },
+  { id: "calendar", label: "カレンダー", icon: "🗓️", sectionId: "activity", defaultAudienceRoles: ["child", "parent", "admin"] },
+  { id: "duty-log", label: "当番日誌", icon: "📝", sectionId: "activity", defaultAudienceRoles: ["parent", "admin"] },
+  { id: "practice-log", label: "練習日誌", icon: "🎺", sectionId: "activity", defaultAudienceRoles: ["child", "parent", "admin"] },
+  { id: "homework", label: "宿題", icon: "📚", sectionId: "activity", defaultAudienceRoles: ["child", "parent", "admin"] },
+  { id: "todo", label: "TODO", icon: "✅", sectionId: "activity", defaultAudienceRoles: ["parent", "admin"] },
+  { id: "event", label: "イベント", icon: "🎪", sectionId: "activity", defaultAudienceRoles: ["child", "parent", "admin"] },
+  {
+    id: "shift-create",
+    label: "シフト作成",
+    icon: "🧭",
+    sectionId: "activity",
+    defaultAudienceRoles: ["admin"],
+    lockedToAdmin: true,
+  },
+  { id: "purchase-request", label: "購入依頼", icon: "🛒", sectionId: "accounting", defaultAudienceRoles: ["parent", "admin"] },
+  { id: "reimbursement", label: "立替", icon: "💴", sectionId: "accounting", defaultAudienceRoles: ["parent", "admin"] },
+  { id: "lunch", label: "お弁当", icon: "🍱", sectionId: "accounting", defaultAudienceRoles: ["parent", "admin"] },
+  {
+    id: "accounting",
+    label: "会計",
+    icon: "💰",
+    sectionId: "accounting",
+    defaultAudienceRoles: ["admin"],
+    lockedToAdmin: true,
+  },
+  { id: "instruments", label: "楽器", icon: "🎷", sectionId: "assets", defaultAudienceRoles: ["child", "parent", "admin"] },
+  { id: "scores", label: "楽譜", icon: "🎼", sectionId: "assets", defaultAudienceRoles: ["child", "parent", "admin"] },
+  { id: "docs", label: "資料", icon: "📄", sectionId: "assets", defaultAudienceRoles: ["child", "parent", "admin"] },
+  { id: "members", label: "メンバー", icon: "👥", sectionId: "assets", defaultAudienceRoles: ["child", "parent", "admin"] },
+  { id: "links", label: "リンク集", icon: "🔗", sectionId: "assets", defaultAudienceRoles: ["child", "parent", "admin"] },
+  { id: "settings", label: "設定", icon: "⚙️", sectionId: "settings", defaultAudienceRoles: ["child", "parent", "admin"] },
   {
     id: "members-management",
     label: "メンバー管理",
     icon: "🛠️",
     sectionId: "settings",
-    allowedRoles: ["admin"],
+    defaultAudienceRoles: ["admin"],
     lockedToAdmin: true,
   },
   {
@@ -76,7 +90,7 @@ export const menuModuleDefinitions: MenuModuleDefinition[] = [
     label: "モジュール管理",
     icon: "🧩",
     sectionId: "settings",
-    allowedRoles: ["admin"],
+    defaultAudienceRoles: ["admin"],
     lockedToAdmin: true,
   },
 ];
@@ -87,13 +101,13 @@ const buildDefaultRule = (definition: MenuModuleDefinition): ModuleVisibilityRul
   const memberTypes: MemberType[] = [];
   const adminRoles: AdminRole[] = [];
 
-  if (definition.allowedRoles.includes("child")) {
+  if (definition.defaultAudienceRoles.includes("child")) {
     memberTypes.push("child");
   }
-  if (definition.allowedRoles.includes("parent")) {
+  if (definition.defaultAudienceRoles.includes("parent")) {
     memberTypes.push(...parentScopedMemberTypes);
   }
-  if (definition.allowedRoles.includes("admin")) {
+  if (definition.defaultAudienceRoles.includes("admin")) {
     adminRoles.push("admin");
   }
 
@@ -147,24 +161,23 @@ export const sanitizeModuleVisibilitySettings = (value: unknown): ModuleVisibili
 export const canAccessModuleBySettings = (
   moduleId: ModuleMenuId,
   member: MemberRecord | null | undefined,
-  fallbackRole: DemoMenuRole,
   settings: ModuleVisibilitySettings,
 ): boolean => {
   const definition = menuModuleDefinitions.find((item) => item.id === moduleId);
   if (!definition) return false;
-  const isAdminUser = member?.role === "admin" || member?.adminRole === "admin" || fallbackRole === "admin";
 
+  const isAdminUser = member?.role === "admin" || member?.adminRole === "admin";
   if (definition.lockedToAdmin) {
     return isAdminUser;
-  }
-
-  if (!definition.allowedRoles.includes(fallbackRole)) {
-    return false;
   }
 
   const rule = settings[moduleId] ?? defaultModuleVisibilitySettings[moduleId];
   if (!rule.isPublic) {
     return isAdminUser;
+  }
+
+  if (isAdminUser) {
+    return true;
   }
 
   if (!member) {
