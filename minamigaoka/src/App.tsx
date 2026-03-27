@@ -681,14 +681,25 @@ export function App() {
   }, [location.pathname, location.search]);
 
   const unreadNotificationCount = notifications.filter((item) => !item.read).length;
-  const inboxTodos = useMemo(
+  const sharedInboxTodos = useMemo(
     () =>
       sortTodos(
-        data.todos.filter((todo) => todo.assigneeUid === currentUid && !todo.completed),
+        data.todos.filter(
+          (todo) => todo.kind === "shared" && todo.assigneeUid === currentUid && !todo.completed,
+        ),
       ),
     [data.todos, currentUid],
   );
-  const inboxTodoCount = inboxTodos.length;
+  const privateInboxTodos = useMemo(
+    () =>
+      sortTodos(
+        data.todos.filter(
+          (todo) => todo.kind === "private" && todo.createdByUid === currentUid && !todo.completed,
+        ),
+      ),
+    [data.todos, currentUid],
+  );
+  const inboxTodoCount = sharedInboxTodos.length + privateInboxTodos.length;
   const statusButtons: Array<{ id: "notice" | "todo"; icon: string; label: string; badge: number }> = [
     { id: "notice", icon: "🔔", label: "Notices", badge: unreadNotificationCount },
     { id: "todo", icon: "✅", label: "My TODO", badge: inboxTodoCount + (hasShiftSurveyTodo ? 1 : 0) },
@@ -1303,9 +1314,34 @@ export function App() {
                 <p className="status-panel-subtitle">自分の受信箱</p>
                 <h2 className="status-panel-title">TODO受信箱</h2>
                 <div className="status-todo-section">
-                  <h3>未完了（自分担当）</h3>
+                  <h3>個人TODO</h3>
                   <ul className="status-panel-list">
-                    {inboxTodos.map((item) => {
+                    {privateInboxTodos.map((item) => {
+                      return (
+                        <li key={item.id} className="status-inbox-row">
+                          <div className="status-inbox-main">
+                            <strong>{item.title}</strong>
+                            <span className="status-inbox-meta">期限: {item.dueDate ?? "—"}</span>
+                          </div>
+                          <button
+                            type="button"
+                            className="button button-small button-secondary"
+                            onClick={() =>
+                              void saveTodo({ ...item, completed: true })
+                            }
+                          >
+                            完了
+                          </button>
+                        </li>
+                      );
+                    })}
+                    {privateInboxTodos.length === 0 && <li>個人TODOはありません</li>}
+                  </ul>
+                </div>
+                <div className="status-todo-section">
+                  <h3>共有TODO（自分担当）</h3>
+                  <ul className="status-panel-list">
+                    {sharedInboxTodos.map((item) => {
                       const related = resolveTodoRelatedSummary(data, item);
                       const relatedPath = related.to;
                       return (
@@ -1343,7 +1379,7 @@ export function App() {
                         </li>
                       );
                     })}
-                    {inboxTodos.length === 0 && <li>受信箱のTODOはありません</li>}
+                    {sharedInboxTodos.length === 0 && <li>共有TODOはありません</li>}
                   </ul>
                   <div className="modal-actions">
                     <button

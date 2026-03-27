@@ -156,6 +156,7 @@ const demoEvents = [
 const demoTodos: DemoData["todos"] = [
   {
     id: "todo-001",
+    kind: "shared",
     title: "配布資料の最終確認",
     completed: false,
     createdAt: "2026-02-18T08:10:00+09:00",
@@ -165,6 +166,7 @@ const demoTodos: DemoData["todos"] = [
   },
   {
     id: "todo-002",
+    kind: "shared",
     title: "会場導線の掲示を準備",
     completed: false,
     createdAt: "2026-02-18T09:30:00+09:00",
@@ -174,6 +176,7 @@ const demoTodos: DemoData["todos"] = [
   },
   {
     id: "todo-003",
+    kind: "shared",
     title: "当日セッションの出欠最終確認",
     completed: false,
     createdAt: "2026-02-19T11:00:00+09:00",
@@ -183,6 +186,7 @@ const demoTodos: DemoData["todos"] = [
   },
   {
     id: "todo-004",
+    kind: "shared",
     title: "備品棚の整理",
     completed: false,
     createdAt: "2026-02-20T08:45:00+09:00",
@@ -191,6 +195,7 @@ const demoTodos: DemoData["todos"] = [
   },
   {
     id: "todo-005",
+    kind: "shared",
     title: "連絡テンプレートを更新",
     completed: true,
     createdAt: "2026-02-15T18:20:00+09:00",
@@ -200,6 +205,7 @@ const demoTodos: DemoData["todos"] = [
   },
   {
     id: "todo-006",
+    kind: "shared",
     title: "保護者会の議題たたき台を作る",
     completed: false,
     createdAt: "2026-02-21T07:30:00+09:00",

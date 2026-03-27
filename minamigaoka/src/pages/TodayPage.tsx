@@ -220,7 +220,9 @@ export function TodayPage({ data, ensureDayLog, currentUid, saveTodo }: TodayPag
     if (!selectedSession) return [] as Todo[];
     const relatedId = makeSessionRelatedId(date, selectedSession.order);
     return sortTodosOpenFirst(
-      data.todos.filter((todo) => todo.related?.type === "session" && todo.related.id === relatedId),
+      data.todos.filter(
+        (todo) => todo.kind === "shared" && todo.related?.type === "session" && todo.related.id === relatedId,
+      ),
     );
   }, [data.todos, date, selectedSession]);
   const birthdayCelebrants = useMemo(() => getBirthdayCelebrants(members, date), [date, members]);

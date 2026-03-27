@@ -10,7 +10,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { db, hasFirebaseAppConfig } from "../config/firebase";
-import type { RelatedRef, Todo } from "../types";
+import type { RelatedRef, Todo, TodoKind } from "../types";
 
 const todosCollection = db ? collection(db, "todos") : null;
 
@@ -31,23 +31,30 @@ const toRelatedRef = (value: unknown): RelatedRef | null => {
   return null;
 };
 
+const toTodoKind = (value: unknown): TodoKind => (value === "private" ? "private" : "shared");
+
 const toTodo = (id: string, value: Record<string, unknown>): Todo => ({
   id,
+  kind: toTodoKind(value.kind),
   title: typeof value.title === "string" ? value.title : "",
   completed: value.completed === true,
   createdAt:
     typeof value.createdAt === "string" && value.createdAt.trim()
       ? value.createdAt
       : new Date(0).toISOString(),
+  createdByUid:
+    typeof value.createdByUid === "string" && value.createdByUid.trim() ? value.createdByUid : null,
   assigneeUid: typeof value.assigneeUid === "string" && value.assigneeUid.trim() ? value.assigneeUid : null,
   dueDate: typeof value.dueDate === "string" && value.dueDate.trim() ? value.dueDate : undefined,
   related: toRelatedRef(value.related),
 });
 
 const toPayload = (todo: Omit<Todo, "id">) => ({
+  kind: todo.kind,
   title: todo.title.trim(),
   completed: todo.completed,
   createdAt: todo.createdAt,
+  createdByUid: todo.createdByUid ?? null,
   assigneeUid: todo.assigneeUid ?? null,
   dueDate: todo.dueDate ?? null,
   related: todo.related ?? null,

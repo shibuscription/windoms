@@ -240,7 +240,7 @@ export function EventsPage({ data, currentUid, saveTodo, menuRole }: EventsPageP
     if (!selectedEvent) return [] as Todo[];
     return sortTodosOpenFirst(
       data.todos.filter(
-        (todo) => todo.related?.type === "event" && todo.related.id === selectedEvent.id,
+        (todo) => todo.kind === "shared" && todo.related?.type === "event" && todo.related.id === selectedEvent.id,
       ),
     );
   }, [data.todos, selectedEvent]);

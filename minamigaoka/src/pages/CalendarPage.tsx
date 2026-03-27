@@ -457,7 +457,9 @@ export function CalendarPage({ data, canManageSessions, ensureDayLog }: Calendar
     if (!selectedDay || !attendanceSession) return [] as Todo[];
     const relatedId = makeSessionRelatedId(selectedDay.date, attendanceSession.order);
     return sortTodosOpenFirst(
-      data.todos.filter((todo) => todo.related?.type === "session" && todo.related.id === relatedId),
+      data.todos.filter(
+        (todo) => todo.kind === "shared" && todo.related?.type === "session" && todo.related.id === relatedId,
+      ),
     );
   }, [attendanceSession, data.todos, selectedDay]);
   const birthdayCelebrants = useMemo(

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import type { DemoData, RelatedType, Todo } from "../types";
+import type { DemoData, RelatedType, Todo, TodoKind } from "../types";
 import type { MemberRecord } from "../members/types";
 import { subscribeMembers } from "../members/service";
 import { sortMembersForDisplay } from "../members/permissions";
@@ -9,6 +9,7 @@ import {
   parseSessionRelatedId,
   resolveTodoRelatedSummary,
   sortTodos,
+  sortTodosOpenFirst,
 } from "../utils/todoUtils";
 import { todayDateKey } from "../utils/date";
 
@@ -24,9 +25,11 @@ type StatusFilter = "open" | "done";
 type AssigneeFilter = "all" | "unassigned" | "me";
 type RelatedFilter = "all" | "session" | "event" | "none";
 type RelatedInputType = "none" | RelatedType;
+type TodoTab = "shared" | "private";
 type TodoFormErrors = { title?: string; relatedId?: string };
 
 type TodoDraft = {
+  kind: TodoKind;
   title: string;
   completed: boolean;
   dueDate: string;
@@ -36,6 +39,7 @@ type TodoDraft = {
 };
 
 const createDraft = (): TodoDraft => ({
+  kind: "shared",
   title: "",
   completed: false,
   dueDate: "",
@@ -45,6 +49,7 @@ const createDraft = (): TodoDraft => ({
 });
 
 const draftFromTodo = (todo: Todo): TodoDraft => ({
+  kind: todo.kind,
   title: todo.title,
   completed: todo.completed,
   dueDate: todo.dueDate ?? "",
@@ -53,14 +58,26 @@ const draftFromTodo = (todo: Todo): TodoDraft => ({
   relatedId: todo.related?.id ?? "",
 });
 
+const normalizeDraftForKind = (draft: TodoDraft): TodoDraft =>
+  draft.kind === "private"
+    ? {
+        ...draft,
+        assigneeUid: "",
+        relatedType: "none",
+        relatedId: "",
+      }
+    : draft;
+
 const applyDraft = (source: Todo, draft: TodoDraft): Todo => ({
   ...source,
+  kind: draft.kind,
   title: draft.title.trim(),
   completed: draft.completed,
-  assigneeUid: draft.assigneeUid || null,
+  createdByUid: source.createdByUid ?? null,
+  assigneeUid: draft.kind === "shared" ? draft.assigneeUid || null : null,
   dueDate: draft.dueDate || undefined,
   related:
-    draft.relatedType === "none"
+    draft.kind === "private" || draft.relatedType === "none"
       ? null
       : {
           type: draft.relatedType,
@@ -76,6 +93,7 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
   );
   const [members, setMembers] = useState<MemberRecord[]>([]);
   const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<TodoTab>("shared");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("open");
   const [assigneeFilter, setAssigneeFilter] = useState<AssigneeFilter>("all");
   const [relatedFilter, setRelatedFilter] = useState<RelatedFilter>("all");
@@ -93,9 +111,8 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
       sortMembersForDisplay(members, "all")
         .map((member) => ({
           uid: member.authUid || member.id,
-          name: member.displayName || member.name || member.id,
-        }))
-        .filter((member) => member.uid !== currentUid),
+          name: `${member.displayName || member.name || member.id}${(member.authUid || member.id) === currentUid ? "（自分）" : ""}`,
+        })),
     [currentUid, members],
   );
   const eventOptions = useMemo(
@@ -143,7 +160,9 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
   const validateDraft = (draft: TodoDraft): TodoFormErrors => {
     const errors: TodoFormErrors = {};
     if (!draft.title.trim()) errors.title = "タイトルは必須です";
-    if (draft.relatedType !== "none" && !draft.relatedId) errors.relatedId = "紐付け先を選択してください";
+    if (draft.kind === "shared" && draft.relatedType !== "none" && !draft.relatedId) {
+      errors.relatedId = "紐付け先を選択してください";
+    }
     return errors;
   };
 
@@ -158,7 +177,11 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
     return true;
   };
 
-  const filteredTodos = useMemo(() => sortTodos(data.todos.filter(passFilters)), [data.todos, statusFilter, assigneeFilter, relatedFilter]);
+  const sharedTodos = useMemo(
+    () => data.todos.filter((todo) => todo.kind === "shared" && passFilters(todo)),
+    [data.todos, statusFilter, assigneeFilter, relatedFilter],
+  );
+  const filteredTodos = useMemo(() => sortTodos(sharedTodos), [sharedTodos]);
   const unassignedTodos = useMemo(
     () => filteredTodos.filter((item) => item.assigneeUid === null),
     [filteredTodos],
@@ -166,6 +189,15 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
   const assignedTodos = useMemo(
     () => filteredTodos.filter((item) => item.assigneeUid !== null),
     [filteredTodos],
+  );
+  const privateTodos = useMemo(
+    () =>
+      sortTodosOpenFirst(
+        data.todos.filter(
+          (todo) => todo.kind === "private" && todo.createdByUid === currentUid,
+        ),
+      ),
+    [currentUid, data.todos],
   );
 
   const userNameByUid = (uid: string | null): string => {
@@ -186,22 +218,25 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
   };
 
   const handleCreateTodo = async () => {
-    const errors = validateDraft(createDraftState);
+    const normalizedDraft = normalizeDraftForKind(createDraftState);
+    const errors = validateDraft(normalizedDraft);
     setCreateErrors(errors);
     if (errors.title || errors.relatedId) return;
     const now = new Date().toISOString();
     const next: Omit<Todo, "id"> = {
-      title: createDraftState.title.trim(),
-      completed: createDraftState.completed,
+      kind: normalizedDraft.kind,
+      title: normalizedDraft.title.trim(),
+      completed: normalizedDraft.completed,
       createdAt: now,
-      assigneeUid: createDraftState.assigneeUid || null,
-      dueDate: createDraftState.dueDate || undefined,
+      createdByUid: currentUid,
+      assigneeUid: normalizedDraft.kind === "shared" ? normalizedDraft.assigneeUid || null : null,
+      dueDate: normalizedDraft.dueDate || undefined,
       related:
-        createDraftState.relatedType === "none"
+        normalizedDraft.kind === "private" || normalizedDraft.relatedType === "none"
           ? null
           : {
-              type: createDraftState.relatedType,
-              id: createDraftState.relatedId,
+              type: normalizedDraft.relatedType,
+              id: normalizedDraft.relatedId,
             },
     };
     await createTodo(next);
@@ -220,21 +255,28 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
     if (!editingId) return;
     const base = data.todos.find((item) => item.id === editingId);
     if (!base) return;
-    const errors = validateDraft(editDraft);
+    const normalizedDraft = normalizeDraftForKind(editDraft);
+    const errors = validateDraft(normalizedDraft);
     setEditErrors(errors);
     if (errors.title || errors.relatedId) return;
-    const nextTodo = applyDraft(base, editDraft);
+    const nextTodo = {
+      ...applyDraft(base, normalizedDraft),
+      createdByUid:
+        normalizedDraft.kind === "private" ? currentUid : base.createdByUid ?? null,
+    };
     await saveTodo(nextTodo);
     setEditingId(null);
   };
 
   const assigneeActionLabel = (todo: Todo): string | null => {
+    if (todo.kind !== "shared") return null;
     if (todo.assigneeUid === null) return "引き取る";
     if (todo.assigneeUid !== currentUid) return "引き継ぐ";
     return null;
   };
 
   const runAssigneeAction = async (todo: Todo) => {
+    if (todo.kind !== "shared") return;
     await saveTodo({ ...todo, assigneeUid: currentUid });
   };
 
@@ -254,10 +296,10 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
         <div className="todo-main">
           <p className="todo-title">{todo.title}</p>
           <p className="todo-meta">
-            <span>担当: {userNameByUid(todo.assigneeUid)}</span>
+            <span>{todo.kind === "shared" ? `担当: ${userNameByUid(todo.assigneeUid)}` : "種別: 個人TODO"}</span>
             <span>期限: {todo.dueDate ?? "—"}</span>
           </p>
-          {relatedPath ? (
+          {todo.kind === "shared" && relatedPath ? (
             <button
               type="button"
               className="todo-related-link"
@@ -321,63 +363,92 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
         </button>
       </div>
 
-      <section className="todos-filters">
-        <div className="todos-filter-header">
-          <h2>フィルタ</h2>
-          <button
-            type="button"
-            className={`todos-filter-toggle ${filterActiveCount > 0 ? "active-filter" : ""}`}
-            onClick={() => setIsMobileFilterOpen((prev) => !prev)}
-          >
-            フィルタ {shouldShowFilterBody ? "▲" : "▼"}
-            {filterActiveCount > 0 && <span className="todos-filter-badge">{filterActiveCount}</span>}
-          </button>
-        </div>
-        {shouldShowFilterBody && (
-          <div className="todos-filter-row">
-            <label>
-              状態
-              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
-                <option value="open">未完了</option>
-                <option value="done">完了</option>
-              </select>
-            </label>
-            <label>
-              担当
-              <select value={assigneeFilter} onChange={(event) => setAssigneeFilter(event.target.value as AssigneeFilter)}>
-                <option value="all">すべて</option>
-                <option value="unassigned">未アサイン</option>
-                <option value="me">自分</option>
-              </select>
-            </label>
-            <label>
-              紐付け
-              <select value={relatedFilter} onChange={(event) => setRelatedFilter(event.target.value as RelatedFilter)}>
-                <option value="all">すべて</option>
-                <option value="session">予定</option>
-                <option value="event">イベント</option>
-                <option value="none">なし</option>
-              </select>
-            </label>
+      <div className="events-tabs" role="tablist" aria-label="TODO種別">
+        <button
+          type="button"
+          className={`members-tab ${activeTab === "shared" ? "active" : ""}`}
+          onClick={() => setActiveTab("shared")}
+        >
+          共有TODO
+        </button>
+        <button
+          type="button"
+          className={`members-tab ${activeTab === "private" ? "active" : ""}`}
+          onClick={() => setActiveTab("private")}
+        >
+          個人TODO
+        </button>
+      </div>
+
+      {activeTab === "shared" ? (
+        <>
+          <section className="todos-filters">
+            <div className="todos-filter-header">
+              <h2>フィルタ</h2>
+              <button
+                type="button"
+                className={`todos-filter-toggle ${filterActiveCount > 0 ? "active-filter" : ""}`}
+                onClick={() => setIsMobileFilterOpen((prev) => !prev)}
+              >
+                フィルタ {shouldShowFilterBody ? "▲" : "▼"}
+                {filterActiveCount > 0 && <span className="todos-filter-badge">{filterActiveCount}</span>}
+              </button>
+            </div>
+            {shouldShowFilterBody && (
+              <div className="todos-filter-row">
+                <label>
+                  状態
+                  <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}>
+                    <option value="open">未完了</option>
+                    <option value="done">完了</option>
+                  </select>
+                </label>
+                <label>
+                  担当
+                  <select value={assigneeFilter} onChange={(event) => setAssigneeFilter(event.target.value as AssigneeFilter)}>
+                    <option value="all">すべて</option>
+                    <option value="unassigned">未アサイン</option>
+                    <option value="me">自分</option>
+                  </select>
+                </label>
+                <label>
+                  紐付け
+                  <select value={relatedFilter} onChange={(event) => setRelatedFilter(event.target.value as RelatedFilter)}>
+                    <option value="all">すべて</option>
+                    <option value="session">予定</option>
+                    <option value="event">イベント</option>
+                    <option value="none">なし</option>
+                  </select>
+                </label>
+              </div>
+            )}
+          </section>
+
+          <section className="todos-section">
+            <h2>未アサイン</h2>
+            <div className="todos-list">
+              {unassignedTodos.map(renderTodoRow)}
+              {unassignedTodos.length === 0 && <p className="muted">該当TODOはありません。</p>}
+            </div>
+          </section>
+
+          <section className="todos-section">
+            <h2>アサイン済み</h2>
+            <div className="todos-list">
+              {assignedTodos.map(renderTodoRow)}
+              {assignedTodos.length === 0 && <p className="muted">該当TODOはありません。</p>}
+            </div>
+          </section>
+        </>
+      ) : (
+        <section className="todos-section">
+          <h2>個人TODO</h2>
+          <div className="todos-list">
+            {privateTodos.map(renderTodoRow)}
+            {privateTodos.length === 0 && <p className="muted">個人TODOはありません。</p>}
           </div>
-        )}
-      </section>
-
-      <section className="todos-section">
-        <h2>未アサイン</h2>
-        <div className="todos-list">
-          {unassignedTodos.map(renderTodoRow)}
-          {unassignedTodos.length === 0 && <p className="muted">該当TODOはありません。</p>}
-        </div>
-      </section>
-
-      <section className="todos-section">
-        <h2>アサイン済み</h2>
-        <div className="todos-list">
-          {assignedTodos.map(renderTodoRow)}
-          {assignedTodos.length === 0 && <p className="muted">該当TODOはありません。</p>}
-        </div>
-      </section>
+        </section>
+      )}
 
       {editingId && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
@@ -386,6 +457,20 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
               ×
             </button>
             <h3>TODO編集</h3>
+            <label>
+              種別
+              <select
+                value={editDraft.kind}
+                onChange={(event) =>
+                  setEditDraft((prev) =>
+                    normalizeDraftForKind({ ...prev, kind: event.target.value as TodoKind }),
+                  )
+                }
+              >
+                <option value="shared">共有TODO</option>
+                <option value="private">個人TODO</option>
+              </select>
+            </label>
             <label>
               タイトル
               <input value={editDraft.title} onChange={(event) => setEditDraft((prev) => ({ ...prev, title: event.target.value }))} />
@@ -407,44 +492,47 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
                 <input type="date" value={editDraft.dueDate} onChange={(event) => setEditDraft((prev) => ({ ...prev, dueDate: event.target.value }))} />
               </label>
             </div>
-            <div className="field-grid">
-              <label>
-                担当
-                <select
-                  value={editDraft.assigneeUid}
-                  onChange={(event) => setEditDraft((prev) => ({ ...prev, assigneeUid: event.target.value }))}
-                >
-                  <option value="">未アサイン</option>
-                  <option value={currentUid}>自分</option>
-                  {userOptions.map((user) => (
-                    <option key={user.uid} value={user.uid}>
-                      {user.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                紐付け種別
-                <select value={editDraft.relatedType} onChange={(event) => updateDraftRelationType(setEditDraft, event.target.value as RelatedInputType)}>
-                  <option value="none">なし</option>
-                  <option value="session">予定</option>
-                  <option value="event">イベント</option>
-                </select>
-              </label>
-            </div>
-            {editDraft.relatedType !== "none" && (
-              <label>
-                紐付け先
-                <select value={editDraft.relatedId} onChange={(event) => setEditDraft((prev) => ({ ...prev, relatedId: event.target.value }))}>
-                  <option value="">選択してください</option>
-                  {(editDraft.relatedType === "session" ? sessionOptions : eventOptions).map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                {editErrors.relatedId && <span className="field-error">{editErrors.relatedId}</span>}
-              </label>
+            {editDraft.kind === "shared" && (
+              <>
+                <div className="field-grid">
+                  <label>
+                    担当
+                    <select
+                      value={editDraft.assigneeUid}
+                      onChange={(event) => setEditDraft((prev) => ({ ...prev, assigneeUid: event.target.value }))}
+                    >
+                      <option value="">未アサイン</option>
+                      {userOptions.map((user) => (
+                        <option key={user.uid} value={user.uid}>
+                          {user.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    紐付け種別
+                    <select value={editDraft.relatedType} onChange={(event) => updateDraftRelationType(setEditDraft, event.target.value as RelatedInputType)}>
+                      <option value="none">なし</option>
+                      <option value="session">予定</option>
+                      <option value="event">イベント</option>
+                    </select>
+                  </label>
+                </div>
+                {editDraft.relatedType !== "none" && (
+                  <label>
+                    紐付け先
+                    <select value={editDraft.relatedId} onChange={(event) => setEditDraft((prev) => ({ ...prev, relatedId: event.target.value }))}>
+                      <option value="">選択してください</option>
+                      {(editDraft.relatedType === "session" ? sessionOptions : eventOptions).map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    {editErrors.relatedId && <span className="field-error">{editErrors.relatedId}</span>}
+                  </label>
+                )}
+              </>
             )}
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={() => setEditingId(null)}>
@@ -466,6 +554,20 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
             </button>
             <h3>TODO追加</h3>
             <label>
+              種別
+              <select
+                value={createDraftState.kind}
+                onChange={(event) =>
+                  setCreateDraftState((prev) =>
+                    normalizeDraftForKind({ ...prev, kind: event.target.value as TodoKind }),
+                  )
+                }
+              >
+                <option value="shared">共有TODO</option>
+                <option value="private">個人TODO</option>
+              </select>
+            </label>
+            <label>
               タイトル
               <input
                 value={createDraftState.title}
@@ -482,56 +584,61 @@ export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }
                   onChange={(event) => setCreateDraftState((prev) => ({ ...prev, dueDate: event.target.value }))}
                 />
               </label>
-              <label>
-                担当
-                <select
-                  value={createDraftState.assigneeUid}
-                  onChange={(event) => setCreateDraftState((prev) => ({ ...prev, assigneeUid: event.target.value }))}
-                >
-                  <option value="">未アサイン</option>
-                  <option value={currentUid}>自分</option>
-                  {userOptions.map((user) => (
-                    <option key={user.uid} value={user.uid}>
-                      {user.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
             </div>
-            <div className="field-grid">
-              <label>
-                紐付け種別
-                <select
-                  value={createDraftState.relatedType}
-                  onChange={(event) =>
-                    updateDraftRelationType(setCreateDraftState, event.target.value as RelatedInputType)
-                  }
-                >
-                  <option value="none">なし</option>
-                  <option value="session">予定</option>
-                  <option value="event">イベント</option>
-                </select>
-              </label>
-              {createDraftState.relatedType !== "none" && (
-                <label>
-                  紐付け先
-                  <select
-                    value={createDraftState.relatedId}
-                    onChange={(event) =>
-                      setCreateDraftState((prev) => ({ ...prev, relatedId: event.target.value }))
-                    }
-                  >
-                    <option value="">選択してください</option>
-                    {(createDraftState.relatedType === "session" ? sessionOptions : eventOptions).map((option) => (
-                      <option key={option.id} value={option.id}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                  {createErrors.relatedId && <span className="field-error">{createErrors.relatedId}</span>}
-                </label>
-              )}
-            </div>
+            {createDraftState.kind === "shared" && (
+              <>
+                <div className="field-grid">
+                  <label>
+                    担当
+                    <select
+                      value={createDraftState.assigneeUid}
+                      onChange={(event) => setCreateDraftState((prev) => ({ ...prev, assigneeUid: event.target.value }))}
+                    >
+                      <option value="">未アサイン</option>
+                      {userOptions.map((user) => (
+                        <option key={user.uid} value={user.uid}>
+                          {user.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    紐付け種別
+                    <select
+                      value={createDraftState.relatedType}
+                      onChange={(event) =>
+                        updateDraftRelationType(setCreateDraftState, event.target.value as RelatedInputType)
+                      }
+                    >
+                      <option value="none">なし</option>
+                      <option value="session">予定</option>
+                      <option value="event">イベント</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="field-grid">
+                  {createDraftState.relatedType !== "none" && (
+                    <label>
+                      紐付け先
+                      <select
+                        value={createDraftState.relatedId}
+                        onChange={(event) =>
+                          setCreateDraftState((prev) => ({ ...prev, relatedId: event.target.value }))
+                        }
+                      >
+                        <option value="">選択してください</option>
+                        {(createDraftState.relatedType === "session" ? sessionOptions : eventOptions).map((option) => (
+                          <option key={option.id} value={option.id}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      {createErrors.relatedId && <span className="field-error">{createErrors.relatedId}</span>}
+                    </label>
+                  )}
+                </div>
+              </>
+            )}
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={() => setIsAddModalOpen(false)}>
                 キャンセル
