@@ -21,7 +21,7 @@ type TodayPageProps = {
   data: DemoData;
   ensureDayLog: (date: string) => Promise<void>;
   currentUid: string;
-  updateTodos: (updater: (prev: Todo[]) => Todo[]) => void;
+  saveTodo: (todo: Todo) => Promise<void>;
 };
 
 type AttendanceRow = {
@@ -113,7 +113,7 @@ const countAttendanceRows = (rows: AttendanceRow[]) => ({
 const getSessionDisplayTitle = (session: SessionDoc): string =>
   session.type === "event" && session.eventName?.trim() ? session.eventName.trim() : typeLabel[session.type];
 
-export function TodayPage({ data, ensureDayLog, currentUid, updateTodos }: TodayPageProps) {
+export function TodayPage({ data, ensureDayLog, currentUid, saveTodo }: TodayPageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [selectedSession, setSelectedSession] = useState<SessionDoc | null>(null);
@@ -485,13 +485,7 @@ export function TodayPage({ data, ensureDayLog, currentUid, updateTodos }: Today
                           <input
                             type="checkbox"
                             checked={todo.completed}
-                            onChange={() =>
-                              updateTodos((prev) =>
-                                prev.map((item) =>
-                                  item.id === todo.id ? { ...item, completed: !item.completed } : item,
-                                ),
-                              )
-                            }
+                            onChange={() => void saveTodo({ ...todo, completed: !todo.completed })}
                           />
                         </label>
                         <div className="todo-main">
@@ -506,13 +500,7 @@ export function TodayPage({ data, ensureDayLog, currentUid, updateTodos }: Today
                             <button
                               type="button"
                               className="button button-small"
-                              onClick={() =>
-                                updateTodos((prev) =>
-                                  prev.map((item) =>
-                                    item.id === todo.id ? { ...item, assigneeUid: currentUid } : item,
-                                  ),
-                                )
-                              }
+                              onClick={() => void saveTodo({ ...todo, assigneeUid: currentUid })}
                             >
                               {takeover}
                             </button>

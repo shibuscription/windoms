@@ -162,11 +162,11 @@ const createInitialDraft = (): EventFormDraft => ({
 type EventsPageProps = {
   data: DemoData;
   currentUid: string;
-  updateTodos: (updater: (prev: Todo[]) => Todo[]) => void;
+  saveTodo: (todo: Todo) => Promise<void>;
   menuRole: DemoMenuRole;
 };
 
-export function EventsPage({ data, currentUid, updateTodos, menuRole }: EventsPageProps) {
+export function EventsPage({ data, currentUid, saveTodo, menuRole }: EventsPageProps) {
   const [events, setEvents] = useState<DemoEvent[]>(demoEvents);
   const [activeTab, setActiveTab] = useState<"active" | "done">("active");
   const [isLinkedSessionsModalOpen, setIsLinkedSessionsModalOpen] = useState(false);
@@ -475,13 +475,7 @@ export function EventsPage({ data, currentUid, updateTodos, menuRole }: EventsPa
                         <input
                           type="checkbox"
                           checked={todo.completed}
-                          onChange={() =>
-                            updateTodos((prev) =>
-                              prev.map((item) =>
-                                item.id === todo.id ? { ...item, completed: !item.completed } : item,
-                              ),
-                            )
-                          }
+                          onChange={() => void saveTodo({ ...todo, completed: !todo.completed })}
                         />
                       </label>
                       <div className="todo-main">
@@ -496,13 +490,7 @@ export function EventsPage({ data, currentUid, updateTodos, menuRole }: EventsPa
                           <button
                             type="button"
                             className="button button-small"
-                            onClick={() =>
-                              updateTodos((prev) =>
-                                prev.map((item) =>
-                                  item.id === todo.id ? { ...item, assigneeUid: currentUid } : item,
-                                ),
-                              )
-                            }
+                            onClick={() => void saveTodo({ ...todo, assigneeUid: currentUid })}
                           >
                             {takeover}
                           </button>

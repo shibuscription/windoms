@@ -72,6 +72,12 @@ import {
 } from "./journal/service";
 import { subscribeScheduleDays } from "./schedule/service";
 import { saveScore as saveFirestoreScore, subscribeScores } from "./scores/service";
+import {
+  createTodo as createFirestoreTodo,
+  deleteTodo as deleteFirestoreTodo,
+  saveTodo as saveFirestoreTodo,
+  subscribeTodos,
+} from "./todos/service";
 
 type MenuItem = {
   id: ModuleMenuId;
@@ -378,11 +384,15 @@ const menuSections = (
 };
 
 export function App() {
-  const [data, setData] = useState<DemoData>(() => ({
-    ...loadInitialData(),
-    scheduleDays: {},
-    dayLogs: {},
-  }));
+  const [data, setData] = useState<DemoData>(() => {
+    const initialData = loadInitialData();
+    return {
+      ...initialData,
+      scheduleDays: {},
+      dayLogs: {},
+      todos: hasFirebaseAppConfig ? [] : initialData.todos,
+    };
+  });
   const [authUser, setAuthUser] = useState<AuthenticatedUser | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [linkedMember, setLinkedMember] = useState<MemberRecord | null>(null);
@@ -491,6 +501,35 @@ export function App() {
       active = false;
     };
   }, [authUser]);
+
+  useEffect(() => {
+    if (!hasFirebaseAppConfig) {
+      return undefined;
+    }
+
+    try {
+      return subscribeTodos(
+        (todos) => {
+          setData((prev) => ({
+            ...prev,
+            todos,
+          }));
+        },
+        () => {
+          setData((prev) => ({
+            ...prev,
+            todos: [],
+          }));
+        },
+      );
+    } catch {
+      setData((prev) => ({
+        ...prev,
+        todos: [],
+      }));
+      return undefined;
+    }
+  }, []);
 
   useEffect(() => {
     if (!hasFirebaseAppConfig) {
@@ -785,12 +824,11 @@ export function App() {
     [data, ensureDayLog, saveDayLog, saveSessionRsvps, updateDayLog, updateDemoDictionaries, updateSessionRsvps],
   );
 
-  const updateTodos = (updater: (prev: Todo[]) => Todo[]) => {
-    setData((prev) => ({
-      ...prev,
-      todos: updater(prev.todos),
-    }));
-  };
+  const createTodo = useCallback((todo: Omit<Todo, "id">) => createFirestoreTodo(todo), []);
+
+  const saveTodo = useCallback((todo: Todo) => saveFirestoreTodo(todo), []);
+
+  const deleteTodo = useCallback((todoId: string) => deleteFirestoreTodo(todoId), []);
 
   const updateDocs = (updater: (prev: DocMemo[]) => DocMemo[]) => {
     setData((prev) => ({
@@ -947,7 +985,7 @@ export function App() {
                   data={context.data}
                   ensureDayLog={context.ensureDayLog}
                   currentUid={currentUid}
-                  updateTodos={updateTodos}
+                  saveTodo={saveTodo}
                 />
             }
           />
@@ -987,15 +1025,23 @@ export function App() {
           />
           <Route
             path="/events"
-            element={<EventsPage data={data} currentUid={currentUid} updateTodos={updateTodos} menuRole={currentRole} />}
+            element={<EventsPage data={data} currentUid={currentUid} saveTodo={saveTodo} menuRole={currentRole} />}
           />
           <Route
             path="/events/:eventId"
-            element={<EventsPage data={data} currentUid={currentUid} updateTodos={updateTodos} menuRole={currentRole} />}
+            element={<EventsPage data={data} currentUid={currentUid} saveTodo={saveTodo} menuRole={currentRole} />}
           />
           <Route
             path="/todos"
-            element={<TodosPage data={data} currentUid={currentUid} updateTodos={updateTodos} />}
+            element={
+              <TodosPage
+                data={data}
+                currentUid={currentUid}
+                createTodo={createTodo}
+                saveTodo={saveTodo}
+                deleteTodo={deleteTodo}
+              />
+            }
           />
           <Route path="/docs" element={<DocsListPage data={data} updateDocs={updateDocs} />} />
           <Route path="/docs/new" element={<DocsEditorPage data={data} updateDocs={updateDocs} mode="new" />} />
@@ -1289,11 +1335,7 @@ export function App() {
                             type="button"
                             className="button button-small button-secondary"
                             onClick={() =>
-                              updateTodos((prev) =>
-                                prev.map((todo) =>
-                                  todo.id === item.id ? { ...todo, completed: true } : todo,
-                                ),
-                              )
+                              void saveTodo({ ...item, completed: true })
                             }
                           >
                             完了

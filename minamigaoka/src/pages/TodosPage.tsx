@@ -12,7 +12,9 @@ import { toDemoFamilyName } from "../utils/demoName";
 type TodosPageProps = {
   data: DemoData;
   currentUid: string;
-  updateTodos: (updater: (prev: Todo[]) => Todo[]) => void;
+  createTodo: (todo: Omit<Todo, "id">) => Promise<void>;
+  saveTodo: (todo: Todo) => Promise<void>;
+  deleteTodo: (todoId: string) => Promise<void>;
 };
 
 type StatusFilter = "open" | "done";
@@ -63,7 +65,7 @@ const applyDraft = (source: Todo, draft: TodoDraft): Todo => ({
         },
 });
 
-export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
+export function TodosPage({ data, currentUid, createTodo, saveTodo, deleteTodo }: TodosPageProps) {
   const navigate = useNavigate();
   const [isMobileFilterMode, setIsMobileFilterMode] = useState<boolean>(() =>
     window.matchMedia("(max-width: 760px)").matches,
@@ -154,13 +156,12 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
     }));
   };
 
-  const createTodo = () => {
+  const handleCreateTodo = async () => {
     const errors = validateDraft(createDraftState);
     setCreateErrors(errors);
     if (errors.title || errors.relatedId) return;
     const now = new Date().toISOString();
-    const next: Todo = {
-      id: `todo-${Date.now()}`,
+    const next: Omit<Todo, "id"> = {
       title: createDraftState.title.trim(),
       completed: createDraftState.completed,
       createdAt: now,
@@ -174,7 +175,7 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
               id: createDraftState.relatedId,
             },
     };
-    updateTodos((prev) => [...prev, next]);
+    await createTodo(next);
     setCreateDraftState(createDraft());
     setCreateErrors({});
     setIsAddModalOpen(false);
@@ -186,7 +187,7 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
     setEditErrors({});
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editingId) return;
     const base = data.todos.find((item) => item.id === editingId);
     if (!base) return;
@@ -194,7 +195,7 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
     setEditErrors(errors);
     if (errors.title || errors.relatedId) return;
     const nextTodo = applyDraft(base, editDraft);
-    updateTodos((prev) => prev.map((item) => (item.id === editingId ? nextTodo : item)));
+    await saveTodo(nextTodo);
     setEditingId(null);
   };
 
@@ -204,10 +205,8 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
     return null;
   };
 
-  const runAssigneeAction = (todo: Todo) => {
-    updateTodos((prev) =>
-      prev.map((item) => (item.id === todo.id ? { ...item, assigneeUid: currentUid } : item)),
-    );
+  const runAssigneeAction = async (todo: Todo) => {
+    await saveTodo({ ...todo, assigneeUid: currentUid });
   };
 
   const renderTodoRow = (todo: Todo) => {
@@ -220,11 +219,7 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
           <input
             type="checkbox"
             checked={todo.completed}
-            onChange={() =>
-              updateTodos((prev) =>
-                prev.map((item) => (item.id === todo.id ? { ...item, completed: !item.completed } : item)),
-              )
-            }
+            onChange={() => void saveTodo({ ...todo, completed: !todo.completed })}
           />
         </label>
         <div className="todo-main">
@@ -426,7 +421,7 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
               <button type="button" className="button button-secondary" onClick={() => setEditingId(null)}>
                 キャンセル
               </button>
-              <button type="button" className="button" onClick={saveEdit}>
+              <button type="button" className="button" onClick={() => void saveEdit()}>
                 保存
               </button>
             </div>
@@ -512,7 +507,7 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
               <button type="button" className="button button-secondary" onClick={() => setIsAddModalOpen(false)}>
                 キャンセル
               </button>
-              <button type="button" className="button" onClick={createTodo}>
+              <button type="button" className="button" onClick={() => void handleCreateTodo()}>
                 追加
               </button>
             </div>
@@ -591,7 +586,7 @@ export function TodosPage({ data, currentUid, updateTodos }: TodosPageProps) {
                 type="button"
                 className="button events-danger-button"
                 onClick={() => {
-                  updateTodos((prev) => prev.filter((item) => item.id !== deleteTarget.id));
+                  void deleteTodo(deleteTarget.id);
                   setDeleteTargetId(null);
                 }}
               >
