@@ -205,6 +205,13 @@ const menuSections = (
           isActive: (location) => location.pathname === "/calendar",
         },
         {
+          id: "attendance",
+          label: "\u51fa\u6b20",
+          icon: "\u2611\uFE0F",
+          to: "/attendance",
+          isActive: (location) => location.pathname === "/attendance",
+        },
+        {
           id: "duty-log",
           label: "当番日誌",
           icon: "📝",
@@ -231,13 +238,6 @@ const menuSections = (
           icon: "✅",
           to: "/todos",
           isActive: (location) => location.pathname === "/todos",
-        },
-        {
-          id: "attendance",
-          label: "\u51fa\u6b20",
-          icon: "\u2611\uFE0F",
-          to: "/attendance",
-          isActive: (location) => location.pathname === "/attendance",
         },
         {
           id: "event",

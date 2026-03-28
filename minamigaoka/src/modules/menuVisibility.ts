@@ -46,9 +46,9 @@ export type MenuModuleDefinition = {
 };
 
 export const menuModuleDefinitions: MenuModuleDefinition[] = [
-  { id: "attendance", label: "出欠", icon: "☑️", sectionId: "activity", defaultAudienceRoles: ["child", "parent", "admin"] },
   { id: "today", label: "Today", icon: "🏠", sectionId: "activity", defaultAudienceRoles: ["child", "parent", "admin"] },
   { id: "calendar", label: "カレンダー", icon: "🗓️", sectionId: "activity", defaultAudienceRoles: ["child", "parent", "admin"] },
+  { id: "attendance", label: "出欠", icon: "☑️", sectionId: "activity", defaultAudienceRoles: ["child", "parent", "admin"] },
   { id: "duty-log", label: "当番日誌", icon: "📝", sectionId: "activity", defaultAudienceRoles: ["parent", "admin"] },
   { id: "practice-log", label: "練習日誌", icon: "🎺", sectionId: "activity", defaultAudienceRoles: ["child", "parent", "admin"] },
   { id: "homework", label: "宿題", icon: "📚", sectionId: "activity", defaultAudienceRoles: ["child", "parent", "admin"] },
