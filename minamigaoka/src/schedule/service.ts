@@ -100,6 +100,7 @@ const toDemoRsvps = (snapshotDocs: Awaited<ReturnType<typeof getDocs>>["docs"]):
         displayName:
           typeof value.displayNameSnapshot === "string" ? value.displayNameSnapshot : rsvpDoc.id,
         status,
+        comment: typeof value.comment === "string" ? value.comment : "",
       };
     })
     .sort((left, right) => left.displayName.localeCompare(right.displayName, "ja"));

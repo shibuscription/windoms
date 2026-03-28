@@ -5,6 +5,7 @@ export type DemoMenuRole = "child" | "parent" | "admin";
 export type ModuleMenuId =
   | "today"
   | "calendar"
+  | "attendance"
   | "duty-log"
   | "practice-log"
   | "homework"
@@ -45,6 +46,7 @@ export type MenuModuleDefinition = {
 };
 
 export const menuModuleDefinitions: MenuModuleDefinition[] = [
+  { id: "attendance", label: "出欠", icon: "☑️", sectionId: "activity", defaultAudienceRoles: ["child", "parent", "admin"] },
   { id: "today", label: "Today", icon: "🏠", sectionId: "activity", defaultAudienceRoles: ["child", "parent", "admin"] },
   { id: "calendar", label: "カレンダー", icon: "🗓️", sectionId: "activity", defaultAudienceRoles: ["child", "parent", "admin"] },
   { id: "duty-log", label: "当番日誌", icon: "📝", sectionId: "activity", defaultAudienceRoles: ["parent", "admin"] },

@@ -147,6 +147,9 @@ export const saveSessionRsvps = async (
   const rsvpsCollection = collection(db!, "scheduleDays", date, "sessions", sessionId, "rsvps");
   const existingSnapshot = await getDocs(rsvpsCollection);
   const nextIds = new Set(rsvps.map((rsvp) => rsvp.uid));
+  const existingById = new Map(
+    existingSnapshot.docs.map((currentDoc) => [currentDoc.id, currentDoc.data() as Record<string, unknown>]),
+  );
   const batch = writeBatch(db!);
 
   existingSnapshot.docs.forEach((currentDoc) => {
@@ -160,7 +163,12 @@ export const saveSessionRsvps = async (
       doc(rsvpsCollection, rsvp.uid),
       {
         status: rsvp.status,
-        comment: "",
+        comment:
+          typeof rsvp.comment === "string"
+            ? rsvp.comment
+            : typeof existingById.get(rsvp.uid)?.comment === "string"
+              ? (existingById.get(rsvp.uid)?.comment as string)
+              : "",
         displayNameSnapshot: rsvp.displayName,
         updatedAt: serverTimestamp(),
       },

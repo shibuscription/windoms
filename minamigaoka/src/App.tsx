@@ -82,6 +82,7 @@ import {
   saveSessionRsvps as saveFirestoreSessionRsvps,
   subscribeDayLogs,
 } from "./journal/service";
+import type { SaveAttendanceEntry } from "./attendance/service";
 import { subscribeScheduleDays } from "./schedule/service";
 import { saveScore as saveFirestoreScore, subscribeScores } from "./scores/service";
 import {
@@ -161,6 +162,7 @@ const resolvePageLabel = (pathname: string, search: string): string | null => {
   }
   if (pathname === "/calendar") return "カレンダー";
   if (pathname === "/logs" || pathname.startsWith("/logs/")) return "当番日誌";
+  if (pathname === "/attendance") return "\u51fa\u6b20";
   if (pathname === "/todos") return "TODO";
   if (pathname === "/events" || pathname.startsWith("/events/")) return "イベント";
   if (pathname === "/activity-plan" || pathname === "/shift-survey") return "シフト作成";
@@ -229,6 +231,13 @@ const menuSections = (
           icon: "✅",
           to: "/todos",
           isActive: (location) => location.pathname === "/todos",
+        },
+        {
+          id: "attendance",
+          label: "\u51fa\u6b20",
+          icon: "\u2611\uFE0F",
+          to: "/attendance",
+          isActive: (location) => location.pathname === "/attendance",
         },
         {
           id: "event",
@@ -842,6 +851,52 @@ export function App() {
     [],
   );
 
+  const applyAttendanceEntries = useCallback((entries: SaveAttendanceEntry[]) => {
+    if (entries.length === 0) return;
+    setData((prev) => {
+      let hasChanged = false;
+      const nextScheduleDays = { ...prev.scheduleDays };
+
+      entries.forEach((entry) => {
+        const day = nextScheduleDays[entry.date];
+        if (!day) return;
+
+        const nextSessions = day.sessions.map((session) => {
+          if (session.id !== entry.sessionId) return session;
+
+          const currentRsvps = session.demoRsvps ?? [];
+          const filteredRsvps = currentRsvps.filter((rsvp) => rsvp.uid !== entry.memberId);
+          const nextRsvps =
+            entry.status === "unknown"
+              ? filteredRsvps
+              : [
+                  ...filteredRsvps,
+                  {
+                    uid: entry.memberId,
+                    displayName: entry.displayName,
+                    status: entry.status,
+                    comment: entry.comment,
+                  },
+                ];
+
+          hasChanged = true;
+          return { ...session, demoRsvps: nextRsvps };
+        });
+
+        nextScheduleDays[entry.date] = {
+          ...day,
+          sessions: nextSessions,
+        };
+      });
+
+      if (!hasChanged) return prev;
+      return {
+        ...prev,
+        scheduleDays: nextScheduleDays,
+      };
+    });
+  }, []);
+
   const updateDemoDictionaries = useCallback((next: Partial<DemoData["demoDictionaries"]>) => {
     setData((prev) => ({
       ...prev,
@@ -1055,7 +1110,18 @@ export function App() {
             path="/activity-plan"
             element={isAdmin ? <ActivityPlanPage /> : <Navigate to="/today" replace />}
           />
-          <Route path="/attendance" element={<AttendancePage />} />
+          <Route
+            path="/attendance"
+            element={
+              <AttendancePage
+                data={data}
+                currentUid={currentUid}
+                linkedMember={linkedMember}
+                authRole={authUser?.role ?? null}
+                applyAttendanceEntries={applyAttendanceEntries}
+              />
+            }
+          />
           <Route path="/watch" element={<WatchPage />} />
           <Route path="/shift-survey" element={isAdmin ? <ShiftSurveyPage /> : <Navigate to="/today" replace />} />
           <Route

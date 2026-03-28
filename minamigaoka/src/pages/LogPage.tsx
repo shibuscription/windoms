@@ -799,7 +799,7 @@ export function LogPage({
     () =>
       sessions.reduce<Record<number, AttendanceRow[]>>((result, session) => {
         result[session.order] = visibleChildMembers.map((member) => {
-          const rsvpUid = member.authUid || member.id || member.loginId;
+          const rsvpUid = member.id || member.authUid || member.loginId;
           const matched =
             session.demoRsvps?.find(
               (item) =>

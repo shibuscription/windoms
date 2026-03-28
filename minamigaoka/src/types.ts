@@ -6,6 +6,7 @@ export type DemoRsvp = {
   uid: string;
   displayName: string;
   status: RsvpStatus;
+  comment?: string;
 };
 
 export type DemoMember = {
