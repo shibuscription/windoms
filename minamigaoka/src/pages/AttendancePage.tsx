@@ -49,6 +49,13 @@ type AttendanceCellModalState = {
   comment: string;
 };
 
+type AttendanceCommentModalState = {
+  sessionKey: string;
+  title: string;
+  editable: boolean;
+  comment: string;
+};
+
 type DraftEntry = {
   status: RsvpStatus;
   comment: string;
@@ -77,18 +84,15 @@ const TEXT = {
   save: "\u4fdd\u5b58",
   saving: "\u4fdd\u5b58\u4e2d...",
   saveSuccess: "\u51fa\u6b20\u3092\u4fdd\u5b58\u3057\u307e\u3057\u305f\u3002",
-  commentPlaceholder: "\u88dc\u8db3\u304c\u3042\u308c\u3070\u5165\u529b",
-  commentDisabledPlaceholder: "\u307e\u305a \u25cb / \u25b3 / \u00d7 \u3092\u9078\u3093\u3067\u304f\u3060\u3055\u3044",
+  commentPlaceholder: "\u30b3\u30e1\u30f3\u30c8",
   readOnlyEmptyComment: "-",
   adminHelperTitle: "\u672a\u56de\u7b54\u30c1\u30a7\u30c3\u30af",
   adminHelperEmpty: "\u672a\u56de\u7b54\u306f\u3042\u308a\u307e\u305b\u3093\u3002",
-  commentToggle: "\u30b3\u30e1\u30f3\u30c8",
-  commentEdit: "\u5165\u529b",
-  commentExpand: "\u5168\u6587\u3092\u8868\u793a",
-  commentCollapse: "\u9589\u3058\u308b",
+  commentTitle: "\u30b3\u30e1\u30f3\u30c8",
   noMembers: "\u5bfe\u8c61\u306e\u90e8\u54e1\u306f\u307e\u3060\u3044\u307e\u305b\u3093\u3002",
   directEditSave: "\u6c7a\u5b9a",
   directEditSaving: "\u4fdd\u5b58\u4e2d...",
+  statusRequired: "\u25cb / \u25b3 / \u00d7 \u306e\u3044\u305a\u308c\u304b\u3092\u9078\u3093\u3067\u304f\u3060\u3055\u3044\u3002",
 };
 
 const statusButtonMeta: Array<{ status: RsvpStatus; symbol: string; label: string }> = [
@@ -109,14 +113,17 @@ const makeSessionKey = (item: AttendanceSessionItem): string =>
 const getSessionMetaLabel = (item: AttendanceSessionItem): string =>
   `${formatDateYmd(item.date)}(${formatWeekdayJa(item.date)}) ${formatTimeNoLeadingZero(item.session.startTime)}-${formatTimeNoLeadingZero(item.session.endTime)}`;
 
+const getSessionDateLabel = (item: AttendanceSessionItem): string =>
+  `${formatDateYmd(item.date)}(${formatWeekdayJa(item.date)})`;
+
+const getSessionDateCompactLabel = (item: AttendanceSessionItem): string =>
+  `${formatDateYmd(item.date).slice(5)}(${formatWeekdayJa(item.date)})`;
+
+const getSessionTimeLabel = (item: AttendanceSessionItem): string =>
+  `${formatTimeNoLeadingZero(item.session.startTime)}-${formatTimeNoLeadingZero(item.session.endTime)}`;
+
 const getSessionHeading = (session: SessionDoc): string | null =>
   session.type === "event" && session.eventName?.trim() ? session.eventName.trim() : null;
-
-const summarizeComment = (value: string, maxLength = 18): string => {
-  const normalized = value.replace(/\s+/g, " ").trim();
-  if (!normalized) return TEXT.readOnlyEmptyComment;
-  return normalized.length > maxLength ? `${normalized.slice(0, maxLength)}...` : normalized;
-};
 
 const buildMonthSessions = (data: DemoData, monthKey: string): AttendanceSessionItem[] => {
   const items = Object.entries(data.scheduleDays).flatMap(([date, day]) => {
@@ -167,11 +174,11 @@ export function AttendancePage({
     null,
   );
   const [selectedCellState, setSelectedCellState] = useState<AttendanceCellModalState | null>(null);
+  const [selectedCommentState, setSelectedCommentState] = useState<AttendanceCommentModalState | null>(null);
   const [draftBySessionKey, setDraftBySessionKey] = useState<Record<string, DraftEntry>>({});
   const [saveError, setSaveError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
-  const [expandedCommentSessionKeys, setExpandedCommentSessionKeys] = useState<string[]>([]);
   const rowTargetRef = useRef<HTMLTableRowElement | null>(null);
   const columnTargetRef = useRef<HTMLButtonElement | null>(null);
   const today = todayDateKey();
@@ -214,7 +221,6 @@ export function AttendancePage({
     if (!selectedMemberState) return;
     setSaveError("");
     setIsSaving(false);
-    setExpandedCommentSessionKeys([]);
 
     const nextDraft = buildMonthSessions(data, monthKey).reduce<Record<string, DraftEntry>>(
       (result, item) => {
@@ -352,7 +358,6 @@ export function AttendancePage({
     setDraftBySessionKey({});
     setSaveError("");
     setIsSaving(false);
-    setExpandedCommentSessionKeys([]);
   };
 
   const closeSessionModal = () => {
@@ -362,6 +367,21 @@ export function AttendancePage({
   const closeCellModal = () => {
     setSelectedCellState(null);
     setSaveError("");
+  };
+
+  const openCommentModal = (item: AttendanceSessionItem, editable: boolean) => {
+    const sessionKey = makeSessionKey(item);
+    const draft = draftBySessionKey[sessionKey] ?? { status: "unknown" as RsvpStatus, comment: "" };
+    setSelectedCommentState({
+      sessionKey,
+      title: getSessionHeading(item.session) ?? TEXT.commentTitle,
+      editable,
+      comment: draft.comment,
+    });
+  };
+
+  const closeCommentModal = () => {
+    setSelectedCommentState(null);
   };
 
   const updateDraftStatus = (sessionKey: string, status: RsvpStatus) => {
@@ -384,14 +404,12 @@ export function AttendancePage({
     }));
   };
 
-  const toggleCommentExpansion = (sessionKey: string) => {
-    setExpandedCommentSessionKeys((prev) =>
-      prev.includes(sessionKey) ? prev.filter((key) => key !== sessionKey) : [...prev, sessionKey],
-    );
-  };
-
   const updateCellStatus = (status: RsvpStatus) => {
     setSelectedCellState((prev) => (prev ? { ...prev, status } : prev));
+  };
+
+  const updateCommentDraft = (comment: string) => {
+    setSelectedCommentState((prev) => (prev ? { ...prev, comment } : prev));
   };
 
   const persistEntries = async (entries: SaveAttendanceEntry[], onSuccess: () => void) => {
@@ -415,6 +433,10 @@ export function AttendancePage({
 
   const handleSave = async () => {
     if (!selectedMemberState?.editable) return;
+    if (modalSessions.some((item) => (draftBySessionKey[makeSessionKey(item)]?.status ?? "unknown") === "unknown")) {
+      setSaveError(TEXT.statusRequired);
+      return;
+    }
 
     const entries: SaveAttendanceEntry[] = modalSessions.map((item) => {
       const sessionKey = makeSessionKey(item);
@@ -434,6 +456,10 @@ export function AttendancePage({
 
   const handleCellSave = async () => {
     if (!selectedCellState) return;
+    if (selectedCellState.status === "unknown") {
+      setSaveError(TEXT.statusRequired);
+      return;
+    }
     const entry: SaveAttendanceEntry = {
       date: selectedCellState.item.date,
       sessionId: selectedCellState.item.session.id ?? "",
@@ -444,6 +470,15 @@ export function AttendancePage({
       updatedBy: currentUid || linkedMember?.id || selectedCellState.member.id,
     };
     await persistEntries([entry], closeCellModal);
+  };
+
+  const handleCommentSave = () => {
+    if (!selectedCommentState?.editable) {
+      closeCommentModal();
+      return;
+    }
+    updateDraftComment(selectedCommentState.sessionKey, selectedCommentState.comment);
+    closeCommentModal();
   };
 
   return (
@@ -531,10 +566,7 @@ export function AttendancePage({
                         className="attendance-member-button"
                         onClick={() => openMemberModal(member)}
                       >
-                        <span className="attendance-member-name">
-                          {member.name}
-                          {editableMemberIds.has(member.id) && <span className="attendance-member-edit-icon">✏</span>}
-                        </span>
+                        <span className="attendance-member-name">{member.name}</span>
                       </button>
                     </th>
                   ))}
@@ -656,10 +688,7 @@ export function AttendancePage({
                           className="attendance-member-button row"
                           onClick={() => openMemberModal(member)}
                         >
-                          <span className="attendance-member-name">
-                            {member.name}
-                            {editableMemberIds.has(member.id) && <span className="attendance-member-edit-icon">✏</span>}
-                          </span>
+                          <span className="attendance-member-name">{member.name}</span>
                           <span className="attendance-member-counts">
                             <span className="attendance-count-pill count-yes">{`${TEXT.statusYes}${counts.yes}`}</span>
                             <span className="attendance-count-pill count-maybe">{`${TEXT.statusMaybe}${counts.maybe}`}</span>
@@ -722,12 +751,13 @@ export function AttendancePage({
               {modalSessions.map((item) => {
                 const sessionKey = makeSessionKey(item);
                 const draft = draftBySessionKey[sessionKey] ?? { status: "unknown" as RsvpStatus, comment: "" };
-                const commentExpanded = expandedCommentSessionKeys.includes(sessionKey);
                 return (
                   <div key={sessionKey} className="attendance-member-modal-row" role="row">
                     <div className="attendance-member-modal-session" role="cell">
                       <div className="attendance-member-modal-session-main">
-                        <span>{getSessionMetaLabel(item)}</span>
+                        <span className="attendance-session-date attendance-session-date-full">{getSessionDateLabel(item)}</span>
+                        <span className="attendance-session-date attendance-session-date-compact">{getSessionDateCompactLabel(item)}</span>
+                        <span className="attendance-session-time">{getSessionTimeLabel(item)}</span>
                         {getSessionHeading(item.session) && (
                           <strong className="attendance-session-title" title={getSessionHeading(item.session) ?? undefined}>
                             {getSessionHeading(item.session)}
@@ -746,8 +776,8 @@ export function AttendancePage({
                                 type="button"
                                 className={`rsvp-toggle ${option.status} ${draft.status === option.status ? "active" : ""}`}
                                 onClick={() => updateDraftStatus(sessionKey, option.status)}
-                                title={option.label}
-                                aria-label={option.label}
+                                title={option.symbol}
+                                aria-label={option.symbol}
                               >
                                 {option.symbol}
                               </button>
@@ -757,26 +787,13 @@ export function AttendancePage({
                         <div className="attendance-comment-cell" role="cell">
                           <button
                             type="button"
-                            className="attendance-comment-toggle"
-                            onClick={() => toggleCommentExpansion(sessionKey)}
+                            className="attendance-comment-icon-button"
+                            onClick={() => openCommentModal(item, true)}
+                            aria-label={draft.comment.trim() ? "コメント編集" : "コメント追加"}
+                            title={draft.comment.trim() ? "コメント編集" : "コメント追加"}
                           >
-                            <span>{draft.comment.trim() ? summarizeComment(draft.comment) : TEXT.commentToggle}</span>
-                            <span>{commentExpanded ? TEXT.commentCollapse : TEXT.commentEdit}</span>
+                            {draft.comment.trim() ? "📝" : "➕"}
                           </button>
-                          {commentExpanded && (
-                            <label className="attendance-comment-field">
-                              <textarea
-                                value={draft.comment}
-                                onChange={(event) => updateDraftComment(sessionKey, event.target.value)}
-                                placeholder={
-                                  draft.status === "unknown"
-                                    ? TEXT.commentDisabledPlaceholder
-                                    : TEXT.commentPlaceholder
-                                }
-                                disabled={draft.status === "unknown"}
-                              />
-                            </label>
-                          )}
                         </div>
                       </>
                     ) : (
@@ -794,20 +811,16 @@ export function AttendancePage({
                         </div>
                         <div className="attendance-comment-cell" role="cell">
                           {draft.comment.trim() ? (
-                            <>
-                              <button
-                                type="button"
-                                className="attendance-comment-toggle"
-                                onClick={() => toggleCommentExpansion(sessionKey)}
-                              >
-                                <span>{summarizeComment(draft.comment)}</span>
-                                <span>{commentExpanded ? TEXT.commentCollapse : TEXT.commentExpand}</span>
-                              </button>
-                              {commentExpanded && <p className="attendance-comment-readonly">{draft.comment.trim()}</p>}
-                            </>
-                          ) : (
-                            <p className="attendance-comment-readonly empty">{TEXT.readOnlyEmptyComment}</p>
-                          )}
+                            <button
+                              type="button"
+                              className="attendance-comment-icon-button"
+                              onClick={() => openCommentModal(item, false)}
+                              aria-label="コメント閲覧"
+                              title="コメント閲覧"
+                            >
+                              📝
+                            </button>
+                          ) : null}
                         </div>
                       </>
                     )}
@@ -907,7 +920,13 @@ export function AttendancePage({
             <h2>{selectedCellState.member.name}</h2>
             <div className="attendance-member-modal-session attendance-cell-modal-heading">
               <div className="attendance-member-modal-session-main">
-                <span>{getSessionMetaLabel(selectedCellState.item)}</span>
+                <span className="attendance-session-date attendance-session-date-full">
+                  {getSessionDateLabel(selectedCellState.item)}
+                </span>
+                <span className="attendance-session-date attendance-session-date-compact">
+                  {getSessionDateCompactLabel(selectedCellState.item)}
+                </span>
+                <span className="attendance-session-time">{getSessionTimeLabel(selectedCellState.item)}</span>
                 {getSessionHeading(selectedCellState.item.session) && (
                   <strong className="attendance-session-title" title={getSessionHeading(selectedCellState.item.session) ?? undefined}>
                     {getSessionHeading(selectedCellState.item.session)}
@@ -920,15 +939,16 @@ export function AttendancePage({
             </div>
             {saveError && <p className="modal-error">{saveError}</p>}
             <div className="attendance-cell-status-grid">
-              {[...statusButtonMeta, { status: "unknown" as RsvpStatus, symbol: TEXT.statusUnknown, label: "未回答" }].map((option) => (
+              {statusButtonMeta.map((option) => (
                 <button
                   key={option.status}
                   type="button"
                   className={`attendance-cell-status-option ${option.status} ${selectedCellState.status === option.status ? "active" : ""}`}
                   onClick={() => updateCellStatus(option.status)}
+                  aria-label={option.symbol}
+                  title={option.symbol}
                 >
                   <span>{option.symbol}</span>
-                  <span>{option.label}</span>
                 </button>
               ))}
             </div>
@@ -941,9 +961,54 @@ export function AttendancePage({
               >
                 {TEXT.cancel}
               </button>
-              <button type="button" className="button" onClick={() => void handleCellSave()} disabled={isSaving}>
+              <button
+                type="button"
+                className="button"
+                onClick={() => void handleCellSave()}
+                disabled={isSaving || selectedCellState.status === "unknown"}
+              >
                 {isSaving ? TEXT.directEditSaving : TEXT.directEditSave}
               </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {selectedCommentState && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={closeCommentModal}>
+          <section className="modal-panel attendance-comment-modal" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close"
+              onClick={closeCommentModal}
+              aria-label={TEXT.close}
+              title={TEXT.close}
+            >
+              ×
+            </button>
+            <h2>{selectedCommentState.title}</h2>
+            {selectedCommentState.editable ? (
+              <label className="attendance-comment-field">
+                <textarea
+                  value={selectedCommentState.comment}
+                  onChange={(event) => updateCommentDraft(event.target.value)}
+                  placeholder={TEXT.commentPlaceholder}
+                />
+              </label>
+            ) : (
+              <p className="attendance-comment-readonly">
+                {selectedCommentState.comment.trim() || TEXT.readOnlyEmptyComment}
+              </p>
+            )}
+            <div className="modal-actions">
+              <button type="button" className="button button-secondary" onClick={closeCommentModal}>
+                {TEXT.cancel}
+              </button>
+              {selectedCommentState.editable && (
+                <button type="button" className="button" onClick={handleCommentSave}>
+                  {TEXT.save}
+                </button>
+              )}
             </div>
           </section>
         </div>
