@@ -6816,8 +6816,9 @@ textarea {
 }
 
 @media (min-width: 768px) {
-  .attendance-session-counts,
-  .attendance-member-counts {
+  .attendance-session-head .attendance-session-counts,
+  .attendance-session-column-head .attendance-session-counts,
+  .attendance-member-row-head .attendance-member-counts {
     display: flex;
   }
 }
@@ -6910,6 +6911,11 @@ textarea {
 
   .attendance-session-counts,
   .attendance-member-counts {
+    display: none;
+  }
+
+  .attendance-session-head .attendance-session-title,
+  .attendance-session-column-head .attendance-session-column-title {
     display: none;
   }
 
