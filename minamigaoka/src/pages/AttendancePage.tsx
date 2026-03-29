@@ -125,6 +125,13 @@ const getSessionTimeLabel = (item: AttendanceSessionItem): string =>
 const getSessionHeading = (session: SessionDoc): string | null =>
   session.type === "event" && session.eventName?.trim() ? session.eventName.trim() : null;
 
+const getAttendanceMemberNameLines = (member: MemberRecord): [string, string?] => {
+  const familyName = member.familyName?.trim() ?? "";
+  const givenName = member.givenName?.trim() ?? "";
+  if (familyName && givenName) return [familyName, givenName];
+  return [member.name];
+};
+
 const buildMonthSessions = (data: DemoData, monthKey: string): AttendanceSessionItem[] => {
   const items = Object.entries(data.scheduleDays).flatMap(([date, day]) => {
     if (getMonthKeyFromDateKey(date) !== monthKey) return [];
@@ -566,7 +573,13 @@ export function AttendancePage({
                         className="attendance-member-button"
                         onClick={() => openMemberModal(member)}
                       >
-                        <span className="attendance-member-name">{member.name}</span>
+                        <span className="attendance-member-name">
+                          {getAttendanceMemberNameLines(member).map((line, index) => (
+                            <span key={`${member.id}-head-${index}`} className="attendance-member-name-line">
+                              {line}
+                            </span>
+                          ))}
+                        </span>
                       </button>
                     </th>
                   ))}
@@ -657,8 +670,8 @@ export function AttendancePage({
                           onClick={() => openSessionModal(item)}
                           ref={targetSessionKey === sessionKey ? columnTargetRef : null}
                         >
-                          <span>{formatDateYmd(item.date).slice(5)}</span>
-                          <span>{formatTimeNoLeadingZero(item.session.startTime)}</span>
+                          <span className="attendance-session-column-date">{getSessionDateCompactLabel(item)}</span>
+                          <span className="attendance-session-column-time">{getSessionTimeLabel(item)}</span>
                           {getSessionHeading(item.session) && (
                             <span className="attendance-session-column-title" title={getSessionHeading(item.session) ?? undefined}>
                               {getSessionHeading(item.session)}
@@ -688,7 +701,13 @@ export function AttendancePage({
                           className="attendance-member-button row"
                           onClick={() => openMemberModal(member)}
                         >
-                          <span className="attendance-member-name">{member.name}</span>
+                          <span className="attendance-member-name">
+                            {getAttendanceMemberNameLines(member).map((line, index) => (
+                              <span key={`${member.id}-row-${index}`} className="attendance-member-name-line">
+                                {line}
+                              </span>
+                            ))}
+                          </span>
                           <span className="attendance-member-counts">
                             <span className="attendance-count-pill count-yes">{`${TEXT.statusYes}${counts.yes}`}</span>
                             <span className="attendance-count-pill count-maybe">{`${TEXT.statusMaybe}${counts.maybe}`}</span>

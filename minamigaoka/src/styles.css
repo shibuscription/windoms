@@ -6409,10 +6409,13 @@ textarea {
 }
 
 .attendance-member-name {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
+  display: grid;
+  justify-items: center;
+  line-height: 1.05;
+}
+
+.attendance-member-name-line {
+  display: block;
 }
 
 .attendance-member-button.row {
@@ -6420,7 +6423,7 @@ textarea {
 }
 
 .attendance-member-button.row .attendance-member-name {
-  justify-content: flex-start;
+  justify-items: start;
 }
 
 .attendance-session-head {
@@ -6451,6 +6454,9 @@ textarea {
 .attendance-session-title {
   font-size: 0.94rem;
   color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .attendance-session-date-compact {
@@ -6517,14 +6523,21 @@ textarea {
   position: relative;
   align-content: start;
   padding-top: 2px;
-  padding-right: 38px;
+  padding-right: 34px;
+}
+
+.attendance-session-column-date,
+.attendance-session-column-time {
+  font-size: 0.72rem;
+  color: #64748b;
+  white-space: nowrap;
 }
 
 .attendance-session-column-title {
+  display: block;
   font-weight: 700;
   color: #0f172a;
-  padding-right: 2px;
-  max-width: 7.2em;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -6851,7 +6864,12 @@ textarea {
   .attendance-session-column-title,
   .attendance-member-name {
     font-size: 0.62rem;
-    max-width: 4.4em;
+    max-width: none;
+  }
+
+  .attendance-session-column-date,
+  .attendance-session-column-time {
+    font-size: 0.56rem;
   }
 
   .attendance-session-counts,
@@ -6891,7 +6909,7 @@ textarea {
   }
 
   .attendance-session-column-button {
-    padding-right: 34px;
+    padding-right: 30px;
   }
 
   .attendance-session-head-top {
