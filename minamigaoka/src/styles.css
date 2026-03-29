@@ -6409,13 +6409,15 @@ textarea {
 }
 
 .attendance-member-name {
-  display: grid;
-  justify-items: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.18em;
   line-height: 1.05;
 }
 
 .attendance-member-name-line {
-  display: block;
+  display: inline;
 }
 
 .attendance-member-button.row {
@@ -6832,14 +6834,17 @@ textarea {
   }
 
   .attendance-corner-cell,
-  .attendance-session-head,
-  .attendance-member-row-head {
-    min-width: 94px;
+  .attendance-session-head {
+    min-width: 72px;
   }
 
   .attendance-session-column-head,
   .attendance-member-head {
     min-width: 56px;
+  }
+
+  .attendance-member-row-head {
+    min-width: 52px;
   }
 
   .attendance-matrix th,
@@ -6869,7 +6874,7 @@ textarea {
 
   .attendance-session-column-date,
   .attendance-session-column-time {
-    font-size: 0.56rem;
+    font-size: 0.52rem;
   }
 
   .attendance-session-counts,
@@ -6904,16 +6909,39 @@ textarea {
   .attendance-session-head .session-type-badge,
   .attendance-session-column-head .session-type-badge,
   .attendance-member-modal-session .session-type-badge {
-    font-size: 0.6rem;
-    padding: 1px 6px;
+    font-size: 0.5rem;
+    padding: 0 4px;
+    line-height: 1.3;
   }
 
   .attendance-session-column-button {
-    padding-right: 30px;
+    padding-right: 24px;
   }
 
   .attendance-session-head-top {
-    padding-right: 36px;
+    padding-right: 24px;
+  }
+
+  .attendance-session-column-title {
+    max-width: 2.4em;
+  }
+
+  .attendance-member-name {
+    display: grid;
+    justify-items: center;
+    gap: 0;
+  }
+
+  .attendance-member-name-line {
+    display: block;
+  }
+
+  .attendance-member-button.row {
+    text-align: center;
+  }
+
+  .attendance-member-button.row .attendance-member-name {
+    justify-items: center;
   }
 
   .attendance-member-modal {
