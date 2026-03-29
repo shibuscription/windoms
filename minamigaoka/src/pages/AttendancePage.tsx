@@ -42,6 +42,13 @@ type AttendanceSessionModalState = {
   item: AttendanceSessionItem;
 };
 
+type AttendanceCellModalState = {
+  item: AttendanceSessionItem;
+  member: MemberRecord;
+  status: RsvpStatus;
+  comment: string;
+};
+
 type DraftEntry = {
   status: RsvpStatus;
   comment: string;
@@ -75,13 +82,13 @@ const TEXT = {
   readOnlyEmptyComment: "-",
   adminHelperTitle: "\u672a\u56de\u7b54\u30c1\u30a7\u30c3\u30af",
   adminHelperEmpty: "\u672a\u56de\u7b54\u306f\u3042\u308a\u307e\u305b\u3093\u3002",
-  editableLabel: "\u7de8\u96c6",
-  readOnlyLabel: "\u95b2\u89a7",
   commentToggle: "\u30b3\u30e1\u30f3\u30c8",
   commentEdit: "\u5165\u529b",
   commentExpand: "\u5168\u6587\u3092\u8868\u793a",
   commentCollapse: "\u9589\u3058\u308b",
   noMembers: "\u5bfe\u8c61\u306e\u90e8\u54e1\u306f\u307e\u3060\u3044\u307e\u305b\u3093\u3002",
+  directEditSave: "\u6c7a\u5b9a",
+  directEditSaving: "\u4fdd\u5b58\u4e2d...",
 };
 
 const statusButtonMeta: Array<{ status: RsvpStatus; symbol: string; label: string }> = [
@@ -102,8 +109,8 @@ const makeSessionKey = (item: AttendanceSessionItem): string =>
 const getSessionMetaLabel = (item: AttendanceSessionItem): string =>
   `${formatDateYmd(item.date)}(${formatWeekdayJa(item.date)}) ${formatTimeNoLeadingZero(item.session.startTime)}-${formatTimeNoLeadingZero(item.session.endTime)}`;
 
-const getSessionHeading = (session: SessionDoc): string =>
-  session.type === "event" && session.eventName?.trim() ? session.eventName.trim() : "\u4e88\u5b9a";
+const getSessionHeading = (session: SessionDoc): string | null =>
+  session.type === "event" && session.eventName?.trim() ? session.eventName.trim() : null;
 
 const summarizeComment = (value: string, maxLength = 18): string => {
   const normalized = value.replace(/\s+/g, " ").trim();
@@ -159,6 +166,7 @@ export function AttendancePage({
   const [selectedSessionState, setSelectedSessionState] = useState<AttendanceSessionModalState | null>(
     null,
   );
+  const [selectedCellState, setSelectedCellState] = useState<AttendanceCellModalState | null>(null);
   const [draftBySessionKey, setDraftBySessionKey] = useState<Record<string, DraftEntry>>({});
   const [saveError, setSaveError] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -327,6 +335,18 @@ export function AttendancePage({
     setSelectedSessionState({ item });
   };
 
+  const openCellModal = (item: AttendanceSessionItem, member: MemberRecord) => {
+    if (!editableMemberIds.has(member.id)) return;
+    const current = findRsvpForMember(item.session, member);
+    setSelectedCellState({
+      item,
+      member,
+      status: current?.status ?? "unknown",
+      comment: current?.comment ?? "",
+    });
+    setSaveError("");
+  };
+
   const closeMemberModal = () => {
     setSelectedMemberState(null);
     setDraftBySessionKey({});
@@ -337,6 +357,11 @@ export function AttendancePage({
 
   const closeSessionModal = () => {
     setSelectedSessionState(null);
+  };
+
+  const closeCellModal = () => {
+    setSelectedCellState(null);
+    setSaveError("");
   };
 
   const updateDraftStatus = (sessionKey: string, status: RsvpStatus) => {
@@ -365,10 +390,31 @@ export function AttendancePage({
     );
   };
 
-  const handleSave = async () => {
-    if (!selectedMemberState?.editable) return;
+  const updateCellStatus = (status: RsvpStatus) => {
+    setSelectedCellState((prev) => (prev ? { ...prev, status } : prev));
+  };
+
+  const persistEntries = async (entries: SaveAttendanceEntry[], onSuccess: () => void) => {
     setIsSaving(true);
     setSaveError("");
+    try {
+      const validEntries = entries.filter((entry) => entry.sessionId);
+      await saveAttendanceEntries(validEntries);
+      applyAttendanceEntries(validEntries);
+      setToastMessage(TEXT.saveSuccess);
+      onSuccess();
+    } catch (error) {
+      setSaveError(
+        error instanceof Error ? error.message : "\u51fa\u6b20\u306e\u4fdd\u5b58\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002",
+      );
+      setIsSaving(false);
+      return;
+    }
+    setIsSaving(false);
+  };
+
+  const handleSave = async () => {
+    if (!selectedMemberState?.editable) return;
 
     const entries: SaveAttendanceEntry[] = modalSessions.map((item) => {
       const sessionKey = makeSessionKey(item);
@@ -383,18 +429,21 @@ export function AttendancePage({
         updatedBy: currentUid || linkedMember?.id || selectedMemberState.member.id,
       };
     });
+    await persistEntries(entries, closeMemberModal);
+  };
 
-    try {
-      await saveAttendanceEntries(entries.filter((entry) => entry.sessionId));
-      applyAttendanceEntries(entries.filter((entry) => entry.sessionId));
-      setToastMessage(TEXT.saveSuccess);
-      closeMemberModal();
-    } catch (error) {
-      setSaveError(
-        error instanceof Error ? error.message : "\u51fa\u6b20\u306e\u4fdd\u5b58\u306b\u5931\u6557\u3057\u307e\u3057\u305f\u3002",
-      );
-      setIsSaving(false);
-    }
+  const handleCellSave = async () => {
+    if (!selectedCellState) return;
+    const entry: SaveAttendanceEntry = {
+      date: selectedCellState.item.date,
+      sessionId: selectedCellState.item.session.id ?? "",
+      memberId: selectedCellState.member.id,
+      displayName: selectedCellState.member.name,
+      status: selectedCellState.status,
+      comment: selectedCellState.comment,
+      updatedBy: currentUid || linkedMember?.id || selectedCellState.member.id,
+    };
+    await persistEntries([entry], closeCellModal);
   };
 
   return (
@@ -482,9 +531,9 @@ export function AttendancePage({
                         className="attendance-member-button"
                         onClick={() => openMemberModal(member)}
                       >
-                        <span>{member.name}</span>
-                        <span className={`attendance-member-access ${editableMemberIds.has(member.id) ? "editable" : "readonly"}`}>
-                          {editableMemberIds.has(member.id) ? TEXT.editableLabel : TEXT.readOnlyLabel}
+                        <span className="attendance-member-name">
+                          {member.name}
+                          {editableMemberIds.has(member.id) && <span className="attendance-member-edit-icon">✏</span>}
                         </span>
                       </button>
                     </th>
@@ -518,7 +567,11 @@ export function AttendancePage({
                                 <span className="attendance-session-time">
                                   {formatTimeNoLeadingZero(item.session.startTime)}-{formatTimeNoLeadingZero(item.session.endTime)}
                                 </span>
-                                <strong className="attendance-session-title">{getSessionHeading(item.session)}</strong>
+                                {getSessionHeading(item.session) && (
+                                  <strong className="attendance-session-title" title={getSessionHeading(item.session) ?? undefined}>
+                                    {getSessionHeading(item.session)}
+                                  </strong>
+                                )}
                               </div>
                               <span className={`session-type-badge ${item.session.type}`}>{sessionTypeLabel[item.session.type]}</span>
                             </div>
@@ -533,9 +586,21 @@ export function AttendancePage({
                       </th>
                       {childMembers.map((member) => {
                         const status = findRsvpForMember(item.session, member)?.status ?? "unknown";
+                        const editable = editableMemberIds.has(member.id);
                         return (
                           <td key={member.id} className={`attendance-cell ${status}`}>
-                            <span className={`rsvp-mark ${status}`}>{status === "yes" ? TEXT.statusYes : status === "maybe" ? TEXT.statusMaybe : status === "no" ? TEXT.statusNo : TEXT.statusUnknown}</span>
+                            {editable ? (
+                              <button
+                                type="button"
+                                className={`attendance-cell-button ${status}`}
+                                onClick={() => openCellModal(item, member)}
+                                aria-label={`${member.name} ${getSessionMetaLabel(item)} の出欠を変更`}
+                              >
+                                <span className={`rsvp-mark ${status}`}>{status === "yes" ? TEXT.statusYes : status === "maybe" ? TEXT.statusMaybe : status === "no" ? TEXT.statusNo : TEXT.statusUnknown}</span>
+                              </button>
+                            ) : (
+                              <span className={`rsvp-mark ${status}`}>{status === "yes" ? TEXT.statusYes : status === "maybe" ? TEXT.statusMaybe : status === "no" ? TEXT.statusNo : TEXT.statusUnknown}</span>
+                            )}
                           </td>
                         );
                       })}
@@ -562,7 +627,11 @@ export function AttendancePage({
                         >
                           <span>{formatDateYmd(item.date).slice(5)}</span>
                           <span>{formatTimeNoLeadingZero(item.session.startTime)}</span>
-                          <span className="attendance-session-column-title">{getSessionHeading(item.session)}</span>
+                          {getSessionHeading(item.session) && (
+                            <span className="attendance-session-column-title" title={getSessionHeading(item.session) ?? undefined}>
+                              {getSessionHeading(item.session)}
+                            </span>
+                          )}
                           <span className={`session-type-badge ${item.session.type}`}>{sessionTypeLabel[item.session.type]}</span>
                           <span className="attendance-session-counts compact">
                             <span className="attendance-count-pill count-yes">{`${TEXT.statusYes}${counts.yes}`}</span>
@@ -587,9 +656,9 @@ export function AttendancePage({
                           className="attendance-member-button row"
                           onClick={() => openMemberModal(member)}
                         >
-                          <span>{member.name}</span>
-                          <span className={`attendance-member-access ${editableMemberIds.has(member.id) ? "editable" : "readonly"}`}>
-                            {editableMemberIds.has(member.id) ? TEXT.editableLabel : TEXT.readOnlyLabel}
+                          <span className="attendance-member-name">
+                            {member.name}
+                            {editableMemberIds.has(member.id) && <span className="attendance-member-edit-icon">✏</span>}
                           </span>
                           <span className="attendance-member-counts">
                             <span className="attendance-count-pill count-yes">{`${TEXT.statusYes}${counts.yes}`}</span>
@@ -601,9 +670,21 @@ export function AttendancePage({
                       </th>
                       {monthSessions.map((item) => {
                         const status = findRsvpForMember(item.session, member)?.status ?? "unknown";
+                        const editable = editableMemberIds.has(member.id);
                         return (
                           <td key={makeSessionKey(item)} className={`attendance-cell ${status}`}>
-                            <span className={`rsvp-mark ${status}`}>{status === "yes" ? TEXT.statusYes : status === "maybe" ? TEXT.statusMaybe : status === "no" ? TEXT.statusNo : TEXT.statusUnknown}</span>
+                            {editable ? (
+                              <button
+                                type="button"
+                                className={`attendance-cell-button ${status}`}
+                                onClick={() => openCellModal(item, member)}
+                                aria-label={`${member.name} ${getSessionMetaLabel(item)} の出欠を変更`}
+                              >
+                                <span className={`rsvp-mark ${status}`}>{status === "yes" ? TEXT.statusYes : status === "maybe" ? TEXT.statusMaybe : status === "no" ? TEXT.statusNo : TEXT.statusUnknown}</span>
+                              </button>
+                            ) : (
+                              <span className={`rsvp-mark ${status}`}>{status === "yes" ? TEXT.statusYes : status === "maybe" ? TEXT.statusMaybe : status === "no" ? TEXT.statusNo : TEXT.statusUnknown}</span>
+                            )}
                           </td>
                         );
                       })}
@@ -634,8 +715,8 @@ export function AttendancePage({
             <div className="attendance-member-modal-list">
               <div className="attendance-member-modal-table" role="table" aria-label={`${selectedMemberState.member.name}\u306e\u51fa\u6b20`}>
                 <div className="attendance-member-modal-table-head" role="row">
-                  <span role="columnheader">\u4e88\u5b9a</span>
-                  <span role="columnheader">\u72b6\u614b</span>
+                  <span role="columnheader">日付 / 時刻</span>
+                  <span role="columnheader">状態</span>
                   <span role="columnheader">{TEXT.commentLabel}</span>
                 </div>
               {modalSessions.map((item) => {
@@ -646,8 +727,12 @@ export function AttendancePage({
                   <div key={sessionKey} className="attendance-member-modal-row" role="row">
                     <div className="attendance-member-modal-session" role="cell">
                       <div className="attendance-member-modal-session-main">
-                        <strong>{getSessionHeading(item.session)}</strong>
                         <span>{getSessionMetaLabel(item)}</span>
+                        {getSessionHeading(item.session) && (
+                          <strong className="attendance-session-title" title={getSessionHeading(item.session) ?? undefined}>
+                            {getSessionHeading(item.session)}
+                          </strong>
+                        )}
                       </div>
                       <span className={`session-type-badge ${item.session.type}`}>{sessionTypeLabel[item.session.type]}</span>
                     </div>
@@ -768,7 +853,7 @@ export function AttendancePage({
               {formatTimeNoLeadingZero(selectedSessionState.item.session.startTime)}-
               {formatTimeNoLeadingZero(selectedSessionState.item.session.endTime)}
             </p>
-            <h2>{getSessionHeading(selectedSessionState.item.session)}</h2>
+            <h2>{getSessionHeading(selectedSessionState.item.session) ?? TEXT.title}</h2>
             <p className="modal-summary">
               <span className={`session-type-badge ${selectedSessionState.item.session.type}`}>
                 {sessionTypeLabel[selectedSessionState.item.session.type]}
@@ -802,6 +887,63 @@ export function AttendancePage({
                   </div>
                 ))
               )}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {selectedCellState && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={closeCellModal}>
+          <section className="modal-panel attendance-cell-modal" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close"
+              onClick={closeCellModal}
+              aria-label={TEXT.close}
+              title={TEXT.close}
+            >
+              ×
+            </button>
+            <h2>{selectedCellState.member.name}</h2>
+            <div className="attendance-member-modal-session attendance-cell-modal-heading">
+              <div className="attendance-member-modal-session-main">
+                <span>{getSessionMetaLabel(selectedCellState.item)}</span>
+                {getSessionHeading(selectedCellState.item.session) && (
+                  <strong className="attendance-session-title" title={getSessionHeading(selectedCellState.item.session) ?? undefined}>
+                    {getSessionHeading(selectedCellState.item.session)}
+                  </strong>
+                )}
+              </div>
+              <span className={`session-type-badge ${selectedCellState.item.session.type}`}>
+                {sessionTypeLabel[selectedCellState.item.session.type]}
+              </span>
+            </div>
+            {saveError && <p className="modal-error">{saveError}</p>}
+            <div className="attendance-cell-status-grid">
+              {[...statusButtonMeta, { status: "unknown" as RsvpStatus, symbol: TEXT.statusUnknown, label: "未回答" }].map((option) => (
+                <button
+                  key={option.status}
+                  type="button"
+                  className={`attendance-cell-status-option ${option.status} ${selectedCellState.status === option.status ? "active" : ""}`}
+                  onClick={() => updateCellStatus(option.status)}
+                >
+                  <span>{option.symbol}</span>
+                  <span>{option.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={closeCellModal}
+                disabled={isSaving}
+              >
+                {TEXT.cancel}
+              </button>
+              <button type="button" className="button" onClick={() => void handleCellSave()} disabled={isSaving}>
+                {isSaving ? TEXT.directEditSaving : TEXT.directEditSave}
+              </button>
             </div>
           </section>
         </div>

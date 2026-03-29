@@ -6408,8 +6408,25 @@ textarea {
   text-align: center;
 }
 
+.attendance-member-name {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
 .attendance-member-button.row {
   text-align: left;
+}
+
+.attendance-member-button.row .attendance-member-name {
+  justify-content: flex-start;
+}
+
+.attendance-member-edit-icon {
+  font-size: 0.74rem;
+  color: #475569;
+  line-height: 1;
 }
 
 .attendance-session-head {
@@ -6495,17 +6512,23 @@ textarea {
   gap: 3px;
   text-align: left;
   position: relative;
+  align-content: start;
 }
 
 .attendance-session-column-title {
   font-weight: 700;
   color: #0f172a;
   padding-right: 2px;
+  max-width: 7.2em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .attendance-cell {
   min-width: 64px;
   font-weight: 700;
+  padding: 0 !important;
 }
 
 .attendance-cell.yes {
@@ -6529,6 +6552,22 @@ textarea {
   align-items: center;
   justify-content: center;
   min-width: 1.8em;
+}
+
+.attendance-cell-button {
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.attendance-cell-button:hover,
+.attendance-cell-button:focus-visible {
+  outline: 0;
+  box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.18);
 }
 
 .attendance-member-modal {
@@ -6580,11 +6619,19 @@ textarea {
 .attendance-member-modal-session-main {
   display: grid;
   gap: 4px;
+  min-width: 0;
 }
 
-.attendance-member-modal-session span {
+.attendance-member-modal-session-main span {
   font-size: 0.84rem;
   color: #64748b;
+}
+
+.attendance-member-modal-session .attendance-session-title {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .attendance-member-modal-fields {
@@ -6656,32 +6703,6 @@ textarea {
   color: #94a3b8;
 }
 
-.attendance-member-access {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: fit-content;
-  margin: 0 auto;
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-.attendance-member-button.row .attendance-member-access {
-  margin: 0;
-}
-
-.attendance-member-access.editable {
-  background: #dbeafe;
-  color: #1d4ed8;
-}
-
-.attendance-member-access.readonly {
-  background: #e2e8f0;
-  color: #475569;
-}
-
 .attendance-count-pill {
   display: inline-flex;
   align-items: center;
@@ -6717,6 +6738,54 @@ textarea {
   width: min(440px, calc(100vw - 24px));
 }
 
+.attendance-cell-modal {
+  width: min(360px, calc(100vw - 24px));
+}
+
+.attendance-cell-modal-heading {
+  margin-bottom: 12px;
+}
+
+.attendance-cell-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.attendance-cell-status-option {
+  display: grid;
+  gap: 4px;
+  place-items: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #fff;
+  padding: 12px 10px;
+  font: inherit;
+  color: #334155;
+  cursor: pointer;
+}
+
+.attendance-cell-status-option.active {
+  border-color: #2563eb;
+  box-shadow: inset 0 0 0 1px #2563eb;
+}
+
+.attendance-cell-status-option.yes.active {
+  background: #ecfdf5;
+}
+
+.attendance-cell-status-option.maybe.active {
+  background: #fff7ed;
+}
+
+.attendance-cell-status-option.no.active {
+  background: #fef2f2;
+}
+
+.attendance-cell-status-option.unknown.active {
+  background: #f8fafc;
+}
+
 @media (max-width: 767px) {
   .attendance-page-header,
   .attendance-page-controls {
@@ -6738,12 +6807,17 @@ textarea {
   .attendance-corner-cell,
   .attendance-session-head,
   .attendance-member-row-head {
-    min-width: 138px;
+    min-width: 120px;
   }
 
   .attendance-session-column-head,
   .attendance-member-head {
-    min-width: 92px;
+    min-width: 74px;
+  }
+
+  .attendance-matrix th,
+  .attendance-matrix td {
+    padding: 6px 7px;
   }
 
   .attendance-session-date-full {
@@ -6756,12 +6830,37 @@ textarea {
 
   .attendance-session-time,
   .attendance-session-date {
-    font-size: 0.76rem;
+    font-size: 0.7rem;
   }
 
   .attendance-session-title,
   .attendance-session-column-title {
-    font-size: 0.86rem;
+    font-size: 0.78rem;
+    max-width: 5.8em;
+  }
+
+  .attendance-session-counts,
+  .attendance-member-counts {
+    gap: 4px;
+    font-size: 0.72rem;
+  }
+
+  .attendance-count-pill {
+    min-width: 2.2em;
+    padding: 1px 5px;
+    font-size: 0.68rem;
+  }
+
+  .attendance-cell {
+    min-width: 44px;
+  }
+
+  .attendance-cell-button {
+    min-height: 34px;
+  }
+
+  .attendance-session-column-button {
+    gap: 2px;
   }
 
   .attendance-member-modal-table-head,
