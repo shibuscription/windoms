@@ -566,23 +566,32 @@ export function AttendancePage({
               <thead>
                 <tr>
                   <th className="attendance-sticky-col attendance-corner-cell">{TEXT.sessionColumn}</th>
-                  {childMembers.map((member) => (
-                    <th key={member.id} className="attendance-member-head">
-                      <button
-                        type="button"
-                        className="attendance-member-button"
-                        onClick={() => openMemberModal(member)}
-                      >
-                        <span className="attendance-member-name">
-                          {getAttendanceMemberNameLines(member).map((line, index) => (
-                            <span key={`${member.id}-head-${index}`} className="attendance-member-name-line">
-                              {line}
-                            </span>
-                          ))}
-                        </span>
-                      </button>
-                    </th>
-                  ))}
+                  {childMembers.map((member) => {
+                    const counts = memberCounts[member.id] ?? { yes: 0, maybe: 0, no: 0, unknown: 0 };
+                    return (
+                      <th key={member.id} className="attendance-member-head">
+                        <button
+                          type="button"
+                          className="attendance-member-button"
+                          onClick={() => openMemberModal(member)}
+                        >
+                          <span className="attendance-member-name">
+                            {getAttendanceMemberNameLines(member).map((line, index) => (
+                              <span key={`${member.id}-head-${index}`} className="attendance-member-name-line">
+                                {line}
+                              </span>
+                            ))}
+                          </span>
+                          <span className="attendance-member-counts">
+                            <span className="attendance-count-pill count-yes">{`${TEXT.statusYes}${counts.yes}`}</span>
+                            <span className="attendance-count-pill count-maybe">{`${TEXT.statusMaybe}${counts.maybe}`}</span>
+                            <span className="attendance-count-pill count-no">{`${TEXT.statusNo}${counts.no}`}</span>
+                            <span className="attendance-count-pill count-unknown">{`${TEXT.statusUnknown}${counts.unknown}`}</span>
+                          </span>
+                        </button>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>

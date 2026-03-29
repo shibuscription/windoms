@@ -6818,6 +6818,7 @@ textarea {
 @media (min-width: 768px) {
   .attendance-session-head .attendance-session-counts,
   .attendance-session-column-head .attendance-session-counts,
+  .attendance-member-head .attendance-member-counts,
   .attendance-member-row-head .attendance-member-counts {
     display: flex;
   }
