@@ -96,7 +96,7 @@ const TEXT = {
 };
 
 const statusButtonMeta: Array<{ status: RsvpStatus; symbol: string; label: string }> = [
-  { status: "yes", symbol: TEXT.statusYes, label: TEXT.statusYesLabel },
+  { status: "yes", symbol: "◯", label: TEXT.statusYesLabel },
   { status: "maybe", symbol: TEXT.statusMaybe, label: TEXT.statusMaybeLabel },
   { status: "no", symbol: TEXT.statusNo, label: TEXT.statusNoLabel },
 ];

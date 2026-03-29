@@ -6482,12 +6482,17 @@ textarea {
   min-width: 132px;
 }
 
-.attendance-session-column-head .session-type-badge,
 .attendance-session-head .session-type-badge,
 .attendance-member-modal-session .session-type-badge,
 .attendance-session-modal .session-type-badge {
   position: static;
   align-self: flex-start;
+}
+
+.attendance-session-column-head .session-type-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 
 .attendance-session-button {
@@ -6507,6 +6512,8 @@ textarea {
   text-align: left;
   position: relative;
   align-content: start;
+  padding-top: 2px;
+  padding-right: 54px;
 }
 
 .attendance-session-column-title {
@@ -6871,6 +6878,10 @@ textarea {
   .attendance-member-modal-session .session-type-badge {
     font-size: 0.6rem;
     padding: 1px 6px;
+  }
+
+  .attendance-session-column-button {
+    padding-right: 42px;
   }
 
   .attendance-member-modal {
