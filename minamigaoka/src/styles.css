@@ -6923,7 +6923,11 @@ textarea {
   }
 
   .attendance-session-column-title {
-    max-width: 2.4em;
+    max-width: 3.6em;
+  }
+
+  .attendance-session-head .attendance-session-title {
+    max-width: 2.2em;
   }
 
   .attendance-member-name {
