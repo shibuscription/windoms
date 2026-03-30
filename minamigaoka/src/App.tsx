@@ -57,6 +57,7 @@ import { LoginScreen } from "./components/LoginScreen";
 import { auth, ensureAuthPersistence, hasFirebaseAppConfig } from "./config/firebase";
 import { siteConfig } from "./config/site";
 import { toAuthenticatedUser, type AuthenticatedUser } from "./auth/session";
+import { LinkifiedText } from "./components/LinkifiedText";
 import { loadInitialData } from "./data/runtimeData";
 import { getMemberByAuthUid } from "./members/service";
 import type { MemberRecord, MemberRole } from "./members/types";
@@ -405,6 +406,7 @@ export function App() {
   const [activeStatusPanel, setActiveStatusPanel] = useState<"notice" | "todo" | null>(
     null,
   );
+  const [selectedInboxTodoId, setSelectedInboxTodoId] = useState<string | null>(null);
   const [noticeTab, setNoticeTab] = useState<"pending" | "history">("pending");
   const [notifications, setNotifications] = useState<DemoNotification[]>([
     { id: "n1", title: "当番可否アンケートの回答期限が近づいています", type: "actionable", read: false, resolved: false },
@@ -691,6 +693,11 @@ export function App() {
   }, [location.key]);
 
   useEffect(() => {
+    if (activeStatusPanel === "todo") return;
+    setSelectedInboxTodoId(null);
+  }, [activeStatusPanel]);
+
+  useEffect(() => {
     const updateDocumentTitle = () => {
       const rawHash = window.location.hash.startsWith("#")
         ? window.location.hash.slice(1)
@@ -743,6 +750,10 @@ export function App() {
     [data.todos, currentUid],
   );
   const inboxTodoCount = sharedInboxTodos.length + privateInboxTodos.length;
+  const selectedInboxTodo = useMemo(
+    () => (selectedInboxTodoId ? data.todos.find((todo) => todo.id === selectedInboxTodoId) ?? null : null),
+    [data.todos, selectedInboxTodoId],
+  );
   const statusButtons: Array<{ id: "notice" | "todo"; icon: string; label: string; badge: number }> = [
     { id: "notice", icon: "🔔", label: "Notices", badge: unreadNotificationCount },
     { id: "todo", icon: "✅", label: "My TODO", badge: inboxTodoCount + (hasShiftSurveyTodo ? 1 : 0) },
@@ -1455,8 +1466,14 @@ export function App() {
                       return (
                         <li key={item.id} className="status-inbox-row">
                           <div className="status-inbox-main">
+                            <button
+                              type="button"
+                              className="status-inbox-trigger"
+                              onClick={() => setSelectedInboxTodoId(item.id)}
+                            >
                             <strong>{item.title}</strong>
                             <span className="status-inbox-meta">期限: {item.dueDate ?? "—"}</span>
+                            </button>
                           </div>
                           <button
                             type="button"
@@ -1482,8 +1499,14 @@ export function App() {
                       return (
                         <li key={item.id} className="status-inbox-row">
                           <div className="status-inbox-main">
+                            <button
+                              type="button"
+                              className="status-inbox-trigger"
+                              onClick={() => setSelectedInboxTodoId(item.id)}
+                            >
                             <strong>{item.title}</strong>
                             <span className="status-inbox-meta">期限: {item.dueDate ?? "—"}</span>
+                            </button>
                             <span className="status-inbox-meta">
                               {related.to ? (
                                 <button
@@ -1551,6 +1574,44 @@ export function App() {
                 )}
               </>
             )}
+          </section>
+        </div>
+      )}
+      {selectedInboxTodo && (
+        <div className="modal-backdrop modal-backdrop-front" onClick={() => setSelectedInboxTodoId(null)}>
+          <section className="modal-panel todos-related-modal" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close"
+              aria-label="閉じる"
+              onClick={() => setSelectedInboxTodoId(null)}
+            >
+              ×
+            </button>
+            <h3>TODO詳細</h3>
+            <p className="modal-context">{selectedInboxTodo.title}</p>
+            <p className="modal-summary">期限: {selectedInboxTodo.dueDate ?? "—"}</p>
+            <p className="modal-summary">
+              種別: {selectedInboxTodo.kind === "shared" ? "共有TODO" : "個人TODO"}
+            </p>
+            <p className="modal-summary">状態: {selectedInboxTodo.completed ? "完了" : "未完了"}</p>
+            {selectedInboxTodo.memo?.trim() && (
+              <>
+                <p className="modal-summary">メモ</p>
+                <p className="todo-memo-full">
+                  <LinkifiedText text={selectedInboxTodo.memo} className="todo-linkified-text" />
+                </p>
+              </>
+            )}
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => setSelectedInboxTodoId(null)}
+              >
+                閉じる
+              </button>
+            </div>
           </section>
         </div>
       )}
