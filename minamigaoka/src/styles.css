@@ -2924,11 +2924,21 @@ body {
 
 .today-actions {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: nowrap;
   flex-shrink: 0;
   margin-left: auto;
-  align-items: flex-end;
-  gap: 4px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.today-secondary-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .log-status {
@@ -5213,10 +5223,24 @@ textarea {
   }
 
   .today-actions {
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    column-gap: 8px;
+    row-gap: 6px;
+    width: 100%;
     margin-left: 0;
+  }
+
+  .today-secondary-actions {
+    min-width: 0;
+    justify-content: flex-end;
+  }
+
+  .today-next-day-button {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: start;
   }
 
   .today-date-nav {

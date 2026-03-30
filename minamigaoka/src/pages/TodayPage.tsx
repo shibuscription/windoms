@@ -316,17 +316,6 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
               <span className="date-main date-short">{formatDateYmd(date).slice(5)}</span>
               <span className={`date-weekday ${weekdayTone(date)}`}>（{formatWeekdayJa(date)}）</span>
             </button>
-            {birthdayCelebrants.length > 0 && (
-              <button
-                type="button"
-                className="today-birthday-trigger"
-                onClick={() => setBirthdayModalDate(date)}
-                aria-label="誕生日のお祝いを見る"
-                title="誕生日のお祝いを見る"
-              >
-                🎂
-              </button>
-            )}
             <Link
               to={calendarPath}
               className="today-calendar-link-trigger"
@@ -380,16 +369,29 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
               </div>
             )}
           </div>
-          <button type="button" className="date-nav-button" onClick={() => moveDate(1)}>
-            翌日 →
-          </button>
         </div>
         <div className="today-actions">
-          {hasSessions && (
-            <button type="button" className="button button-small" onClick={() => void openDayLog()}>
-              日誌へ
-            </button>
-          )}
+          <div className="today-secondary-actions">
+            {birthdayCelebrants.length > 0 && (
+              <button
+                type="button"
+                className="today-birthday-trigger"
+                onClick={() => setBirthdayModalDate(date)}
+                aria-label="誕生日のお祝いを見る"
+                title="誕生日のお祝いを見る"
+              >
+                🎂
+              </button>
+            )}
+            {hasSessions && (
+              <button type="button" className="button button-small" onClick={() => void openDayLog()}>
+                日誌へ
+              </button>
+            )}
+          </div>
+          <button type="button" className="date-nav-button today-next-day-button" onClick={() => moveDate(1)}>
+            翌日 →
+          </button>
         </div>
       </div>
 
