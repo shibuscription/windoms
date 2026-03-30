@@ -291,6 +291,23 @@ export function TodosPage({
       ),
     [currentUid, data.todos],
   );
+  const sharedOpenCount = useMemo(
+    () =>
+      data.todos.filter(
+        (todo) =>
+          todo.kind === "shared" &&
+          !todo.completed &&
+          canViewSharedTodo(todo, linkedMember, authRole),
+      ).length,
+    [authRole, data.todos, linkedMember],
+  );
+  const privateOpenCount = useMemo(
+    () =>
+      data.todos.filter(
+        (todo) => todo.kind === "private" && todo.createdByUid === currentUid && !todo.completed,
+      ).length,
+    [currentUid, data.todos],
+  );
 
   const userNameByUid = (uid: string | null): string => {
     if (!uid) return "未アサイン";
@@ -497,6 +514,7 @@ export function TodosPage({
             onClick={() => setActiveTab("shared")}
           >
             共有TODO
+            {sharedOpenCount > 0 && <span className="todo-tab-badge">{sharedOpenCount}</span>}
           </button>
           <button
             type="button"
@@ -504,6 +522,7 @@ export function TodosPage({
             onClick={() => setActiveTab("private")}
           >
             個人TODO
+            {privateOpenCount > 0 && <span className="todo-tab-badge">{privateOpenCount}</span>}
           </button>
         </div>
       )}

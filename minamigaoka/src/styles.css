@@ -936,12 +936,30 @@ body {
   color: #334155;
   padding: 6px 12px;
   cursor: pointer;
+  position: relative;
 }
 
 .members-tab.active {
   background: #1d4ed8;
   border-color: #1d4ed8;
   color: #fff;
+}
+
+.todo-tab-badge {
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  min-width: 1.45rem;
+  height: 1.45rem;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.45rem;
+  text-align: center;
+  box-shadow: 0 0 0 2px #fff;
 }
 
 .members-list {
