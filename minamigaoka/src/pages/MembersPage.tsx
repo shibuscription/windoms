@@ -7,6 +7,7 @@ import {
 } from "../auth/loginId";
 import { auth, firebaseFunctionsRegion, firebaseProjectId } from "../config/firebase";
 import { memberCsvTemplateHeader, parseMemberCsv } from "../members/csv";
+import { sortFamiliesByDisplayOrder } from "../members/familyOrder";
 import {
   findAuthCandidate,
   findAuthUsersWithoutMember,
@@ -151,26 +152,6 @@ type DeleteDialogState =
   | null;
 
 type ManagementTab = "family" | "member" | "auth" | "integrity";
-
-const compareFamilyName = (left: FamilyRecord, right: FamilyRecord): number => {
-  const nameCompare = (left.name || "").localeCompare(right.name || "", "ja");
-  if (nameCompare !== 0) return nameCompare;
-  return left.id.localeCompare(right.id, "ja");
-};
-
-const sortFamiliesForDisplay = (rows: FamilyRecord[]): FamilyRecord[] =>
-  [...rows].sort((left, right) => {
-    const leftOrder =
-      typeof left.sortOrder === "number" && Number.isFinite(left.sortOrder) ? left.sortOrder : Number.MAX_SAFE_INTEGER;
-    const rightOrder =
-      typeof right.sortOrder === "number" && Number.isFinite(right.sortOrder)
-        ? right.sortOrder
-        : Number.MAX_SAFE_INTEGER;
-    if (leftOrder !== rightOrder) {
-      return leftOrder - rightOrder;
-    }
-    return compareFamilyName(left, right);
-  });
 
 const emptyFamilyForm = (): FamilyFormState => ({
   id: null,
@@ -343,7 +324,7 @@ export function MembersManagementPage() {
       }, {}),
     [families],
   );
-  const orderedFamilies = useMemo(() => sortFamiliesForDisplay(families), [families]);
+  const orderedFamilies = useMemo(() => sortFamiliesByDisplayOrder(families), [families]);
 
   const memberNameById = useMemo(
     () =>
@@ -1872,7 +1853,7 @@ export function MembersManagementPage() {
                 onChange={(event) => setMemberForm((current) => ({ ...current, familyId: event.target.value }))}
               >
                 <option value="">未所属</option>
-                {families.map((family) => (
+                {orderedFamilies.map((family) => (
                   <option key={family.id} value={family.id}>
                     {family.name}
                   </option>

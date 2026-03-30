@@ -23,6 +23,7 @@ import {
   hasFirebaseAppConfig,
 } from "../config/firebase";
 import { normalizeLoginId, toInternalAuthEmail } from "../auth/loginId";
+import { sortFamiliesByDisplayOrder } from "./familyOrder";
 import { normalizeInstrumentCodes } from "./instruments";
 import {
   deriveLegacyPermissions,
@@ -259,7 +260,7 @@ const ensureFunctions = () => {
 export const subscribeFamilies = (callback: (rows: FamilyRecord[]) => void): (() => void) => {
   ensureDb();
   return onSnapshot(query(familiesCollection!, orderBy("name", "asc")), (snapshot) => {
-    callback(snapshot.docs.map((item) => toFamilyRecord(item.id, item.data() as Record<string, unknown>)));
+    callback(sortFamiliesByDisplayOrder(snapshot.docs.map((item) => toFamilyRecord(item.id, item.data() as Record<string, unknown>))));
   });
 };
 

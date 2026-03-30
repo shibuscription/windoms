@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { BirthdayCelebrationModal } from "../components/BirthdayCelebrationModal";
 import { getBirthdayCelebrants } from "../members/birthday";
+import { sortFamiliesByDisplayOrder } from "../members/familyOrder";
 import {
   createCalendarSession,
   deleteCalendarSession,
@@ -347,13 +348,11 @@ export function CalendarPage({
 
   const familyOptions = useMemo(
     () =>
-      families
-        .filter((family) => family.status === "active")
+      sortFamiliesByDisplayOrder(families.filter((family) => family.status === "active"))
         .map((family) => ({
           id: family.id,
           label: toFamilyName(family.name),
-        }))
-        .sort((left, right) => left.label.localeCompare(right.label, "ja")),
+        })),
     [families],
   );
 
