@@ -6599,6 +6599,7 @@ textarea {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding-right: 52px;
 }
 
 .attendance-member-modal-header h2 {
