@@ -2,6 +2,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { ledgerRowsForAccount } from "../../accounting/calc";
 import { formatMoney } from "../../accounting/format";
 import { useAccountingStore } from "../../accounting/useAccountingStore";
+import { LinkifiedText } from "../../components/LinkifiedText";
 
 export function AccountLedger() {
   const { store } = useAccountingStore();
@@ -65,7 +66,9 @@ export function AccountLedger() {
                 <td>{row.date}</td>
                 <td>{row.kindLabel}</td>
                 <td>{row.subjectLabel}</td>
-                <td>{row.memo || "-"}</td>
+                <td>
+                  {row.memo ? <LinkifiedText text={row.memo} className="todo-linkified-text" /> : "-"}
+                </td>
                 <td>{formatMoney(row.signedAmount)}</td>
                 <td>{formatMoney(row.balance)}</td>
               </tr>

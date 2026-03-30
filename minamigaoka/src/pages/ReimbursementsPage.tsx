@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DemoData, Reimbursement, ReimbursementStatus } from "../types";
 import { useAccountingStore } from "../accounting/useAccountingStore";
+import { LinkifiedText } from "../components/LinkifiedText";
 import { ReceiptImagePicker } from "../components/ReceiptImagePicker";
 import { useReceiptPreviews } from "../hooks/useReceiptPreviews";
 import { toDemoFamilyName } from "../utils/demoName";
@@ -572,7 +573,11 @@ export function ReimbursementsPage({
               {item.relatedPurchaseRequestId && (
                 <p className="muted">関連購入依頼: {item.relatedPurchaseRequestId}</p>
               )}
-              {item.memo && <p className="muted">{item.memo}</p>}
+              {item.memo?.trim() && (
+                <p className="todo-memo-preview compact">
+                  <LinkifiedText text={item.memo} className="todo-linkified-text" />
+                </p>
+              )}
               {(canMarkPaid || canMarkReceived) && (
                 <div className="reimbursement-actions">
                   {canMarkPaid && (

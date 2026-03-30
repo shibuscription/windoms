@@ -478,7 +478,11 @@ export function EventsPage({
               種別: {selectedEvent.kind}
               <span className={`event-status ${selectedEvent.state}`}>{selectedEvent.state === "done" ? "完了" : "進行中"}</span>
             </p>
-            {selectedEvent.memo && <p className="muted">{selectedEvent.memo}</p>}
+            {selectedEvent.memo?.trim() && (
+              <p className="todo-memo-full">
+                <LinkifiedText text={selectedEvent.memo} className="todo-linkified-text" />
+              </p>
+            )}
               <button type="button" className="events-linked-summary" onClick={() => setIsLinkedSessionsModalOpen(true)}>
                 紐付け予定: {linkedSessions.length}件
               </button>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { LinkifiedText } from "../components/LinkifiedText";
 import { ReceiptImagePicker } from "../components/ReceiptImagePicker";
 import { useReceiptPreviews } from "../hooks/useReceiptPreviews";
 import type {
@@ -821,7 +822,14 @@ export function LunchPage({
             <p className="muted">購入者: {resolveBuyerName(detailTarget)}</p>
             <p className="muted">金額: {detailTarget.amount.toLocaleString()}円</p>
             <p className="muted">支払い内訳: {toSplitSummary(detailTarget.paymentSplits, data.quoCards)}</p>
-            {detailTarget.memo && <p className="muted">メモ: {detailTarget.memo}</p>}
+            {detailTarget.memo?.trim() && (
+              <>
+                <p className="muted">メモ</p>
+                <p className="todo-memo-full">
+                  <LinkifiedText text={detailTarget.memo} className="todo-linkified-text" />
+                </p>
+              </>
+            )}
             {detailTarget.imageUrls && detailTarget.imageUrls.length > 0 && (
               <div className="purchase-receipt-grid">
                 {detailTarget.imageUrls.map((imageUrl, index) => (

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { LinkifiedText } from "../components/LinkifiedText";
 import type { DemoData, PurchaseRequest, Reimbursement } from "../types";
 import { ReceiptImagePicker } from "../components/ReceiptImagePicker";
 import { useReceiptPreviews } from "../hooks/useReceiptPreviews";
@@ -325,6 +326,11 @@ export function PurchasesPage({
               <span>依頼者: {userName(item.createdBy)}</span>
               <span>依頼日時: {toDateTimeLabel(item.createdAt)}</span>
             </p>
+            {item.memo?.trim() && (
+              <p className="todo-memo-preview compact">
+                <LinkifiedText text={item.memo} className="todo-linkified-text" />
+              </p>
+            )}
             {item.status === "BOUGHT" && (
               <p className="purchase-bought-meta muted">
                 購入者: {userName(item.boughtBy)} / 購入日時: {toDateTimeLabel(item.boughtAt)}
