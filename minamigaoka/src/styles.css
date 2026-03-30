@@ -3183,19 +3183,24 @@ body {
   }
 
   .month-calendar-header-left {
+    order: 2;
     grid-column: 1;
     justify-content: flex-start;
-  }
-
-  .month-calendar-header-center {
-    grid-column: 1;
-    justify-self: center;
     width: 100%;
   }
 
-  .month-calendar-header-right {
+  .month-calendar-header-center {
+    order: 1;
     grid-column: 1;
-    justify-content: flex-end;
+    justify-self: stretch;
+    width: 100%;
+  }
+
+  .month-calendar-nav {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 6px;
     width: 100%;
   }
 
@@ -3206,6 +3211,7 @@ body {
 
   .month-calendar-month-button {
     font-size: 1.2rem;
+    min-width: 0;
   }
 
   .month-picker-popover {
@@ -5218,21 +5224,28 @@ textarea {
   }
 
   .today-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "nav next"
+      ". secondary";
     gap: 8px;
     margin-bottom: 6px;
   }
 
-  .today-actions {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      ". next"
-      "secondary next";
+  .today-date-view {
     align-items: start;
-    column-gap: 8px;
-    row-gap: 6px;
+  }
+
+  .today-date-nav {
+    grid-area: nav;
     width: 100%;
-    margin-left: 0;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .today-actions {
+    display: contents;
   }
 
   .today-secondary-actions {
@@ -5246,12 +5259,6 @@ textarea {
     grid-area: next;
     align-self: start;
     justify-self: end;
-  }
-
-  .today-date-nav {
-    width: 100%;
-    justify-content: space-between;
-    gap: 6px;
   }
 
   .date-nav-button {

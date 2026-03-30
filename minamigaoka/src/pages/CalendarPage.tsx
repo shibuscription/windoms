@@ -684,6 +684,9 @@ export function CalendarPage({
             >
               <strong>{monthLabel(monthKey)}</strong>
             </button>
+            <button type="button" className="button button-small button-secondary month-calendar-today-button" onClick={goToday}>
+              今日
+            </button>
             <button type="button" className="button button-small button-secondary" onClick={goNextMonth}>
               翌月 →
             </button>
@@ -727,11 +730,6 @@ export function CalendarPage({
               </div>
             </div>
           )}
-        </div>
-        <div className="month-calendar-header-right">
-          <button type="button" className="button button-small button-secondary" onClick={goToday}>
-            今日
-          </button>
         </div>
       </div>
       <div className="calendar-mobile-bleed">
