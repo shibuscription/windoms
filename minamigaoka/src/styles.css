@@ -5225,6 +5225,9 @@ textarea {
   .today-actions {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      ". next"
+      "secondary next";
     align-items: start;
     column-gap: 8px;
     row-gap: 6px;
@@ -5233,14 +5236,16 @@ textarea {
   }
 
   .today-secondary-actions {
+    grid-area: secondary;
     min-width: 0;
     justify-content: flex-end;
+    justify-self: end;
   }
 
   .today-next-day-button {
-    grid-column: 2;
-    grid-row: 1 / span 2;
+    grid-area: next;
     align-self: start;
+    justify-self: end;
   }
 
   .today-date-nav {
