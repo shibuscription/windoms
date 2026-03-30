@@ -3071,6 +3071,14 @@ body {
   margin-bottom: 12px;
 }
 
+@media (min-width: 768px) {
+  .month-calendar-header::after {
+    content: "";
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
 .month-calendar-header-left,
 .month-calendar-header-right {
   flex: 1 1 0;
