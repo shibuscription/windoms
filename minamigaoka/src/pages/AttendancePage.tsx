@@ -411,6 +411,20 @@ export function AttendancePage({
     }));
   };
 
+  const fillAllDraftStatuses = (status: RsvpStatus) => {
+    setDraftBySessionKey((prev) => {
+      const next = { ...prev };
+      for (const item of modalSessions) {
+        const sessionKey = makeSessionKey(item);
+        next[sessionKey] = {
+          status,
+          comment: prev[sessionKey]?.comment ?? "",
+        };
+      }
+      return next;
+    });
+  };
+
   const updateCellStatus = (status: RsvpStatus) => {
     setSelectedCellState((prev) => (prev ? { ...prev, status } : prev));
   };
@@ -766,7 +780,18 @@ export function AttendancePage({
             >
               ×
             </button>
-            <h2>{selectedMemberState.member.name}</h2>
+            <div className="attendance-member-modal-header">
+              <h2>{selectedMemberState.member.name}</h2>
+              {selectedMemberState.editable && (
+                <button
+                  type="button"
+                  className="button button-small button-secondary"
+                  onClick={() => fillAllDraftStatuses("yes")}
+                >
+                  全部◯
+                </button>
+              )}
+            </div>
             {saveError && <p className="modal-error">{saveError}</p>}
 
             <div className="attendance-member-modal-list">

@@ -6594,6 +6594,17 @@ textarea {
   width: min(740px, calc(100vw - 24px));
 }
 
+.attendance-member-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.attendance-member-modal-header h2 {
+  margin: 0;
+}
+
 .attendance-member-modal-list {
   max-height: min(62vh, 640px);
   overflow: auto;
@@ -6964,6 +6975,10 @@ textarea {
 
   .attendance-member-modal {
     width: min(100%, calc(100vw - 16px));
+  }
+
+  .attendance-member-modal-header {
+    align-items: flex-start;
   }
 
   .attendance-member-modal-table-head,
