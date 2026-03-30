@@ -160,6 +160,7 @@ export function TodosPage({
   const canCreateSharedTodos = creatableSharedScopes.length > 0;
   const defaultSharedScope = creatableSharedScopes[0] ?? "parent";
   const showSharedScopeSelector = creatableSharedScopes.length > 1;
+  const createDefaultKind: TodoKind = todoKindOptions.includes(activeTab) ? activeTab : todoKindOptions[0];
   const userOptions = useMemo(
     () =>
       sortMembersForDisplay(members, "all").map((member) => {
@@ -479,7 +480,7 @@ export function TodosPage({
           aria-label="追加"
           title="追加"
           onClick={() => {
-            setCreateDraftState(createDraft(todoKindOptions[0], defaultSharedScope));
+            setCreateDraftState(createDraft(createDefaultKind, defaultSharedScope));
             setCreateErrors({});
             setIsAddModalOpen(true);
           }}
