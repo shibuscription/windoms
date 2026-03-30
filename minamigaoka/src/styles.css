@@ -2252,6 +2252,36 @@ body {
   font-weight: 700;
 }
 
+.todo-memo-preview,
+.todo-memo-full {
+  margin: 0;
+  color: #475569;
+  font-size: 0.84rem;
+}
+
+.todo-memo-preview {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.todo-memo-preview.compact {
+  -webkit-line-clamp: 2;
+  font-size: 0.78rem;
+}
+
+.todo-linkified-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.todo-linkified-text a {
+  color: #1d4ed8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .todo-meta {
   margin: 0;
   display: flex;

@@ -40,6 +40,7 @@ const toTodo = (id: string, value: Record<string, unknown>): Todo => ({
   kind: toTodoKind(value.kind),
   sharedScope: toTodoSharedScope(value.sharedScope),
   title: typeof value.title === "string" ? value.title : "",
+  memo: typeof value.memo === "string" ? value.memo : undefined,
   completed: value.completed === true,
   createdAt:
     typeof value.createdAt === "string" && value.createdAt.trim()
@@ -56,6 +57,7 @@ const toPayload = (todo: Omit<Todo, "id">) => ({
   kind: todo.kind,
   sharedScope: todo.kind === "shared" ? todo.sharedScope ?? null : null,
   title: todo.title.trim(),
+  memo: todo.memo?.trim() ? todo.memo : null,
   completed: todo.completed,
   createdAt: todo.createdAt,
   createdByUid: todo.createdByUid ?? null,

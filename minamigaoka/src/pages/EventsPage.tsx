@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { LinkifiedText } from "../components/LinkifiedText";
 import type { MemberRecord } from "../members/types";
 import type { DemoData, EventKind, EventRecord, SessionDoc, Todo } from "../types";
 import { canViewSharedTodo, sortTodosOpenFirst } from "../utils/todoUtils";
@@ -497,6 +498,11 @@ export function EventsPage({
                       </label>
                       <div className="todo-main">
                         <p className="todo-title">{todo.title}</p>
+                        {todo.memo?.trim() && (
+                          <p className="todo-memo-preview compact">
+                            <LinkifiedText text={todo.memo} className="todo-linkified-text" />
+                          </p>
+                        )}
                         <p className="todo-meta">
                           <span>担当: {assigneeLabel(todo.assigneeUid)}</span>
                           <span>期限: {todo.dueDate ?? "—"}</span>

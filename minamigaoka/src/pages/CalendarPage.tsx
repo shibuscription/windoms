@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { BirthdayCelebrationModal } from "../components/BirthdayCelebrationModal";
+import { LinkifiedText } from "../components/LinkifiedText";
 import { getBirthdayCelebrants } from "../members/birthday";
 import { sortFamiliesByDisplayOrder } from "../members/familyOrder";
 import {
@@ -1186,7 +1187,14 @@ export function CalendarPage({
                   {selectedSessionTodos.map((todo) => (
                     <label key={todo.id} className={`todo-check ${todo.completed ? "done" : ""}`}>
                       <input type="checkbox" checked={todo.completed} readOnly />
-                      <span>{todo.title}</span>
+                      <span>
+                        <span>{todo.title}</span>
+                        {todo.memo?.trim() && (
+                          <span className="todo-memo-preview compact">
+                            <LinkifiedText text={todo.memo} className="todo-linkified-text" />
+                          </span>
+                        )}
+                      </span>
                     </label>
                   ))}
                 </div>

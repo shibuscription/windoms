@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { LinkifiedText } from "../components/LinkifiedText";
 import type { DemoData, RelatedType, Todo, TodoKind, TodoSharedScope } from "../types";
 import type { MemberRecord } from "../members/types";
 import { subscribeMembers } from "../members/service";
@@ -39,6 +40,7 @@ type TodoDraft = {
   kind: TodoKind;
   sharedScope: TodoSharedScope;
   title: string;
+  memo: string;
   completed: boolean;
   dueDate: string;
   assigneeUid: string;
@@ -56,6 +58,7 @@ const createDraft = (kind: TodoKind = "shared", sharedScope: TodoSharedScope = "
   kind,
   sharedScope,
   title: "",
+  memo: "",
   completed: false,
   dueDate: "",
   assigneeUid: "",
@@ -67,6 +70,7 @@ const draftFromTodo = (todo: Todo): TodoDraft => ({
   kind: todo.kind,
   sharedScope: todo.sharedScope ?? "parent",
   title: todo.title,
+  memo: todo.memo ?? "",
   completed: todo.completed,
   dueDate: todo.dueDate ?? "",
   assigneeUid: todo.assigneeUid ?? "",
@@ -89,6 +93,7 @@ const applyDraft = (source: Todo, draft: TodoDraft): Todo => ({
   kind: draft.kind,
   sharedScope: draft.kind === "shared" ? draft.sharedScope : undefined,
   title: draft.title.trim(),
+  memo: draft.memo.trim() || undefined,
   completed: draft.completed,
   createdByUid: source.createdByUid ?? null,
   assigneeUid: draft.kind === "shared" ? draft.assigneeUid || null : null,
@@ -340,6 +345,7 @@ export function TodosPage({
       kind: normalizedDraft.kind,
       sharedScope: normalizedDraft.kind === "shared" ? normalizedDraft.sharedScope : undefined,
       title: normalizedDraft.title.trim(),
+      memo: normalizedDraft.memo.trim() || undefined,
       completed: normalizedDraft.completed,
       createdAt: now,
       createdByUid: currentUid,
@@ -409,6 +415,11 @@ export function TodosPage({
         </label>
         <div className="todo-main">
           <p className="todo-title">{todo.title}</p>
+          {todo.memo?.trim() && (
+            <p className="todo-memo-preview">
+              <LinkifiedText text={todo.memo} className="todo-linkified-text" />
+            </p>
+          )}
           <p className="todo-meta">
             <span>{todo.kind === "shared" ? `担当: ${userNameByUid(todo.assigneeUid)}` : "種別: 個人TODO"}</span>
             <span>期限: {todo.dueDate ?? "—"}</span>
@@ -591,6 +602,14 @@ export function TodosPage({
               <input value={editDraft.title} onChange={(event) => setEditDraft((prev) => ({ ...prev, title: event.target.value }))} />
               {editErrors.title && <span className="field-error">{editErrors.title}</span>}
             </label>
+            <label>
+              メモ
+              <textarea
+                rows={5}
+                value={editDraft.memo}
+                onChange={(event) => setEditDraft((prev) => ({ ...prev, memo: event.target.value }))}
+              />
+            </label>
             {editDraft.kind === "shared" && showSharedScopeSelector && (
               <label>
                 共有範囲
@@ -712,6 +731,14 @@ export function TodosPage({
               />
               {createErrors.title && <span className="field-error">{createErrors.title}</span>}
             </label>
+            <label>
+              メモ
+              <textarea
+                rows={5}
+                value={createDraftState.memo}
+                onChange={(event) => setCreateDraftState((prev) => ({ ...prev, memo: event.target.value }))}
+              />
+            </label>
             {createDraftState.kind === "shared" && showSharedScopeSelector && (
               <label>
                 共有範囲
@@ -819,6 +846,11 @@ export function TodosPage({
             </button>
             <h3>紐付け先詳細</h3>
             <p className="modal-context">{relatedDetailTodo.title}</p>
+            {relatedDetailTodo.memo?.trim() && (
+              <p className="todo-memo-full">
+                <LinkifiedText text={relatedDetailTodo.memo} className="todo-linkified-text" />
+              </p>
+            )}
             {relatedDetail.type === "event" && (
               <>
                 <p className="modal-summary">種別: イベント</p>

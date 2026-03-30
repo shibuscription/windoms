@@ -118,6 +118,7 @@ export type Todo = {
   kind: TodoKind;
   sharedScope?: TodoSharedScope;
   title: string;
+  memo?: string;
   completed: boolean;
   createdAt: string;
   createdByUid?: string | null;
