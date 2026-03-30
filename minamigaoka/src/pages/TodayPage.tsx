@@ -301,10 +301,9 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
   return (
     <section className="card">
       <div className="today-header today-date-view">
-        <div className="today-date-nav">
-          <button type="button" className="date-nav-button" onClick={() => moveDate(-1)}>
+        <button type="button" className="date-nav-button today-prev-day-button" onClick={() => moveDate(-1)}>
             ← 前日
-          </button>
+        </button>
           <div className="today-date-center" ref={calendarWrapRef}>
             <button
               type="button"
@@ -369,7 +368,6 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
               </div>
             )}
           </div>
-        </div>
         <div className="today-actions">
           <div className="today-secondary-actions">
             {birthdayCelebrants.length > 0 && (

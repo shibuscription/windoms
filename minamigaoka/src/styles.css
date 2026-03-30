@@ -2718,23 +2718,15 @@ body {
 }
 
 .today-header {
-  display: flex;
-  flex-wrap: nowrap;
-  justify-content: space-between;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
   gap: 12px;
   margin-bottom: 8px;
 }
 
 .today-date-view {
   align-items: center;
-}
-
-.today-date-nav {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: nowrap;
 }
 
 .date-nav-button {
@@ -2751,7 +2743,6 @@ body {
 .today-date-center {
   position: relative;
   z-index: 5;
-  flex: 1 1 auto;
   min-width: 0;
   display: flex;
   align-items: center;
@@ -2760,6 +2751,7 @@ body {
   overflow: visible;
   border-radius: 8px;
   padding: 2px 4px;
+  justify-self: center;
 }
 
 .today-date-center:focus-visible {
@@ -2926,11 +2918,14 @@ body {
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
-  flex-shrink: 0;
-  margin-left: auto;
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+  justify-self: end;
+}
+
+.today-prev-day-button {
+  justify-self: start;
 }
 
 .today-secondary-actions {
@@ -5233,10 +5228,10 @@ textarea {
 
   .today-header {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-areas:
-      "nav next"
-      ". secondary";
+      "prev center next"
+      ". secondary next";
     gap: 8px;
     margin-bottom: 6px;
   }
@@ -5245,11 +5240,13 @@ textarea {
     align-items: start;
   }
 
-  .today-date-nav {
-    grid-area: nav;
+  .today-prev-day-button {
+    grid-area: prev;
+  }
+
+  .today-date-center {
+    grid-area: center;
     width: 100%;
-    justify-content: space-between;
-    gap: 6px;
   }
 
   .today-actions {
