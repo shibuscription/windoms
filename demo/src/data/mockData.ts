@@ -174,7 +174,7 @@ const demoTodos: DemoData["todos"] = [
   },
   {
     id: "todo-003",
-    title: "当日セッションの出欠最終確認",
+    title: "当日の出欠最終確認",
     completed: false,
     createdAt: "2026-02-19T11:00:00+09:00",
     assigneeUid: DEMO_CURRENT_UID,

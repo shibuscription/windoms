@@ -289,14 +289,14 @@ export function CalendarPage({ data }: CalendarPageProps) {
                 <button
                   type="button"
                   className="button button-small button-secondary"
-                  onClick={() => openInfoDialog("セッション追加", "セッション追加は準備中です。")}
+                  onClick={() => openInfoDialog("予定追加", "予定追加は準備中です。")}
                 >
                   ＋
                 </button>
               </div>
             </header>
             <div className="calendar-day-sheet-list">
-              {selectedDay.sessions.length === 0 && <p className="muted">セッションはありません。</p>}
+              {selectedDay.sessions.length === 0 && <p className="muted">予定はありません。</p>}
               {selectedDay.sessions.map((session) => {
                 const counts = countRsvps(session);
                 return (
@@ -309,7 +309,7 @@ export function CalendarPage({ data }: CalendarPageProps) {
                         type="button"
                         className="calendar-day-sheet-icon"
                         aria-label="編集"
-                        onClick={() => openInfoDialog("セッション編集", "編集機能は準備中です。")}
+                        onClick={() => openInfoDialog("予定編集", "編集機能は準備中です。")}
                       >
                         ✎
                       </button>

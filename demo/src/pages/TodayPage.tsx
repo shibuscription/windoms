@@ -372,7 +372,7 @@ export function TodayPage({ data, updateDayLog, currentUid, updateTodos }: Today
       )}
 
       {!day || sessions.length === 0 ? (
-        <p>この日のセッションは未登録です。</p>
+        <p>この日の予定は未登録です。</p>
       ) : (
         <div className="session-list">
           {sessions.map((session, index) => {

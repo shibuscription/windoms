@@ -349,7 +349,7 @@ export function ActivityPlanPage() {
                   <button
                     type="button"
                     className="activity-cell-remove"
-                    aria-label="セッションを削除"
+                    aria-label="予定を削除"
                     onClick={() => removeSession(session.id)}
                   >
                     ×
@@ -380,7 +380,7 @@ export function ActivityPlanPage() {
       <button
         type="button"
         className="activity-slot-add"
-        aria-label={`${targetDate}の${slot}枠にセッション追加`}
+        aria-label={`${targetDate}の${slot}枠に予定追加`}
         onClick={() => addSessionToSlot(targetDate, slot)}
       >
         ＋
@@ -667,7 +667,7 @@ export function ActivityPlanPage() {
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setSessionCreateDraft(null)}>
               ×
             </button>
-            <p className="modal-context">セッション追加</p>
+            <p className="modal-context">予定追加</p>
             <p className="modal-summary">
               対象: {formatDateYmd(sessionCreateDraft.targetDate)}（{formatWeekdayJa(sessionCreateDraft.targetDate)}）
             </p>
@@ -738,9 +738,9 @@ export function ActivityPlanPage() {
             </button>
             <p className="modal-context">当番可否アンケート作成</p>
             <p className="modal-summary">この内容で当番可否アンケートを送信します</p>
-            <p className="modal-summary">対象セッション（当番必要のみ）</p>
+            <p className="modal-summary">対象予定（当番必要のみ）</p>
             {dutySurveySessions.length === 0 ? (
-              <p className="activity-survey-note">対象セッションがありません。</p>
+              <p className="activity-survey-note">対象予定はありません。</p>
             ) : (
               <ul className="activity-survey-list">
                 {dutySurveySessions.map((session) => (

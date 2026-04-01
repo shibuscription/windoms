@@ -466,7 +466,7 @@ export function EventsPage({ data, currentUid, updateTodos }: EventsPageProps) {
             </p>
             {selectedEvent.memo && <p className="muted">{selectedEvent.memo}</p>}
             <button type="button" className="events-linked-summary" onClick={() => setIsLinkedSessionsModalOpen(true)}>
-              紐づきセッション: {selectedEvent.sessionIds?.length ?? 0}件
+              関連予定: {selectedEvent.sessionIds?.length ?? 0}件
             </button>
             <section className="related-todos-block">
               <h4>関連TODO</h4>
@@ -541,7 +541,7 @@ export function EventsPage({ data, currentUid, updateTodos }: EventsPageProps) {
               ×
             </button>
             <div className="events-linked-header">
-              <h3>紐づきセッション</h3>
+              <h3>関連予定</h3>
               {isManager && (
                 <button
                   type="button"
@@ -588,7 +588,7 @@ export function EventsPage({ data, currentUid, updateTodos }: EventsPageProps) {
                   </div>
                 </article>
               ))}
-              {linkedSessions.length === 0 && <p className="muted">紐づきセッションはありません。</p>}
+              {linkedSessions.length === 0 && <p className="muted">関連する予定はありません。</p>}
             </div>
             <div className="modal-actions">
               <button type="button" className="button button-small" onClick={() => setIsLinkedSessionsModalOpen(false)}>
@@ -605,7 +605,7 @@ export function EventsPage({ data, currentUid, updateTodos }: EventsPageProps) {
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsSessionBindModalOpen(false)}>
               ×
             </button>
-            <h3>イベントセッションを選択</h3>
+            <h3>イベントに紐づける予定を選択</h3>
             <p className="modal-context">{selectedEvent.title}</p>
             <div className="calendar-day-sheet-list">
               {bindableEventSessions.map((session) => (
@@ -634,7 +634,7 @@ export function EventsPage({ data, currentUid, updateTodos }: EventsPageProps) {
                   </div>
                 </article>
               ))}
-              {bindableEventSessions.length === 0 && <p className="muted">紐づけ可能なイベントセッションはありません。</p>}
+              {bindableEventSessions.length === 0 && <p className="muted">紐づけ可能な予定はありません。</p>}
             </div>
             <p className="muted">DEMO: 保存は行いません</p>
             <div className="modal-actions">
