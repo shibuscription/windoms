@@ -1021,7 +1021,7 @@ export function LogPage({
       return;
     }
     if (!selectedRsvpSession.id) {
-      setRsvpError("セッションの保存先が見つかりません。");
+      setRsvpError("予定の保存先が見つかりません。");
       return;
     }
     const nextRsvps = selectedAttendanceRows.flatMap((row) => {

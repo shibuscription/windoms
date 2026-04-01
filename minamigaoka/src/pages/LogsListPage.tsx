@@ -154,7 +154,7 @@ export function LogsListPage({ data, ensureDayLog }: LogsListPageProps) {
 
       {items.length === 0 ? (
         <div className="empty-state logs-list-empty">
-          <p>この月にセッションがある日はありません。</p>
+          <p>この月に予定がある日はありません。</p>
         </div>
       ) : (
         <div className="logs-list-cards">
