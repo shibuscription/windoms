@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { balancesByAccount, monthlyExpenseByMonth, totalExpense, totalIncome } from "../../accounting/calc";
+import { balancesByAccount, monthlyExpenseByMonth, totalExpense, totalIncome, transactionMemoSuggestions } from "../../accounting/calc";
 import { formatMoney } from "../../accounting/format";
 import type { TransactionType } from "../../accounting/model";
 import { comparePeriodAccounts } from "../../accounting/sort";
@@ -12,7 +12,7 @@ type AccountingHomeProps = {
 };
 
 export function AccountingHome({ isAdmin }: AccountingHomeProps) {
-  const { currentPeriod, addTransaction, loading, error } = useAccountingStore();
+  const { store, currentPeriod, addTransaction, loading, error } = useAccountingStore();
   const [mode, setMode] = useState<TransactionType | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -52,6 +52,8 @@ export function AccountingHome({ isAdmin }: AccountingHomeProps) {
   const transactionLocked = currentPeriod.state === "closed";
   const expenseByMonth = monthlyExpenseByMonth(currentPeriod);
   const maxGraphValue = Math.max(...expenseByMonth.map((item) => item.value), 1);
+  const memoSuggestions =
+    mode === "income" || mode === "expense" ? transactionMemoSuggestions(store.periods, mode) : [];
 
   return (
     <section className="card accounting-page">
@@ -174,6 +176,7 @@ export function AccountingHome({ isAdmin }: AccountingHomeProps) {
         <TransactionForm
           mode={mode}
           period={currentPeriod}
+          memoSuggestions={memoSuggestions}
           onClose={() => setMode(null)}
           onSubmit={async (payload) => {
             setSubmitError(null);

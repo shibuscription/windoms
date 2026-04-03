@@ -180,3 +180,27 @@ export const monthlyExpenseByMonth = (period: AccountingPeriod): { month: string
   }));
 };
 
+export const transactionMemoSuggestions = (
+  periods: AccountingPeriod[],
+  type: "income" | "expense"
+): string[] => {
+  const suggestions: string[] = [];
+  const seen = new Set<string>();
+
+  periods
+    .flatMap((period) => period.transactions)
+    .filter((transaction) => transaction.type === type)
+    .sort((a, b) => {
+      if (a.date !== b.date) return b.date.localeCompare(a.date);
+      return b.updatedAt.localeCompare(a.updatedAt);
+    })
+    .forEach((transaction) => {
+      const memo = transaction.memo?.trim();
+      if (!memo || seen.has(memo)) return;
+      seen.add(memo);
+      suggestions.push(memo);
+    });
+
+  return suggestions;
+};
+

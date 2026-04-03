@@ -2745,6 +2745,15 @@ body {
   overflow-x: auto;
 }
 
+.accounting-ledger-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.accounting-ledger-heading h1 {
+  margin: 0;
+}
+
 .accounting-ledger-table {
   width: 100%;
   border-collapse: collapse;

@@ -10,6 +10,10 @@ import { ReceiptOcrCanceledError, readReceiptSuggestion } from "../../utils/rece
 type Props = {
   mode: TransactionType;
   period: AccountingPeriod;
+  defaultAccountId?: string;
+  defaultFromAccountId?: string;
+  defaultToAccountId?: string;
+  memoSuggestions?: string[];
   onClose: () => void;
   onSubmit: (input: {
     date: string;
@@ -30,6 +34,7 @@ type FormErrors = {
   accountId?: string;
   fromAccountId?: string;
   toAccountId?: string;
+  memo?: string;
   submit?: string;
 };
 
@@ -39,14 +44,23 @@ const titleMap: Record<TransactionType, string> = {
   transfer: "振替を登録",
 };
 
-export function TransactionForm({ mode, period, onClose, onSubmit }: Props) {
+export function TransactionForm({
+  mode,
+  period,
+  defaultAccountId = "",
+  defaultFromAccountId = "",
+  defaultToAccountId = "",
+  memoSuggestions = [],
+  onClose,
+  onSubmit,
+}: Props) {
   const [date, setDate] = useState<string>(todayYmd());
   const [amount, setAmount] = useState<string>("");
   const [categoryId, setCategoryId] = useState<string>("");
   const [memo, setMemo] = useState<string>("");
-  const [accountId, setAccountId] = useState<string>("");
-  const [fromAccountId, setFromAccountId] = useState<string>("");
-  const [toAccountId, setToAccountId] = useState<string>("");
+  const [accountId, setAccountId] = useState<string>(defaultAccountId);
+  const [fromAccountId, setFromAccountId] = useState<string>(defaultFromAccountId);
+  const [toAccountId, setToAccountId] = useState<string>(defaultToAccountId);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReadingReceipt, setIsReadingReceipt] = useState(false);
@@ -61,6 +75,14 @@ export function TransactionForm({ mode, period, onClose, onSubmit }: Props) {
     () => FIXED_CATEGORIES.filter((item) => (mode === "income" ? item.categoryId.startsWith("income_") : item.categoryId.startsWith("expense_"))),
     [mode],
   );
+  const filteredMemoSuggestions = useMemo(() => {
+    const keyword = memo.trim().toLowerCase();
+    if (!keyword) return memoSuggestions.slice(0, 8);
+    return memoSuggestions
+      .filter((item) => item.toLowerCase().includes(keyword))
+      .slice(0, 8);
+  }, [memo, memoSuggestions]);
+  const memoSuggestionListId = `accounting-memo-suggestions-${mode}`;
 
   useEffect(() => {
     return () => {
@@ -89,6 +111,7 @@ export function TransactionForm({ mode, period, onClose, onSubmit }: Props) {
     if (mode !== "transfer" && !categoryId) next.categoryId = "科目を選択してください";
     if (mode === "income" && !accountId) next.accountId = "入金口座を選択してください";
     if (mode === "expense" && !accountId) next.accountId = "出金口座を選択してください";
+    if (mode !== "transfer" && !memo.trim()) next.memo = "摘要を入力してください";
     if (mode === "transfer") {
       if (!fromAccountId) next.fromAccountId = "出金口座を選択してください";
       if (!toAccountId) next.toAccountId = "入金口座を選択してください";
@@ -184,19 +207,29 @@ export function TransactionForm({ mode, period, onClose, onSubmit }: Props) {
           ×
         </button>
         <h3>{titleMap[mode]}</h3>
-        <label>
-          日付
-          <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
-          {errors.date && <span className="field-error">{errors.date}</span>}
-        </label>
-        <label>
-          金額
-          <input type="number" min={1} value={amount} onChange={(event) => setAmount(event.target.value)} />
-          {errors.amount && <span className="field-error">{errors.amount}</span>}
-        </label>
         {mode !== "transfer" && (
           <>
-            <ReceiptImagePicker previews={previews} onAddFiles={addFiles} onRemovePreview={removePreview} title="添付画像（任意・複数）" />
+            <label>
+              {mode === "income" ? "入金口座" : "出金口座"}
+              <select value={accountId} onChange={(event) => setAccountId(event.target.value)}>
+                <option value="">選択してください</option>
+                {period.accounts
+                  .slice()
+                  .sort(comparePeriodAccounts)
+                  .map((account) => (
+                    <option key={account.accountId} value={account.accountId}>
+                      {account.label}
+                    </option>
+                  ))}
+              </select>
+              {errors.accountId && <span className="field-error">{errors.accountId}</span>}
+            </label>
+            <ReceiptImagePicker
+              previews={previews}
+              onAddFiles={addFiles}
+              onRemovePreview={removePreview}
+              title="レシート画像（任意・複数）"
+            />
             <div className="suggestion-anchor">
               {ocrMessage && <div className="inline-toast">{ocrMessage}</div>}
             </div>
@@ -214,37 +247,11 @@ export function TransactionForm({ mode, period, onClose, onSubmit }: Props) {
             )}
           </>
         )}
-        {mode !== "transfer" && (
-          <label>
-            科目
-            <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
-              <option value="">選択してください</option>
-              {categoryOptions.map((category) => (
-                <option key={category.categoryId} value={category.categoryId}>
-                  {category.label}
-                </option>
-              ))}
-            </select>
-            {errors.categoryId && <span className="field-error">{errors.categoryId}</span>}
-          </label>
-        )}
-        {mode !== "transfer" && (
-          <label>
-            {mode === "income" ? "入金口座" : "出金口座"}
-            <select value={accountId} onChange={(event) => setAccountId(event.target.value)}>
-              <option value="">選択してください</option>
-              {period.accounts
-                .slice()
-                .sort(comparePeriodAccounts)
-                .map((account) => (
-                  <option key={account.accountId} value={account.accountId}>
-                    {account.label}
-                  </option>
-                ))}
-            </select>
-            {errors.accountId && <span className="field-error">{errors.accountId}</span>}
-          </label>
-        )}
+        <label>
+          日付
+          <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+          {errors.date && <span className="field-error">{errors.date}</span>}
+        </label>
         {mode === "transfer" && (
           <>
             <label>
@@ -280,9 +287,49 @@ export function TransactionForm({ mode, period, onClose, onSubmit }: Props) {
           </>
         )}
         <label>
-          メモ
-          <input value={memo} onChange={(event) => setMemo(event.target.value)} placeholder="任意" />
+          金額
+          <input type="number" min={1} value={amount} onChange={(event) => setAmount(event.target.value)} />
+          {errors.amount && <span className="field-error">{errors.amount}</span>}
         </label>
+        {mode !== "transfer" && (
+          <label>
+            科目
+            <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+              <option value="">選択してください</option>
+              {categoryOptions.map((category) => (
+                <option key={category.categoryId} value={category.categoryId}>
+                  {category.label}
+                </option>
+              ))}
+            </select>
+            {errors.categoryId && <span className="field-error">{errors.categoryId}</span>}
+          </label>
+        )}
+        {mode !== "transfer" && (
+          <label>
+            摘要
+            <input
+              value={memo}
+              onChange={(event) => setMemo(event.target.value)}
+              list={filteredMemoSuggestions.length > 0 ? memoSuggestionListId : undefined}
+              placeholder="入力してください"
+            />
+            {filteredMemoSuggestions.length > 0 && (
+              <datalist id={memoSuggestionListId}>
+                {filteredMemoSuggestions.map((item) => (
+                  <option key={item} value={item} />
+                ))}
+              </datalist>
+            )}
+            {errors.memo && <span className="field-error">{errors.memo}</span>}
+          </label>
+        )}
+        {mode === "transfer" && (
+          <label>
+            備考
+            <input value={memo} onChange={(event) => setMemo(event.target.value)} placeholder="任意" />
+          </label>
+        )}
         {errors.submit && <p className="field-error">{errors.submit}</p>}
         <div className="modal-actions">
           <button type="button" className="button button-secondary" onClick={onClose} disabled={isSubmitting || isReadingReceipt}>

@@ -1256,7 +1256,7 @@ export function App() {
             element={isAdmin ? <ModuleSettingsPage /> : <Navigate to="/today" replace />}
           />
           <Route path="/accounting" element={<AccountingHome isAdmin={isAdmin} />} />
-          <Route path="/accounting/ledger" element={<AccountLedger />} />
+          <Route path="/accounting/ledger" element={<AccountLedger isAdmin={isAdmin} />} />
           <Route path="/accounting/report" element={<AccountingReport />} />
           <Route
             path="/accounting/periods"

@@ -6,6 +6,7 @@ import {
   totalIncome,
   totalOpeningBalance,
 } from "../../accounting/calc";
+import { buildAccountingFiscalYearRange } from "../../accounting/fiscalYear";
 import { formatMoney } from "../../accounting/format";
 import { useAccountingStore } from "../../accounting/useAccountingStore";
 import { siteConfig } from "../../config/site";
@@ -44,6 +45,7 @@ export function AccountingReport() {
   const carryOut = totalClosingBalance(period);
   const incomeTotal = totalIncome(period) + carryIn;
   const expenseTotal = totalExpense(period) + carryOut;
+  const fiscalRange = buildAccountingFiscalYearRange(period.fiscalYear);
   const incomeRows = incomeCategories.flatMap((category) => [
     <tr key={`${category.categoryId}-head`}>
       <th colSpan={2}>{category.label}</th>
@@ -70,9 +72,9 @@ export function AccountingReport() {
   return (
     <section className="card accounting-page accounting-report-page">
       <h1>{period.fiscalYear}年度 収支計算書</h1>
-      <p className="muted">団体名: {siteConfig.fullDisplayName}</p>
+      <p className="muted">団体名: {siteConfig.organizationName}</p>
       <p className="muted">
-        会計期間: {period.startDate} - {period.endDate}
+        会計期間: {fiscalRange.startDate} - {fiscalRange.endDate}
       </p>
 
       <div className="accounting-small-links print-hidden">
