@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FIXED_CATEGORIES } from "../../accounting/fixedCategories";
+import { groupedAccountingSubjects } from "../../accounting/fixedSubjects";
 import { todayYmd } from "../../accounting/format";
 import type { AccountingPeriod, TransactionType } from "../../accounting/model";
 import { comparePeriodAccounts } from "../../accounting/sort";
@@ -72,7 +72,7 @@ export function TransactionForm({
   const { previews, addFiles, removePreview, clearPreviews } = useReceiptPreviews();
 
   const categoryOptions = useMemo(
-    () => FIXED_CATEGORIES.filter((item) => (mode === "income" ? item.categoryId.startsWith("income_") : item.categoryId.startsWith("expense_"))),
+    () => (mode === "transfer" ? [] : groupedAccountingSubjects(mode)),
     [mode],
   );
   const filteredMemoSuggestions = useMemo(() => {
@@ -296,10 +296,14 @@ export function TransactionForm({
             科目
             <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
               <option value="">選択してください</option>
-              {categoryOptions.map((category) => (
-                <option key={category.categoryId} value={category.categoryId}>
-                  {category.label}
-                </option>
+              {categoryOptions.map((group) => (
+                <optgroup key={group.category.categoryId} label={group.category.label}>
+                  {group.subjects.map((subject) => (
+                    <option key={subject.subjectId} value={subject.subjectId}>
+                      {subject.label}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
             {errors.categoryId && <span className="field-error">{errors.categoryId}</span>}

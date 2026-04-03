@@ -1,4 +1,5 @@
 import { FIXED_CATEGORIES } from "./fixedCategories";
+import { findAccountingSubject } from "./fixedSubjects";
 import { accountingFiscalMonthLabels } from "./fiscalYear";
 import type { AccountingPeriod, AccountingTransaction, CategoryDefinition, TransactionType } from "./model";
 
@@ -39,6 +40,37 @@ const kindLabel = (type: TransactionType, accountDelta: number): string => {
 
 const findCategory = (categoryId: string): CategoryDefinition | undefined =>
   FIXED_CATEGORIES.find((item) => item.categoryId === categoryId);
+
+const resolveStoredCategory = (
+  storedCategoryId: string
+): { parentCategoryId: string; itemId: string; label: string; sortOrder: number } => {
+  const subject = findAccountingSubject(storedCategoryId);
+  if (subject) {
+    return {
+      parentCategoryId: subject.categoryId,
+      itemId: subject.subjectId,
+      label: subject.label,
+      sortOrder: subject.sortOrder,
+    };
+  }
+
+  const category = findCategory(storedCategoryId);
+  if (category) {
+    return {
+      parentCategoryId: category.categoryId,
+      itemId: category.categoryId,
+      label: category.label,
+      sortOrder: category.sortOrder,
+    };
+  }
+
+  return {
+    parentCategoryId: storedCategoryId,
+    itemId: storedCategoryId,
+    label: storedCategoryId,
+    sortOrder: 999,
+  };
+};
 
 export const accountDeltaForTransaction = (
   accountId: string,
@@ -100,7 +132,7 @@ export const ledgerRowsForAccount = (period: AccountingPeriod, accountId: string
       const delta = accountDeltaForTransaction(accountId, transaction);
       if (delta === 0) return null;
       running += delta;
-      const category = transaction.type === "transfer" ? undefined : findCategory(transaction.categoryId ?? "");
+      const category = transaction.type === "transfer" ? undefined : resolveStoredCategory(transaction.categoryId ?? "");
       return {
         transactionId: transaction.id,
         date: transaction.date,
@@ -118,24 +150,41 @@ export const reportCategorySummary = (
   period: AccountingPeriod,
   type: "income" | "expense"
 ): CategorySummary[] => {
-  const categoryTotals = new Map<string, number>();
+  const byCategory = new Map<string, CategoryItemSummary[]>();
   period.transactions
     .filter((item) => item.type === type)
     .forEach((transaction) => {
       const categoryId = transaction.categoryId;
       if (!categoryId) return;
-      const current = categoryTotals.get(categoryId) ?? 0;
-      categoryTotals.set(categoryId, current + transaction.amount);
+      const resolved = resolveStoredCategory(categoryId);
+      const items = byCategory.get(resolved.parentCategoryId) ?? [];
+      const existing = items.find((item) => item.categoryId === resolved.itemId);
+      if (existing) {
+        existing.amount += transaction.amount;
+      } else {
+        items.push({
+          categoryId: resolved.itemId,
+          label: resolved.label,
+          amount: transaction.amount,
+        });
+      }
+      byCategory.set(resolved.parentCategoryId, items);
     });
 
-  return [...categoryTotals.entries()]
-    .map(([categoryId, amount]) => {
+  return [...byCategory.entries()]
+    .map(([categoryId, items]) => {
       const category = findCategory(categoryId);
+      const sortedItems = items.sort((a, b) => {
+        const ra = resolveStoredCategory(a.categoryId).sortOrder;
+        const rb = resolveStoredCategory(b.categoryId).sortOrder;
+        if (ra !== rb) return ra - rb;
+        return a.label.localeCompare(b.label, "ja");
+      });
       return {
         categoryId,
         label: category?.label ?? categoryId,
-        amount,
-        items: [{ categoryId, label: category?.label ?? categoryId, amount }],
+        amount: sortedItems.reduce((sum, item) => sum + item.amount, 0),
+        items: sortedItems,
       };
     })
     .sort((a, b) => {
@@ -157,8 +206,8 @@ export const expenseTopSubjects = (period: AccountingPeriod, limit = 5): Categor
     });
   return [...map.entries()]
     .map(([categoryId, amount]) => {
-      const category = findCategory(categoryId);
-      return { categoryId, label: category?.label ?? categoryId, amount };
+      const resolved = resolveStoredCategory(categoryId);
+      return { categoryId, label: resolved.label, amount };
     })
     .sort((a, b) => b.amount - a.amount)
     .slice(0, limit);

@@ -1,4 +1,5 @@
-import type { SubjectDefinition } from "./model";
+import { FIXED_CATEGORIES } from "./fixedCategories";
+import type { CategoryDefinition, SubjectDefinition, SubjectType } from "./model";
 
 export const TRANSFER_SUBJECT_ID = "__TRANSFER__";
 
@@ -124,3 +125,19 @@ export const FIXED_SUBJECTS: SubjectDefinition[] = [
     sortOrder: 260,
   },
 ];
+
+export const accountingSubjectsForType = (type: Exclude<SubjectType, "both">): SubjectDefinition[] =>
+  FIXED_SUBJECTS.filter((subject) => subject.type === type).sort((a, b) => a.sortOrder - b.sortOrder);
+
+export const groupedAccountingSubjects = (
+  type: Exclude<SubjectType, "both">
+): { category: CategoryDefinition; subjects: SubjectDefinition[] }[] => {
+  const subjects = accountingSubjectsForType(type);
+  return FIXED_CATEGORIES.map((category) => ({
+    category,
+    subjects: subjects.filter((subject) => subject.categoryId === category.categoryId),
+  })).filter((group) => group.subjects.length > 0);
+};
+
+export const findAccountingSubject = (storedCategoryId: string): SubjectDefinition | undefined =>
+  FIXED_SUBJECTS.find((subject) => subject.subjectId === storedCategoryId);
