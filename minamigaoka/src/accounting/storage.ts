@@ -13,7 +13,7 @@ const currentFiscalYear = () => {
 const buildPeriodAccounts = (openingByKey?: Record<string, number>): PeriodAccount[] =>
   FIXED_ACCOUNTS.map((item) => ({
     accountId: item.accountId,
-    label: item.label,
+    label: item.name,
     sortOrder: item.sortOrder,
     openingBalance: openingByKey?.[item.accountId] ?? 0,
   }));
@@ -40,6 +40,7 @@ const seedStore = (): AccountingStore => {
   const period = createPeriod(fiscalYear);
   return {
     currentPeriodId: period.periodId,
+    accounts: FIXED_ACCOUNTS,
     periods: [period],
   };
 };

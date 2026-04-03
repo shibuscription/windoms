@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { balancesByAccount, monthlyExpenseByMonth, totalExpense, totalIncome } from "../../accounting/calc";
 import { formatMoney } from "../../accounting/format";
 import type { TransactionType } from "../../accounting/model";
+import { comparePeriodAccounts } from "../../accounting/sort";
 import { useAccountingStore } from "../../accounting/useAccountingStore";
 import { TransactionForm } from "./TransactionForm";
 
@@ -89,7 +90,7 @@ export function AccountingHome() {
         <ul className="accounting-account-list">
           {currentPeriod.accounts
             .slice()
-            .sort((a, b) => a.sortOrder - b.sortOrder)
+            .sort(comparePeriodAccounts)
             .map((account) => (
               <li key={account.accountId} className="accounting-account-row">
                 <Link

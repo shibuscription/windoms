@@ -2,8 +2,9 @@ export type TransactionType = "income" | "expense" | "transfer";
 
 export type AccountDefinition = {
   accountId: string;
-  label: string;
+  name: string;
   sortOrder: number;
+  isActive: boolean;
 };
 
 export type SubjectType = "income" | "expense" | "both";
@@ -71,6 +72,7 @@ export type AccountingPeriod = {
 
 export type AccountingStore = {
   currentPeriodId: string | null;
+  accounts: AccountDefinition[];
   periods: AccountingPeriod[];
 };
 

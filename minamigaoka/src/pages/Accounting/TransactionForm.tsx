@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FIXED_CATEGORIES } from "../../accounting/fixedCategories";
 import { todayYmd } from "../../accounting/format";
 import type { AccountingPeriod, TransactionType } from "../../accounting/model";
+import { comparePeriodAccounts } from "../../accounting/sort";
 import { ReceiptImagePicker } from "../../components/ReceiptImagePicker";
 import { useReceiptPreviews } from "../../hooks/useReceiptPreviews";
 import { ReceiptOcrCanceledError, readReceiptSuggestion } from "../../utils/receiptOcr";
@@ -234,7 +235,7 @@ export function TransactionForm({ mode, period, onClose, onSubmit }: Props) {
               <option value="">選択してください</option>
               {period.accounts
                 .slice()
-                .sort((a, b) => a.sortOrder - b.sortOrder)
+                .sort(comparePeriodAccounts)
                 .map((account) => (
                   <option key={account.accountId} value={account.accountId}>
                     {account.label}
@@ -252,7 +253,7 @@ export function TransactionForm({ mode, period, onClose, onSubmit }: Props) {
                 <option value="">選択してください</option>
                 {period.accounts
                   .slice()
-                  .sort((a, b) => a.sortOrder - b.sortOrder)
+                  .sort(comparePeriodAccounts)
                   .map((account) => (
                     <option key={account.accountId} value={account.accountId}>
                       {account.label}
@@ -267,7 +268,7 @@ export function TransactionForm({ mode, period, onClose, onSubmit }: Props) {
                 <option value="">選択してください</option>
                 {period.accounts
                   .slice()
-                  .sort((a, b) => a.sortOrder - b.sortOrder)
+                  .sort(comparePeriodAccounts)
                   .map((account) => (
                     <option key={account.accountId} value={account.accountId}>
                       {account.label}

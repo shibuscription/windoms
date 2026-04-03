@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { FIXED_CATEGORIES } from "./fixedCategories";
 import type { AccountingStore, TransactionType } from "./model";
 import {
+  createInitialAccountingAccounts,
   closeAccountingPeriodAndCarryOver,
   createAccountingTransaction,
+  saveAccountingAccount,
+  startAccountingPeriod,
   subscribeAccountingStore,
 } from "./service";
 
@@ -21,8 +24,20 @@ export type TransactionInput = {
   files?: File[];
 };
 
+export type SaveAccountingAccountInput = {
+  accountId?: string;
+  name: string;
+  sortOrder: number;
+  isActive: boolean;
+};
+
+export type StartAccountingPeriodInput = {
+  fiscalYear: number;
+  openingBalances: Record<string, number>;
+};
+
 export const useAccountingStore = () => {
-  const [store, setStore] = useState<AccountingStore>({ currentPeriodId: null, periods: [] });
+  const [store, setStore] = useState<AccountingStore>({ currentPeriodId: null, accounts: [], periods: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,8 +67,22 @@ export const useAccountingStore = () => {
     [store.periods]
   );
 
+  const accountsSorted = useMemo(() => store.accounts, [store.accounts]);
+
   const addTransaction = async (input: TransactionInput) => {
     await createAccountingTransaction(input);
+  };
+
+  const saveAccount = async (input: SaveAccountingAccountInput) => {
+    await saveAccountingAccount(input);
+  };
+
+  const createInitialAccounts = async () => {
+    await createInitialAccountingAccounts();
+  };
+
+  const createPeriod = async (input: StartAccountingPeriodInput) => {
+    await startAccountingPeriod(input);
   };
 
   const closeCurrentPeriod = async () => {
@@ -67,8 +96,12 @@ export const useAccountingStore = () => {
     store,
     currentPeriod,
     periodsSorted,
+    accountsSorted,
     categories: FIXED_CATEGORIES,
     addTransaction,
+    saveAccountingAccount: saveAccount,
+    createInitialAccountingAccounts: createInitialAccounts,
+    startAccountingPeriod: createPeriod,
     closeCurrentPeriodAndCarryOver: closeCurrentPeriod,
   };
 };

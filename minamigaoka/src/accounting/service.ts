@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   onSnapshot,
   orderBy,
@@ -12,7 +13,10 @@ import {
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { db, hasFirebaseAppConfig, storage } from "../config/firebase";
+import { FIXED_ACCOUNTS } from "./fixedAccounts";
+import { compareAccountingAccounts, comparePeriodAccounts } from "./sort";
 import type {
+  AccountDefinition,
   AccountingAttachment,
   AccountingPeriod,
   AccountingStore,
@@ -40,8 +44,9 @@ type AccountingPeriodDoc = {
 
 type AccountingAccountDoc = {
   id: string;
-  label: string;
+  name: string;
   sortOrder: number;
+  isActive: boolean;
 };
 
 type AccountingPeriodAccountDoc = {
@@ -96,8 +101,14 @@ const toAccountingPeriodDoc = (id: string, value: Record<string, unknown>): Acco
 
 const toAccountingAccountDoc = (id: string, value: Record<string, unknown>): AccountingAccountDoc => ({
   id,
-  label: typeof value.label === "string" && value.label.trim() ? value.label : id,
+  name:
+    typeof value.name === "string" && value.name.trim()
+      ? value.name.trim()
+      : typeof value.label === "string" && value.label.trim()
+        ? value.label.trim()
+        : id,
   sortOrder: Number.isFinite(typeof value.sortOrder === "number" ? value.sortOrder : Number(value.sortOrder)) ? Number(value.sortOrder) : 999,
+  isActive: value.isActive !== false,
 });
 
 const toAccountingPeriodAccountDoc = (id: string, value: Record<string, unknown>): AccountingPeriodAccountDoc | null => {
@@ -169,7 +180,15 @@ const buildAccountingStore = (
   periodAccounts: AccountingPeriodAccountDoc[],
   transactions: AccountingTransactionDoc[],
 ): AccountingStore => {
-  const accountsById = new Map(accounts.map((item) => [item.id, item]));
+  const normalizedAccounts: AccountDefinition[] = accounts
+    .map((item) => ({
+      accountId: item.id,
+      name: item.name,
+      sortOrder: item.sortOrder,
+      isActive: item.isActive,
+    }))
+    .sort(compareAccountingAccounts);
+  const accountsById = new Map(normalizedAccounts.map((item) => [item.accountId, item]));
   const periodAccountsByPeriodId = new Map<string, PeriodAccount[]>();
 
   for (const item of periodAccounts) {
@@ -177,7 +196,7 @@ const buildAccountingStore = (
     const list = periodAccountsByPeriodId.get(item.periodId) ?? [];
     list.push({
       accountId: item.accountId,
-      label: master?.label ?? item.accountId,
+      label: master?.name ?? item.accountId,
       sortOrder: master?.sortOrder ?? 999,
       openingBalance: item.openingBalance,
     });
@@ -201,7 +220,7 @@ const buildAccountingStore = (
       state: period.state,
       createdAt: period.createdAt,
       updatedAt: period.updatedAt,
-      accounts: (periodAccountsByPeriodId.get(period.id) ?? []).slice().sort((a, b) => a.sortOrder - b.sortOrder),
+      accounts: (periodAccountsByPeriodId.get(period.id) ?? []).slice().sort(comparePeriodAccounts),
       transactions: (transactionsByPeriodId.get(period.id) ?? []).slice().sort((a, b) => {
         if (a.date !== b.date) return a.date.localeCompare(b.date);
         if (a.createdAt !== b.createdAt) return a.createdAt.localeCompare(b.createdAt);
@@ -215,6 +234,7 @@ const buildAccountingStore = (
 
   return {
     currentPeriodId: currentPeriod?.periodId ?? null,
+    accounts: normalizedAccounts,
     periods: normalizedPeriods,
   };
 };
@@ -301,6 +321,13 @@ export type CreateAccountingTransactionInput = {
   source?: AccountingTransaction["source"];
 };
 
+export type SaveAccountingAccountInput = {
+  accountId?: string;
+  name: string;
+  sortOrder: number;
+  isActive: boolean;
+};
+
 const uploadAttachments = async (transactionId: string, files: File[]): Promise<AccountingAttachment[]> => {
   if (files.length === 0) return [];
   ensureStorage();
@@ -343,6 +370,111 @@ export const createAccountingTransaction = async (input: CreateAccountingTransac
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+};
+
+export const saveAccountingAccount = async (input: SaveAccountingAccountInput): Promise<void> => {
+  ensureDb();
+  const accountRef = input.accountId ? doc(accountsCollection!, input.accountId) : doc(accountsCollection!);
+  const payload: Record<string, unknown> = {
+    name: input.name.trim(),
+    sortOrder: input.sortOrder,
+    isActive: input.isActive,
+    updatedAt: serverTimestamp(),
+  };
+  if (!input.accountId) {
+    payload.createdAt = serverTimestamp();
+  }
+  await setDoc(
+    accountRef,
+    payload,
+    { merge: true },
+  );
+};
+
+export const createInitialAccountingAccounts = async (): Promise<void> => {
+  ensureDb();
+  const snapshot = await getDocs(accountsCollection!);
+  if (!snapshot.empty) return;
+  const batch = writeBatch(db!);
+  FIXED_ACCOUNTS.forEach((account) => {
+    batch.set(
+      doc(accountsCollection!, account.accountId),
+      {
+        name: account.name,
+        sortOrder: account.sortOrder,
+        isActive: account.isActive,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+  });
+  await batch.commit();
+};
+
+export type StartAccountingPeriodInput = {
+  fiscalYear: number;
+  openingBalances: Record<string, number>;
+};
+
+export const startAccountingPeriod = async (input: StartAccountingPeriodInput): Promise<void> => {
+  ensureDb();
+  const periodsSnapshot = await getDocs(periodsCollection!);
+  const hasEditing = periodsSnapshot.docs.some(
+    (item) => toPeriodState((item.data() as Record<string, unknown>).state) === "editing",
+  );
+  if (hasEditing) {
+    throw new Error("開始済みの会計期があります。画面を更新して確認してください。");
+  }
+
+  const accountsSnapshot = await getDocs(accountsCollection!);
+  const accounts = accountsSnapshot.docs
+    .map((item) => toAccountingAccountDoc(item.id, item.data() as Record<string, unknown>))
+    .filter((item) => item.isActive)
+    .sort((a, b) =>
+      compareAccountingAccounts(
+        { accountId: a.id, name: a.name, sortOrder: a.sortOrder, isActive: a.isActive },
+        { accountId: b.id, name: b.name, sortOrder: b.sortOrder, isActive: b.isActive },
+      ),
+    );
+
+  if (accounts.length === 0) {
+    throw new Error("有効な口座がありません。先に口座設定を行ってください。");
+  }
+
+  const periodId = `fy-${input.fiscalYear}`;
+  const periodRef = doc(periodsCollection!, periodId);
+  const existingPeriod = await getDoc(periodRef);
+  if (existingPeriod.exists()) {
+    throw new Error("同じ年度の会計期がすでに存在します。年度を確認してください。");
+  }
+  const batch = writeBatch(db!);
+  const range = buildPeriodRange(input.fiscalYear);
+
+  batch.set(periodRef, {
+    label: buildPeriodLabel(input.fiscalYear),
+    fiscalYear: input.fiscalYear,
+    startDate: range.startDate,
+    endDate: range.endDate,
+    state: "editing",
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  accounts.forEach((account) => {
+    batch.set(
+      doc(periodAccountsCollection!, `${periodId}_${account.id}`),
+      {
+        periodId,
+        accountId: account.id,
+        openingBalance: input.openingBalances[account.id] ?? 0,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      },
+    );
+  });
+
+  await batch.commit();
 };
 
 const buildPeriodLabel = (fiscalYear: number): string => `${fiscalYear}年度`;
