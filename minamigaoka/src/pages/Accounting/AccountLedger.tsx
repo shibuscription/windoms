@@ -5,17 +5,27 @@ import { useAccountingStore } from "../../accounting/useAccountingStore";
 import { LinkifiedText } from "../../components/LinkifiedText";
 
 export function AccountLedger() {
-  const { store } = useAccountingStore();
+  const { store, loading, error } = useAccountingStore();
   const [searchParams] = useSearchParams();
-  const periodId = searchParams.get("period") ?? store.currentPeriodId;
-  const accountKey = searchParams.get("account") ?? "";
+  const periodId = searchParams.get("period") ?? store.currentPeriodId ?? "";
+  const accountId = searchParams.get("account") ?? "";
   const period = store.periods.find((item) => item.periodId === periodId);
-  const account = period?.accounts.find((item) => item.accountKey === accountKey);
+  const account = period?.accounts.find((item) => item.accountId === accountId);
+
+  if (loading) {
+    return (
+      <section className="card accounting-page">
+        <h1>口座通帳</h1>
+        <p className="muted">会計データを読み込んでいます...</p>
+      </section>
+    );
+  }
 
   if (!period || !account) {
     return (
       <section className="card accounting-page">
         <h1>口座通帳</h1>
+        {error && <p className="field-error">{error}</p>}
         <p>対象データが見つかりません。</p>
         <Link to="/accounting" className="button">
           会計トップへ戻る
@@ -24,7 +34,7 @@ export function AccountLedger() {
     );
   }
 
-  const rows = ledgerRowsForAccount(period, accountKey);
+  const rows = ledgerRowsForAccount(period, accountId);
 
   return (
     <section className="card accounting-page">

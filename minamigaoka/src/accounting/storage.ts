@@ -1,5 +1,5 @@
 import { FIXED_ACCOUNTS } from "./fixedAccounts";
-import type { AccountingPeriod, AccountingStore, AccountingTransaction, PeriodAccount } from "./model";
+import type { AccountingPeriod, AccountingStore, AccountingTransaction, PeriodAccount, PeriodStatus } from "./model";
 
 export const ACCOUNTING_STORAGE_KEY = "windoms_minamigaoka_accounting_v1";
 
@@ -12,10 +12,10 @@ const currentFiscalYear = () => {
 
 const buildPeriodAccounts = (openingByKey?: Record<string, number>): PeriodAccount[] =>
   FIXED_ACCOUNTS.map((item) => ({
-    accountKey: item.accountKey,
+    accountId: item.accountId,
     label: item.label,
     sortOrder: item.sortOrder,
-    openingBalance: openingByKey?.[item.accountKey] ?? 0,
+    openingBalance: openingByKey?.[item.accountId] ?? 0,
   }));
 
 const createPeriod = (fiscalYear: number, accounts?: PeriodAccount[]): AccountingPeriod => {
@@ -27,10 +27,11 @@ const createPeriod = (fiscalYear: number, accounts?: PeriodAccount[]): Accountin
     fiscalYear,
     startDate: `${fiscalYear}-04-01`,
     endDate: `${fiscalYear + 1}-03-31`,
-    status: "editing",
+    state: "editing",
     accounts: accounts ?? buildPeriodAccounts(),
     transactions: [],
     createdAt,
+    updatedAt: createdAt,
   };
 };
 
@@ -38,7 +39,6 @@ const seedStore = (): AccountingStore => {
   const fiscalYear = currentFiscalYear();
   const period = createPeriod(fiscalYear);
   return {
-    version: 1,
     currentPeriodId: period.periodId,
     periods: [period],
   };
@@ -47,7 +47,7 @@ const seedStore = (): AccountingStore => {
 const isStoreShape = (value: unknown): value is AccountingStore => {
   if (!value || typeof value !== "object") return false;
   const store = value as AccountingStore;
-  return store.version === 1 && Array.isArray(store.periods) && typeof store.currentPeriodId === "string";
+  return Array.isArray(store.periods) && (typeof store.currentPeriodId === "string" || store.currentPeriodId === null);
 };
 
 export const loadAccountingStore = (): AccountingStore => {
@@ -57,11 +57,17 @@ export const loadAccountingStore = (): AccountingStore => {
   try {
     const parsed = JSON.parse(raw) as unknown;
     if (!isStoreShape(parsed)) return seedStore();
-    const normalizedPeriods = parsed.periods.map((period) => {
-      const rawStatus = (period as { status?: string }).status;
+    const normalizedPeriods: AccountingPeriod[] = parsed.periods.map((period) => {
+      const rawStatus = (period as { status?: string; state?: string }).status;
+      const state: PeriodStatus =
+        rawStatus === "open"
+          ? "editing"
+          : (period as { state?: string }).state === "closed"
+            ? "closed"
+            : "editing";
       return {
         ...period,
-        status: rawStatus === "open" ? "editing" : period.status,
+        state,
       };
     });
     return {

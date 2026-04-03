@@ -1,45 +1,49 @@
-import { useMemo, useState } from "react";
-import { balancesByAccount } from "./calc";
-import { FIXED_SUBJECTS } from "./fixedSubjects";
-import type { AccountingPeriod, AccountingStore, AccountingTransaction, TransactionType } from "./model";
+import { useEffect, useMemo, useState } from "react";
+import { FIXED_CATEGORIES } from "./fixedCategories";
+import type { AccountingStore, TransactionType } from "./model";
 import {
-  addTransactionToPeriod,
-  buildNextPeriodFromBalances,
-  loadAccountingStore,
-  replacePeriod,
-  saveAccountingStore,
-} from "./storage";
-
-const withPersist = (
-  current: AccountingStore,
-  setter: (next: AccountingStore) => void,
-  updater: (store: AccountingStore) => AccountingStore
-) => {
-  const next = updater(current);
-  setter(next);
-  saveAccountingStore(next);
-};
-
-const generateId = () => `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  closeAccountingPeriodAndCarryOver,
+  createAccountingTransaction,
+  subscribeAccountingStore,
+} from "./service";
 
 export type TransactionInput = {
   periodId: string;
   type: TransactionType;
   date: string;
-  source?: AccountingTransaction["source"];
+  source?: "manual" | "reimbursement" | "purchase";
   amount: number;
-  subjectId: string;
+  categoryId?: string;
   memo?: string;
-  accountKey?: string;
-  fromAccountKey?: string;
-  toAccountKey?: string;
+  accountId?: string;
+  fromAccountId?: string;
+  toAccountId?: string;
+  files?: File[];
 };
 
 export const useAccountingStore = () => {
-  const [store, setStore] = useState<AccountingStore>(() => loadAccountingStore());
+  const [store, setStore] = useState<AccountingStore>({ currentPeriodId: null, periods: [] });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    const unsubscribe = subscribeAccountingStore(
+      (next) => {
+        setStore(next);
+        setLoading(false);
+        setError(null);
+      },
+      (nextError) => {
+        setError(nextError.message);
+        setLoading(false);
+      },
+    );
+    return unsubscribe;
+  }, []);
 
   const currentPeriod = useMemo(
-    () => store.periods.find((item) => item.periodId === store.currentPeriodId) ?? store.periods[0],
+    () => store.periods.find((item) => item.periodId === store.currentPeriodId) ?? null,
     [store]
   );
 
@@ -48,54 +52,23 @@ export const useAccountingStore = () => {
     [store.periods]
   );
 
-  const addTransaction = (input: TransactionInput) => {
-    const period = store.periods.find((item) => item.periodId === input.periodId);
-    if (!period || period.status !== "editing") return;
-    const transaction: AccountingTransaction = {
-      id: generateId(),
-      createdAt: new Date().toISOString(),
-      date: input.date,
-      type: input.type,
-      source: input.source ?? "manual",
-      amount: input.amount,
-      subjectId: input.subjectId,
-      memo: input.memo?.trim() || undefined,
-      accountKey: input.accountKey,
-      fromAccountKey: input.fromAccountKey,
-      toAccountKey: input.toAccountKey,
-    };
-
-    withPersist(store, setStore, (prev) => addTransactionToPeriod(prev, input.periodId, transaction));
+  const addTransaction = async (input: TransactionInput) => {
+    await createAccountingTransaction(input);
   };
 
-  const closeCurrentPeriodAndCarryOver = () => {
-    if (!currentPeriod || currentPeriod.status !== "editing") return;
-    const closingMap = balancesByAccount(currentPeriod);
-    const closed: AccountingPeriod = { ...currentPeriod, status: "closed" };
-    const nextPeriod = buildNextPeriodFromBalances(closed.fiscalYear + 1, closingMap);
-    withPersist(store, setStore, (prev) => {
-      const withClosed = replacePeriod(prev, closed);
-      return {
-        ...withClosed,
-        currentPeriodId: nextPeriod.periodId,
-        periods: [...withClosed.periods, nextPeriod],
-      };
-    });
-  };
-
-  const setCurrentPeriod = (periodId: string) => {
-    const exists = store.periods.some((item) => item.periodId === periodId);
-    if (!exists) return;
-    withPersist(store, setStore, (prev) => ({ ...prev, currentPeriodId: periodId }));
+  const closeCurrentPeriod = async () => {
+    if (!currentPeriod || currentPeriod.state !== "editing") return;
+    await closeAccountingPeriodAndCarryOver(currentPeriod);
   };
 
   return {
+    loading,
+    error,
     store,
     currentPeriod,
     periodsSorted,
-    subjects: FIXED_SUBJECTS,
+    categories: FIXED_CATEGORIES,
     addTransaction,
-    closeCurrentPeriodAndCarryOver,
-    setCurrentPeriod,
+    closeCurrentPeriodAndCarryOver: closeCurrentPeriod,
   };
 };

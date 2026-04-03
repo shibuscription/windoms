@@ -1,15 +1,8 @@
 import { FIXED_CATEGORIES } from "./fixedCategories";
-import { FIXED_SUBJECTS } from "./fixedSubjects";
-import type {
-  AccountingPeriod,
-  AccountingTransaction,
-  CategoryDefinition,
-  SubjectDefinition,
-  TransactionType,
-} from "./model";
+import type { AccountingPeriod, AccountingTransaction, CategoryDefinition, TransactionType } from "./model";
 
-type SubjectSummary = {
-  subjectId: string;
+type CategoryItemSummary = {
+  categoryId: string;
   label: string;
   amount: number;
 };
@@ -18,7 +11,7 @@ type CategorySummary = {
   categoryId: string;
   label: string;
   amount: number;
-  subjects: SubjectSummary[];
+  items: CategoryItemSummary[];
 };
 
 export type LedgerRow = {
@@ -43,32 +36,29 @@ const kindLabel = (type: TransactionType, accountDelta: number): string => {
   return accountDelta >= 0 ? "振替（入金）" : "振替（出金）";
 };
 
-const findSubject = (subjectId: string): SubjectDefinition | undefined =>
-  FIXED_SUBJECTS.find((item) => item.subjectId === subjectId);
-
 const findCategory = (categoryId: string): CategoryDefinition | undefined =>
   FIXED_CATEGORIES.find((item) => item.categoryId === categoryId);
 
 export const accountDeltaForTransaction = (
-  accountKey: string,
+  accountId: string,
   transaction: AccountingTransaction
 ): number => {
   if (transaction.type === "income") {
-    return transaction.accountKey === accountKey ? transaction.amount : 0;
+    return transaction.accountId === accountId ? transaction.amount : 0;
   }
   if (transaction.type === "expense") {
-    return transaction.accountKey === accountKey ? -transaction.amount : 0;
+    return transaction.accountId === accountId ? -transaction.amount : 0;
   }
-  if (transaction.fromAccountKey === accountKey) return -transaction.amount;
-  if (transaction.toAccountKey === accountKey) return transaction.amount;
+  if (transaction.fromAccountId === accountId) return -transaction.amount;
+  if (transaction.toAccountId === accountId) return transaction.amount;
   return 0;
 };
 
-export const closingBalanceForAccount = (period: AccountingPeriod, accountKey: string): number => {
-  const account = period.accounts.find((item) => item.accountKey === accountKey);
+export const closingBalanceForAccount = (period: AccountingPeriod, accountId: string): number => {
+  const account = period.accounts.find((item) => item.accountId === accountId);
   if (!account) return 0;
   const delta = period.transactions.reduce(
-    (sum, transaction) => sum + accountDeltaForTransaction(accountKey, transaction),
+    (sum, transaction) => sum + accountDeltaForTransaction(accountId, transaction),
     0
   );
   return account.openingBalance + delta;
@@ -77,7 +67,7 @@ export const closingBalanceForAccount = (period: AccountingPeriod, accountKey: s
 export const balancesByAccount = (period: AccountingPeriod): Record<string, number> => {
   const result: Record<string, number> = {};
   period.accounts.forEach((account) => {
-    result[account.accountKey] = closingBalanceForAccount(period, account.accountKey);
+    result[account.accountId] = closingBalanceForAccount(period, account.accountId);
   });
   return result;
 };
@@ -100,21 +90,21 @@ export const totalExpense = (period: AccountingPeriod): number =>
     .filter((item) => item.type === "expense")
     .reduce((sum, item) => sum + item.amount, 0);
 
-export const ledgerRowsForAccount = (period: AccountingPeriod, accountKey: string): LedgerRow[] => {
-  const account = period.accounts.find((item) => item.accountKey === accountKey);
+export const ledgerRowsForAccount = (period: AccountingPeriod, accountId: string): LedgerRow[] => {
+  const account = period.accounts.find((item) => item.accountId === accountId);
   if (!account) return [];
   let running = account.openingBalance;
   return sortTransactions(period.transactions)
     .map((transaction) => {
-      const delta = accountDeltaForTransaction(accountKey, transaction);
+      const delta = accountDeltaForTransaction(accountId, transaction);
       if (delta === 0) return null;
       running += delta;
-      const subject = transaction.type === "transfer" ? undefined : findSubject(transaction.subjectId);
+      const category = transaction.type === "transfer" ? undefined : findCategory(transaction.categoryId ?? "");
       return {
         transactionId: transaction.id,
         date: transaction.date,
         kindLabel: kindLabel(transaction.type, delta),
-        subjectLabel: transaction.type === "transfer" ? "-" : subject?.label ?? transaction.subjectId,
+        subjectLabel: transaction.type === "transfer" ? "-" : category?.label ?? transaction.categoryId ?? "-",
         memo: transaction.memo ?? "",
         signedAmount: delta,
         balance: running,
@@ -127,36 +117,24 @@ export const reportCategorySummary = (
   period: AccountingPeriod,
   type: "income" | "expense"
 ): CategorySummary[] => {
-  const subjectTotals = new Map<string, number>();
+  const categoryTotals = new Map<string, number>();
   period.transactions
     .filter((item) => item.type === type)
     .forEach((transaction) => {
-      const current = subjectTotals.get(transaction.subjectId) ?? 0;
-      subjectTotals.set(transaction.subjectId, current + transaction.amount);
+      const categoryId = transaction.categoryId;
+      if (!categoryId) return;
+      const current = categoryTotals.get(categoryId) ?? 0;
+      categoryTotals.set(categoryId, current + transaction.amount);
     });
 
-  const byCategory = new Map<string, SubjectSummary[]>();
-  subjectTotals.forEach((amount, subjectId) => {
-    const subject = findSubject(subjectId);
-    if (!subject) return;
-    const list = byCategory.get(subject.categoryId) ?? [];
-    list.push({ subjectId, label: subject.label, amount });
-    byCategory.set(subject.categoryId, list);
-  });
-
-  return [...byCategory.entries()]
-    .map(([categoryId, subjects]) => {
+  return [...categoryTotals.entries()]
+    .map(([categoryId, amount]) => {
       const category = findCategory(categoryId);
-      const sortedSubjects = subjects.sort((a, b) => {
-        const sa = findSubject(a.subjectId)?.sortOrder ?? 999;
-        const sb = findSubject(b.subjectId)?.sortOrder ?? 999;
-        return sa - sb;
-      });
       return {
         categoryId,
         label: category?.label ?? categoryId,
-        amount: sortedSubjects.reduce((sum, item) => sum + item.amount, 0),
-        subjects: sortedSubjects,
+        amount,
+        items: [{ categoryId, label: category?.label ?? categoryId, amount }],
       };
     })
     .sort((a, b) => {
@@ -166,20 +144,46 @@ export const reportCategorySummary = (
     });
 };
 
-export const expenseTopSubjects = (period: AccountingPeriod, limit = 5): SubjectSummary[] => {
+export const expenseTopSubjects = (period: AccountingPeriod, limit = 5): CategoryItemSummary[] => {
   const map = new Map<string, number>();
   period.transactions
     .filter((item) => item.type === "expense")
     .forEach((transaction) => {
-      const current = map.get(transaction.subjectId) ?? 0;
-      map.set(transaction.subjectId, current + transaction.amount);
+      const categoryId = transaction.categoryId;
+      if (!categoryId) return;
+      const current = map.get(categoryId) ?? 0;
+      map.set(categoryId, current + transaction.amount);
     });
   return [...map.entries()]
-    .map(([subjectId, amount]) => {
-      const subject = findSubject(subjectId);
-      return { subjectId, label: subject?.label ?? subjectId, amount };
+    .map(([categoryId, amount]) => {
+      const category = findCategory(categoryId);
+      return { categoryId, label: category?.label ?? categoryId, amount };
     })
     .sort((a, b) => b.amount - a.amount)
     .slice(0, limit);
+};
+
+export const monthlyExpenseByMonth = (period: AccountingPeriod): { month: string; value: number }[] => {
+  const result = new Map<string, number>();
+  period.transactions
+    .filter((item) => item.type === "expense")
+    .forEach((transaction) => {
+      const key = transaction.date.slice(0, 7);
+      if (!key) return;
+      result.set(key, (result.get(key) ?? 0) + transaction.amount);
+    });
+
+  const items: { month: string; value: number }[] = [];
+  const cursor = new Date(`${period.startDate}T00:00:00`);
+  const end = new Date(`${period.endDate}T00:00:00`);
+  while (cursor <= end) {
+    const year = cursor.getFullYear();
+    const month = cursor.getMonth() + 1;
+    const key = `${year}-${String(month).padStart(2, "0")}`;
+    items.push({ month: `${month}月`, value: result.get(key) ?? 0 });
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+
+  return items;
 };
 

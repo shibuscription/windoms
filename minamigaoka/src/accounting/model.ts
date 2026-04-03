@@ -1,7 +1,7 @@
 export type TransactionType = "income" | "expense" | "transfer";
 
 export type AccountDefinition = {
-  accountKey: string;
+  accountId: string;
   label: string;
   sortOrder: number;
 };
@@ -23,24 +23,35 @@ export type SubjectDefinition = {
 };
 
 export type PeriodAccount = {
-  accountKey: string;
+  accountId: string;
   label: string;
   sortOrder: number;
   openingBalance: number;
 };
 
+export type AccountingAttachment = {
+  name: string;
+  size: number;
+  type: string;
+  downloadUrl: string;
+  storagePath: string;
+};
+
 export type AccountingTransaction = {
   id: string;
+  periodId: string;
   createdAt: string;
+  updatedAt: string;
   date: string;
   type: TransactionType;
   source?: "manual" | "reimbursement" | "purchase";
   amount: number;
-  subjectId: string;
+  categoryId?: string;
   memo?: string;
-  accountKey?: string;
-  fromAccountKey?: string;
-  toAccountKey?: string;
+  accountId?: string;
+  fromAccountId?: string;
+  toAccountId?: string;
+  attachments?: AccountingAttachment[];
 };
 
 export type PeriodStatus = "editing" | "closed";
@@ -51,24 +62,24 @@ export type AccountingPeriod = {
   fiscalYear: number;
   startDate: string;
   endDate: string;
-  status: PeriodStatus;
+  state: PeriodStatus;
   accounts: PeriodAccount[];
   transactions: AccountingTransaction[];
   createdAt: string;
+  updatedAt: string;
 };
 
 export type AccountingStore = {
-  version: 1;
-  currentPeriodId: string;
+  currentPeriodId: string | null;
   periods: AccountingPeriod[];
 };
 
 export type TransactionDraft = {
   date: string;
   amount: string;
-  subjectId: string;
+  categoryId: string;
   memo: string;
-  accountKey: string;
-  fromAccountKey: string;
-  toAccountKey: string;
+  accountId: string;
+  fromAccountId: string;
+  toAccountId: string;
 };

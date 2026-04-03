@@ -1,29 +1,34 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { balancesByAccount, totalExpense, totalIncome } from "../../accounting/calc";
+import { balancesByAccount, monthlyExpenseByMonth, totalExpense, totalIncome } from "../../accounting/calc";
 import { formatMoney } from "../../accounting/format";
 import type { TransactionType } from "../../accounting/model";
 import { useAccountingStore } from "../../accounting/useAccountingStore";
 import { TransactionForm } from "./TransactionForm";
 
-const DUMMY_EXPENSE_BY_MONTH = [
-  { month: "4月", value: 38000 },
-  { month: "5月", value: 52000 },
-  { month: "6月", value: 29000 },
-  { month: "7月", value: 61000 },
-  { month: "8月", value: 47000 },
-  { month: "9月", value: 43000 },
-];
-
 export function AccountingHome() {
-  const { currentPeriod, addTransaction } = useAccountingStore();
+  const { currentPeriod, addTransaction, loading, error } = useAccountingStore();
   const [mode, setMode] = useState<TransactionType | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  if (loading) {
+    return (
+      <section className="card accounting-page">
+        <h1>会計</h1>
+        <p className="muted">会計データを読み込んでいます...</p>
+      </section>
+    );
+  }
 
   if (!currentPeriod) {
     return (
-      <section className="card">
+      <section className="card accounting-page">
         <h1>会計</h1>
-        <p>会計データを初期化できませんでした。</p>
+        {error && <p className="field-error">{error}</p>}
+        <div className="empty-state">
+          <p>現在の会計期はまだ設定されていません。</p>
+          <p className="muted">現在期として扱う `editing` の会計期を1件用意すると、ここに内容を表示できます。</p>
+        </div>
       </section>
     );
   }
@@ -32,13 +37,16 @@ export function AccountingHome() {
   const income = totalIncome(currentPeriod);
   const expense = totalExpense(currentPeriod);
   const diff = income - expense;
-  const transactionLocked = currentPeriod.status === "closed";
-  const maxGraphValue = Math.max(...DUMMY_EXPENSE_BY_MONTH.map((item) => item.value), 1);
+  const transactionLocked = currentPeriod.state === "closed";
+  const expenseByMonth = monthlyExpenseByMonth(currentPeriod);
+  const maxGraphValue = Math.max(...expenseByMonth.map((item) => item.value), 1);
 
   return (
     <section className="card accounting-page">
       <h1>会計</h1>
       <p className="muted">現在の期: {currentPeriod.label}</p>
+      {error && <p className="field-error">{error}</p>}
+      {submitError && <p className="field-error">{submitError}</p>}
 
       <div className="accounting-action-row accounting-action-row-fixed">
         <button
@@ -78,13 +86,13 @@ export function AccountingHome() {
             .slice()
             .sort((a, b) => a.sortOrder - b.sortOrder)
             .map((account) => (
-              <li key={account.accountKey} className="accounting-account-row">
+              <li key={account.accountId} className="accounting-account-row">
                 <Link
-                  to={`/accounting/ledger?period=${currentPeriod.periodId}&account=${account.accountKey}`}
+                  to={`/accounting/ledger?period=${currentPeriod.periodId}&account=${account.accountId}`}
                   className="accounting-account-row-main"
                 >
                   <span>{account.label}</span>
-                  <strong>{formatMoney(balances[account.accountKey] ?? 0)}</strong>
+                  <strong>{formatMoney(balances[account.accountId] ?? 0)}</strong>
                 </Link>
                 <button
                   type="button"
@@ -97,6 +105,7 @@ export function AccountingHome() {
                 </button>
               </li>
             ))}
+          {currentPeriod.accounts.length === 0 && <li className="muted">表示できる口座がありません。</li>}
         </ul>
       </section>
 
@@ -121,7 +130,7 @@ export function AccountingHome() {
       <section className="card accounting-subcard">
         <h3 className="accounting-section-heading">月別支出グラフ</h3>
         <div className="accounting-graph-list">
-          {DUMMY_EXPENSE_BY_MONTH.map((item) => (
+          {expenseByMonth.map((item) => (
             <div key={item.month} className="accounting-graph-row">
               <span className="accounting-graph-label">{item.month}</span>
               <div className="accounting-graph-track" role="img" aria-label={`${item.month}の支出`}> 
@@ -130,6 +139,7 @@ export function AccountingHome() {
               <span className="accounting-graph-value">{formatMoney(item.value)}</span>
             </div>
           ))}
+          {expenseByMonth.length === 0 && <p className="muted">支出データはありません。</p>}
         </div>
       </section>
 
@@ -147,13 +157,20 @@ export function AccountingHome() {
           mode={mode}
           period={currentPeriod}
           onClose={() => setMode(null)}
-          onSubmit={(payload) => {
-            addTransaction({
-              periodId: currentPeriod.periodId,
-              type: mode,
-              ...payload,
-            });
-            setMode(null);
+          onSubmit={async (payload) => {
+            setSubmitError(null);
+            try {
+              await addTransaction({
+                periodId: currentPeriod.periodId,
+                type: mode,
+                ...payload,
+              });
+              setMode(null);
+            } catch (error) {
+              const message = error instanceof Error ? error.message : "保存に失敗しました。";
+              setSubmitError(message);
+              throw error;
+            }
           }}
         />
       )}

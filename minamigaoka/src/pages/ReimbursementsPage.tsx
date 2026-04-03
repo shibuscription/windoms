@@ -478,19 +478,19 @@ export function ReimbursementsPage({
     );
 
     if (shouldRecordAccountingExpense) {
-      const accountKey = currentPeriod?.accounts[0]?.accountKey;
-      const canRecord = Boolean(currentPeriod && currentPeriod.status === "editing" && accountKey);
+      const accountKey = currentPeriod?.accounts[0]?.accountId;
+      const canRecord = Boolean(currentPeriod && currentPeriod.state === "editing" && accountKey);
       if (canRecord && currentPeriod) {
-        addTransaction({
+        void addTransaction({
           periodId: currentPeriod.periodId,
           type: "expense",
           source: "reimbursement",
           date: now.slice(0, 10),
           amount: paidModalTarget.amount,
-          subjectId: "EXPENSE_MISC",
-          accountKey,
+          categoryId: "expense_misc",
+          accountId: accountKey,
           memo: `[source:reimbursement] ${paidModalTarget.title} (${paidModalTarget.id})`,
-        });
+        }).catch(() => undefined);
       }
     }
 

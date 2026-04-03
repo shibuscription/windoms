@@ -11,15 +11,25 @@ import { useAccountingStore } from "../../accounting/useAccountingStore";
 import { siteConfig } from "../../config/site";
 
 export function AccountingReport() {
-  const { store } = useAccountingStore();
+  const { store, loading, error } = useAccountingStore();
   const [searchParams] = useSearchParams();
-  const periodId = searchParams.get("period") ?? store.currentPeriodId;
+  const periodId = searchParams.get("period") ?? store.currentPeriodId ?? "";
   const period = store.periods.find((item) => item.periodId === periodId);
+
+  if (loading) {
+    return (
+      <section className="card accounting-page">
+        <h1>収支計算書</h1>
+        <p className="muted">会計データを読み込んでいます...</p>
+      </section>
+    );
+  }
 
   if (!period) {
     return (
       <section className="card accounting-page">
         <h1>収支計算書</h1>
+        {error && <p className="field-error">{error}</p>}
         <p>対象期が見つかりません。</p>
         <Link to="/accounting" className="button">
           会計トップへ戻る
@@ -38,10 +48,10 @@ export function AccountingReport() {
     <tr key={`${category.categoryId}-head`}>
       <th colSpan={2}>{category.label}</th>
     </tr>,
-    ...category.subjects.map((subject) => (
-      <tr key={subject.subjectId}>
-        <td>{subject.label}</td>
-        <td>{formatMoney(subject.amount)}</td>
+    ...category.items.map((item) => (
+      <tr key={item.categoryId}>
+        <td>{item.label}</td>
+        <td>{formatMoney(item.amount)}</td>
       </tr>
     )),
   ]);
@@ -49,10 +59,10 @@ export function AccountingReport() {
     <tr key={`${category.categoryId}-head`}>
       <th colSpan={2}>{category.label}</th>
     </tr>,
-    ...category.subjects.map((subject) => (
-      <tr key={subject.subjectId}>
-        <td>{subject.label}</td>
-        <td>{formatMoney(subject.amount)}</td>
+    ...category.items.map((item) => (
+      <tr key={item.categoryId}>
+        <td>{item.label}</td>
+        <td>{formatMoney(item.amount)}</td>
       </tr>
     )),
   ]);
