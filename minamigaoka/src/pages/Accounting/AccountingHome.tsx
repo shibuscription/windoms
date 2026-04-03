@@ -28,6 +28,11 @@ export function AccountingHome() {
         <div className="empty-state">
           <p>現在の会計期はまだ設定されていません。</p>
           <p className="muted">現在期として扱う `editing` の会計期を1件用意すると、ここに内容を表示できます。</p>
+          <div className="accounting-small-links">
+            <Link to="/accounting/periods" className="button button-small button-secondary">
+              期管理へ
+            </Link>
+          </div>
         </div>
       </section>
     );
