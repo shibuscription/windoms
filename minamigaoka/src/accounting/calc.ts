@@ -1,4 +1,5 @@
 import { FIXED_CATEGORIES } from "./fixedCategories";
+import { accountingFiscalMonthLabels } from "./fiscalYear";
 import type { AccountingPeriod, AccountingTransaction, CategoryDefinition, TransactionType } from "./model";
 
 type CategoryItemSummary = {
@@ -168,22 +169,14 @@ export const monthlyExpenseByMonth = (period: AccountingPeriod): { month: string
   period.transactions
     .filter((item) => item.type === "expense")
     .forEach((transaction) => {
-      const key = transaction.date.slice(0, 7);
-      if (!key) return;
-      result.set(key, (result.get(key) ?? 0) + transaction.amount);
+      const monthKey = transaction.date.slice(5, 7);
+      if (!monthKey) return;
+      result.set(monthKey, (result.get(monthKey) ?? 0) + transaction.amount);
     });
 
-  const items: { month: string; value: number }[] = [];
-  const cursor = new Date(`${period.startDate}T00:00:00`);
-  const end = new Date(`${period.endDate}T00:00:00`);
-  while (cursor <= end) {
-    const year = cursor.getFullYear();
-    const month = cursor.getMonth() + 1;
-    const key = `${year}-${String(month).padStart(2, "0")}`;
-    items.push({ month: `${month}月`, value: result.get(key) ?? 0 });
-    cursor.setMonth(cursor.getMonth() + 1);
-  }
-
-  return items;
+  return accountingFiscalMonthLabels().map(({ monthKey, label }) => ({
+    month: label,
+    value: result.get(monthKey) ?? 0,
+  }));
 };
 

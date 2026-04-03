@@ -7,7 +7,11 @@ import { comparePeriodAccounts } from "../../accounting/sort";
 import { useAccountingStore } from "../../accounting/useAccountingStore";
 import { TransactionForm } from "./TransactionForm";
 
-export function AccountingHome() {
+type AccountingHomeProps = {
+  isAdmin: boolean;
+};
+
+export function AccountingHome({ isAdmin }: AccountingHomeProps) {
   const { currentPeriod, addTransaction, loading, error } = useAccountingStore();
   const [mode, setMode] = useState<TransactionType | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -29,11 +33,13 @@ export function AccountingHome() {
         <div className="empty-state">
           <p>現在の会計期はまだ設定されていません。</p>
           <p className="muted">現在期として扱う `editing` の会計期を1件用意すると、ここに内容を表示できます。</p>
-          <div className="accounting-small-links">
-            <Link to="/accounting/periods" className="button button-small button-secondary">
-              期管理へ
-            </Link>
-          </div>
+          {isAdmin && (
+            <div className="accounting-small-links">
+              <Link to="/accounting/periods" className="button button-small button-secondary">
+                期管理へ
+              </Link>
+            </div>
+          )}
         </div>
       </section>
     );
@@ -54,36 +60,40 @@ export function AccountingHome() {
       {error && <p className="field-error">{error}</p>}
       {submitError && <p className="field-error">{submitError}</p>}
 
-      <div className="accounting-action-row accounting-action-row-fixed">
-        <button
-          type="button"
-          className="button accounting-action-button accounting-action-income"
-          disabled={transactionLocked}
-          onClick={() => setMode("income")}
-        >
-          <span className="accounting-action-icon">➕</span>
-          <span>収入</span>
-        </button>
-        <button
-          type="button"
-          className="button accounting-action-button accounting-action-expense"
-          disabled={transactionLocked}
-          onClick={() => setMode("expense")}
-        >
-          <span className="accounting-action-icon">➖</span>
-          <span>支出</span>
-        </button>
-        <button
-          type="button"
-          className="button accounting-action-button accounting-action-transfer"
-          disabled={transactionLocked}
-          onClick={() => setMode("transfer")}
-        >
-          <span className="accounting-action-icon">🔄</span>
-          <span>振替</span>
-        </button>
-      </div>
-      {transactionLocked && <p className="muted">確定済み期は仕訳できません（閲覧のみ）。</p>}
+      {isAdmin && (
+        <>
+          <div className="accounting-action-row accounting-action-row-fixed">
+            <button
+              type="button"
+              className="button accounting-action-button accounting-action-income"
+              disabled={transactionLocked}
+              onClick={() => setMode("income")}
+            >
+              <span className="accounting-action-icon">➕</span>
+              <span>収入</span>
+            </button>
+            <button
+              type="button"
+              className="button accounting-action-button accounting-action-expense"
+              disabled={transactionLocked}
+              onClick={() => setMode("expense")}
+            >
+              <span className="accounting-action-icon">➖</span>
+              <span>支出</span>
+            </button>
+            <button
+              type="button"
+              className="button accounting-action-button accounting-action-transfer"
+              disabled={transactionLocked}
+              onClick={() => setMode("transfer")}
+            >
+              <span className="accounting-action-icon">🔄</span>
+              <span>振替</span>
+            </button>
+          </div>
+          {transactionLocked && <p className="muted">確定済み期は仕訳できません（閲覧のみ）。</p>}
+        </>
+      )}
 
       <section className="card accounting-subcard">
         <h3 className="accounting-section-heading">口座一覧</h3>
@@ -153,12 +163,14 @@ export function AccountingHome() {
         <Link to={`/accounting/report?period=${currentPeriod.periodId}`} className="button button-small button-secondary">
           収支計算書
         </Link>
-        <Link to="/accounting/periods" className="button button-small button-secondary">
-          期管理
-        </Link>
+        {isAdmin && (
+          <Link to="/accounting/periods" className="button button-small button-secondary">
+            期管理
+          </Link>
+        )}
       </div>
 
-      {mode && (
+      {isAdmin && mode && (
         <TransactionForm
           mode={mode}
           period={currentPeriod}

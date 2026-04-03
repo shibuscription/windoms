@@ -1255,12 +1255,12 @@ export function App() {
             path="/settings/modules"
             element={isAdmin ? <ModuleSettingsPage /> : <Navigate to="/today" replace />}
           />
-          <Route path="/accounting" element={isAdmin ? <AccountingHome /> : <Navigate to="/today" replace />} />
-          <Route path="/accounting/ledger" element={isAdmin ? <AccountLedger /> : <Navigate to="/today" replace />} />
-          <Route path="/accounting/report" element={isAdmin ? <AccountingReport /> : <Navigate to="/today" replace />} />
+          <Route path="/accounting" element={<AccountingHome isAdmin={isAdmin} />} />
+          <Route path="/accounting/ledger" element={<AccountLedger />} />
+          <Route path="/accounting/report" element={<AccountingReport />} />
           <Route
             path="/accounting/periods"
-            element={isAdmin ? <AccountingPeriods canManageYear={isAdmin} /> : <Navigate to="/today" replace />}
+            element={isAdmin ? <AccountingPeriods canManageYear={isAdmin} /> : <Navigate to="/accounting" replace />}
           />
           <Route
             path="/logs/:date"

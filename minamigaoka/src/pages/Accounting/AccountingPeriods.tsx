@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { resolveAccountingFiscalYear } from "../../accounting/fiscalYear";
 import { Link } from "react-router-dom";
 import { FIXED_ACCOUNTS } from "../../accounting/fixedAccounts";
 import { totalClosingBalance, totalExpense, totalIncome } from "../../accounting/calc";
@@ -17,10 +18,7 @@ type AccountDraft = {
 };
 
 const currentFiscalYear = (): number => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
-  return month <= 3 ? year - 1 : year;
+  return resolveAccountingFiscalYear(new Date());
 };
 
 const emptyAccountDraft = (): AccountDraft => ({

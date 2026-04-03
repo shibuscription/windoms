@@ -14,6 +14,7 @@ import {
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { db, hasFirebaseAppConfig, storage } from "../config/firebase";
 import { FIXED_ACCOUNTS } from "./fixedAccounts";
+import { buildAccountingFiscalYearRange } from "./fiscalYear";
 import { compareAccountingAccounts, comparePeriodAccounts } from "./sort";
 import type {
   AccountDefinition,
@@ -479,10 +480,7 @@ export const startAccountingPeriod = async (input: StartAccountingPeriodInput): 
 
 const buildPeriodLabel = (fiscalYear: number): string => `${fiscalYear}年度`;
 
-const buildPeriodRange = (fiscalYear: number) => ({
-  startDate: `${fiscalYear}-04-01`,
-  endDate: `${fiscalYear + 1}-03-31`,
-});
+const buildPeriodRange = (fiscalYear: number) => buildAccountingFiscalYearRange(fiscalYear);
 
 export const closeAccountingPeriodAndCarryOver = async (period: AccountingPeriod): Promise<void> => {
   ensureDb();

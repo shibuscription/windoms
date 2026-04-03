@@ -1,14 +1,10 @@
 import { FIXED_ACCOUNTS } from "./fixedAccounts";
+import { buildAccountingFiscalYearRange, resolveAccountingFiscalYear } from "./fiscalYear";
 import type { AccountingPeriod, AccountingStore, AccountingTransaction, PeriodAccount, PeriodStatus } from "./model";
 
 export const ACCOUNTING_STORAGE_KEY = "windoms_minamigaoka_accounting_v1";
 
-const currentFiscalYear = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
-  return month <= 3 ? year - 1 : year;
-};
+const currentFiscalYear = () => resolveAccountingFiscalYear(new Date());
 
 const buildPeriodAccounts = (openingByKey?: Record<string, number>): PeriodAccount[] =>
   FIXED_ACCOUNTS.map((item) => ({
@@ -21,12 +17,13 @@ const buildPeriodAccounts = (openingByKey?: Record<string, number>): PeriodAccou
 const createPeriod = (fiscalYear: number, accounts?: PeriodAccount[]): AccountingPeriod => {
   const periodId = `fy-${fiscalYear}`;
   const createdAt = new Date().toISOString();
+  const range = buildAccountingFiscalYearRange(fiscalYear);
   return {
     periodId,
     label: `${fiscalYear}年度`,
     fiscalYear,
-    startDate: `${fiscalYear}-04-01`,
-    endDate: `${fiscalYear + 1}-03-31`,
+    startDate: range.startDate,
+    endDate: range.endDate,
     state: "editing",
     accounts: accounts ?? buildPeriodAccounts(),
     transactions: [],
