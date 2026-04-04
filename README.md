@@ -696,6 +696,13 @@ TODO: 未決定（セッション名の最終表示ルール）
   - `categoryMappingResults`
   - `summary`
 - 変換プレビューは `minamigaoka` で `powershell -ExecutionPolicy Bypass -File .\scripts\normalize-accounting-csv.ps1 -CashCsv <現金CSV> -DepositCsv <預金CSV> -FiscalYear 2025 -OutJson <出力JSON> -OutMarkdown <出力MD>` のように実行できるようにする。
+- 会計初期データの Firestore 投入は、正規化済み preview JSON を確認したうえで行う。
+- 投入前に、対象年度・対象口座・期首残高件数・収入件数・支出件数・振替件数を確認する。
+- 同一年度の `accountingPeriod` がすでに存在する場合は、原則として重複投入しない。
+- 既存データがある状態で再投入する場合は、自動上書きを行わず、手動確認を前提とする。
+- 投入スクリプトは dry-run を既定とし、明示的な実行指定がある場合のみ Firestore へ書き込む。
+- `2025-08-28` の `印鑑ケース` 支出 1 件は移行時例外として扱い、投入時に日付を `2025-09-01` へ補正して `2025年度` データへ含める。
+- Firestore 投入は `minamigaoka` で `node --env-file=.env ./scripts/import-accounting-migration.mjs --input <preview-json>` を dry-run として実行し、問題なければ `--apply` を付けて投入する。
 
 ---
 

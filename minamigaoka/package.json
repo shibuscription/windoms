@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 5174",
     "seed:links": "node --env-file=.env ./scripts/seed-links.mjs",
-    "migrate:accounting-csv": "powershell -ExecutionPolicy Bypass -File ./scripts/normalize-accounting-csv.ps1"
+    "migrate:accounting-csv": "powershell -ExecutionPolicy Bypass -File ./scripts/normalize-accounting-csv.ps1",
+    "import:accounting-migration": "node --env-file=.env ./scripts/import-accounting-migration.mjs"
   },
   "dependencies": {
     "firebase": "^12.0.0",
