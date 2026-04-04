@@ -55,6 +55,18 @@ export type AccountingTransaction = {
   attachments?: AccountingAttachment[];
 };
 
+export type AccountingTransactionInput = {
+  date: string;
+  amount: number;
+  categoryId?: string;
+  memo?: string;
+  accountId?: string;
+  fromAccountId?: string;
+  toAccountId?: string;
+  files?: File[];
+  source?: "manual" | "reimbursement" | "purchase";
+};
+
 export type PeriodStatus = "editing" | "closed";
 
 export type AccountingPeriod = {

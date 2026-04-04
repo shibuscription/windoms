@@ -2767,6 +2767,26 @@ body {
   text-align: left;
 }
 
+.accounting-ledger-sort {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.accounting-ledger-money {
+  text-align: right !important;
+  white-space: nowrap;
+}
+
+.accounting-ledger-actions {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 .accounting-report-sections {
   display: grid;
   gap: 12px;

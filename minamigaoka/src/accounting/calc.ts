@@ -18,11 +18,14 @@ type CategorySummary = {
 
 export type LedgerRow = {
   transactionId: string;
+  transaction: AccountingTransaction;
   date: string;
   kindLabel: string;
   subjectLabel: string;
   memo: string;
   signedAmount: number;
+  incomeAmount: number;
+  expenseAmount: number;
   balance: number;
 };
 
@@ -135,11 +138,14 @@ export const ledgerRowsForAccount = (period: AccountingPeriod, accountId: string
       const category = transaction.type === "transfer" ? undefined : resolveStoredCategory(transaction.categoryId ?? "");
       return {
         transactionId: transaction.id,
+        transaction,
         date: transaction.date,
         kindLabel: kindLabel(transaction.type, delta),
         subjectLabel: transaction.type === "transfer" ? "-" : category?.label ?? transaction.categoryId ?? "-",
         memo: transaction.memo ?? "",
         signedAmount: delta,
+        incomeAmount: delta > 0 ? delta : 0,
+        expenseAmount: delta < 0 ? Math.abs(delta) : 0,
         balance: running,
       };
     })

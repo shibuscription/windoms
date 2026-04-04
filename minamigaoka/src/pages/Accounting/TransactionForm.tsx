@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { groupedAccountingSubjects } from "../../accounting/fixedSubjects";
 import { todayYmd } from "../../accounting/format";
-import type { AccountingPeriod, TransactionType } from "../../accounting/model";
+import type { AccountingPeriod, AccountingTransactionInput, TransactionType } from "../../accounting/model";
 import { comparePeriodAccounts } from "../../accounting/sort";
 import { ReceiptImagePicker } from "../../components/ReceiptImagePicker";
 import { useReceiptPreviews } from "../../hooks/useReceiptPreviews";
@@ -13,18 +13,12 @@ type Props = {
   defaultAccountId?: string;
   defaultFromAccountId?: string;
   defaultToAccountId?: string;
+  initialValues?: Partial<AccountingTransactionInput>;
   memoSuggestions?: string[];
+  title?: string;
+  submitLabel?: string;
   onClose: () => void;
-  onSubmit: (input: {
-    date: string;
-    amount: number;
-    categoryId?: string;
-    memo?: string;
-    accountId?: string;
-    fromAccountId?: string;
-    toAccountId?: string;
-    files?: File[];
-  }) => Promise<void>;
+  onSubmit: (input: AccountingTransactionInput) => Promise<void>;
 };
 
 type FormErrors = {
@@ -50,17 +44,20 @@ export function TransactionForm({
   defaultAccountId = "",
   defaultFromAccountId = "",
   defaultToAccountId = "",
+  initialValues,
   memoSuggestions = [],
+  title,
+  submitLabel = "登録する",
   onClose,
   onSubmit,
 }: Props) {
-  const [date, setDate] = useState<string>(todayYmd());
-  const [amount, setAmount] = useState<string>("");
-  const [categoryId, setCategoryId] = useState<string>("");
-  const [memo, setMemo] = useState<string>("");
-  const [accountId, setAccountId] = useState<string>(defaultAccountId);
-  const [fromAccountId, setFromAccountId] = useState<string>(defaultFromAccountId);
-  const [toAccountId, setToAccountId] = useState<string>(defaultToAccountId);
+  const [date, setDate] = useState<string>(initialValues?.date ?? todayYmd());
+  const [amount, setAmount] = useState<string>(initialValues?.amount ? String(initialValues.amount) : "");
+  const [categoryId, setCategoryId] = useState<string>(initialValues?.categoryId ?? "");
+  const [memo, setMemo] = useState<string>(initialValues?.memo ?? "");
+  const [accountId, setAccountId] = useState<string>(initialValues?.accountId ?? defaultAccountId);
+  const [fromAccountId, setFromAccountId] = useState<string>(initialValues?.fromAccountId ?? defaultFromAccountId);
+  const [toAccountId, setToAccountId] = useState<string>(initialValues?.toAccountId ?? defaultToAccountId);
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReadingReceipt, setIsReadingReceipt] = useState(false);
@@ -91,6 +88,25 @@ export function TransactionForm({
       }
     };
   }, []);
+
+  useEffect(() => {
+    setDate(initialValues?.date ?? todayYmd());
+    setAmount(initialValues?.amount ? String(initialValues.amount) : "");
+    setCategoryId(initialValues?.categoryId ?? "");
+    setMemo(initialValues?.memo ?? "");
+    setAccountId(initialValues?.accountId ?? defaultAccountId);
+    setFromAccountId(initialValues?.fromAccountId ?? defaultFromAccountId);
+    setToAccountId(initialValues?.toAccountId ?? defaultToAccountId);
+    setErrors({});
+    clearPreviews();
+  }, [
+    clearPreviews,
+    defaultAccountId,
+    defaultFromAccountId,
+    defaultToAccountId,
+    initialValues,
+    mode,
+  ]);
 
   const showOcrMessage = (message: string) => {
     setOcrMessage(message);
@@ -206,7 +222,7 @@ export function TransactionForm({
         <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={onClose}>
           ×
         </button>
-        <h3>{titleMap[mode]}</h3>
+        <h3>{title ?? titleMap[mode]}</h3>
         {mode !== "transfer" && (
           <>
             <label>
@@ -339,8 +355,14 @@ export function TransactionForm({
           <button type="button" className="button button-secondary" onClick={onClose} disabled={isSubmitting || isReadingReceipt}>
             キャンセル
           </button>
-          <button type="button" className="button" onClick={() => void submit()} disabled={isSubmitting || isReadingReceipt}>
-            登録する
+          <button
+            type="button"
+            className="button"
+            aria-label={submitLabel}
+            onClick={() => void submit()}
+            disabled={isSubmitting || isReadingReceipt}
+          >
+            {submitLabel}
           </button>
         </div>
       </section>

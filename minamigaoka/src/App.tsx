@@ -421,6 +421,8 @@ export function App() {
   const currentRole = linkedMember ? toMenuRole(linkedMember.role) : authUser?.role ?? "parent";
   const currentOperatorRole: "admin" | "parent" = currentRole === "admin" ? "admin" : "parent";
   const isAdmin = linkedMember?.role === "admin" || (!linkedMember && authUser?.role === "admin");
+  const canManageAccounting =
+    isAdmin || linkedMember?.staffPermissions.includes("accounting") === true;
   const canManageCalendarSessions =
     isAdmin || canManageCalendarSessionsByMember(linkedMember);
   const accountPrimaryName = linkedMember?.name?.trim() || authUser?.loginId || "ログイン中ユーザー";
@@ -1256,7 +1258,10 @@ export function App() {
             element={isAdmin ? <ModuleSettingsPage /> : <Navigate to="/today" replace />}
           />
           <Route path="/accounting" element={<AccountingHome isAdmin={isAdmin} />} />
-          <Route path="/accounting/ledger" element={<AccountLedger isAdmin={isAdmin} />} />
+          <Route
+            path="/accounting/ledger"
+            element={<AccountLedger isAdmin={isAdmin} canManageAccounting={canManageAccounting} />}
+          />
           <Route path="/accounting/report" element={<AccountingReport />} />
           <Route
             path="/accounting/periods"

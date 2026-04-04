@@ -1,28 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { FIXED_CATEGORIES } from "./fixedCategories";
-import type { AccountingStore, TransactionType } from "./model";
+import type { AccountingStore, AccountingTransactionInput, TransactionType } from "./model";
 import {
   createInitialAccountingAccounts,
   closeAccountingPeriodAndCarryOver,
   createAccountingTransaction,
+  deleteAccountingTransaction,
   saveAccountingAccount,
   startAccountingPeriod,
   subscribeAccountingStore,
+  updateAccountingTransaction,
 } from "./service";
 
 export type TransactionInput = {
   periodId: string;
   type: TransactionType;
-  date: string;
-  source?: "manual" | "reimbursement" | "purchase";
-  amount: number;
-  categoryId?: string;
-  memo?: string;
-  accountId?: string;
-  fromAccountId?: string;
-  toAccountId?: string;
-  files?: File[];
-};
+} & AccountingTransactionInput;
 
 export type SaveAccountingAccountInput = {
   accountId?: string;
@@ -73,6 +66,14 @@ export const useAccountingStore = () => {
     await createAccountingTransaction(input);
   };
 
+  const updateTransaction = async (transactionId: string, input: TransactionInput) => {
+    await updateAccountingTransaction(transactionId, input);
+  };
+
+  const deleteTransaction = async (transactionId: string) => {
+    await deleteAccountingTransaction(transactionId);
+  };
+
   const saveAccount = async (input: SaveAccountingAccountInput) => {
     await saveAccountingAccount(input);
   };
@@ -99,6 +100,8 @@ export const useAccountingStore = () => {
     accountsSorted,
     categories: FIXED_CATEGORIES,
     addTransaction,
+    updateTransaction,
+    deleteTransaction,
     saveAccountingAccount: saveAccount,
     createInitialAccountingAccounts: createInitialAccounts,
     startAccountingPeriod: createPeriod,

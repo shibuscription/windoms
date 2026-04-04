@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -11,7 +12,7 @@ import {
   Timestamp,
   writeBatch,
 } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { db, hasFirebaseAppConfig, storage } from "../config/firebase";
 import { FIXED_ACCOUNTS } from "./fixedAccounts";
 import { buildAccountingFiscalYearRange } from "./fiscalYear";
@@ -21,6 +22,7 @@ import type {
   AccountingAttachment,
   AccountingPeriod,
   AccountingStore,
+  AccountingTransactionInput,
   AccountingTransaction,
   PeriodAccount,
   PeriodStatus,
@@ -311,16 +313,7 @@ export const subscribeAccountingStore = (
 export type CreateAccountingTransactionInput = {
   periodId: string;
   type: TransactionType;
-  date: string;
-  amount: number;
-  categoryId?: string;
-  memo?: string;
-  accountId?: string;
-  fromAccountId?: string;
-  toAccountId?: string;
-  files?: File[];
-  source?: AccountingTransaction["source"];
-};
+} & AccountingTransactionInput;
 
 export type SaveAccountingAccountInput = {
   accountId?: string;
@@ -371,6 +364,80 @@ export const createAccountingTransaction = async (input: CreateAccountingTransac
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+};
+
+export const updateAccountingTransaction = async (
+  transactionId: string,
+  input: CreateAccountingTransactionInput,
+): Promise<void> => {
+  ensureDb();
+  const transactionRef = doc(transactionsCollection!, transactionId);
+  const snapshot = await getDoc(transactionRef);
+  if (!snapshot.exists()) {
+    throw new Error("更新対象の明細が見つかりません。");
+  }
+
+  const current = toAccountingTransactionDoc(snapshot.id, snapshot.data() as Record<string, unknown>);
+  if (!current) {
+    throw new Error("更新対象の明細が読み込めませんでした。");
+  }
+
+  const nextAttachments =
+    input.type === "transfer"
+      ? []
+      : [
+          ...(current.attachments ?? []),
+          ...(await uploadAttachments(transactionId, input.files ?? [])),
+        ];
+
+  await setDoc(
+    transactionRef,
+    {
+      periodId: input.periodId,
+      type: input.type,
+      date: input.date,
+      amount: input.amount,
+      categoryId: input.type === "transfer" ? null : input.categoryId ?? null,
+      memo: input.memo?.trim() ? input.memo : null,
+      accountId: input.type === "transfer" ? null : input.accountId ?? null,
+      fromAccountId: input.type === "transfer" ? input.fromAccountId ?? null : null,
+      toAccountId: input.type === "transfer" ? input.toAccountId ?? null : null,
+      attachments: nextAttachments,
+      source: input.source ?? current.source ?? "manual",
+      createdAt: current.createdAt,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: false },
+  );
+};
+
+export const deleteAccountingTransaction = async (transactionId: string): Promise<void> => {
+  ensureDb();
+  const transactionRef = doc(transactionsCollection!, transactionId);
+  const snapshot = await getDoc(transactionRef);
+  if (!snapshot.exists()) {
+    return;
+  }
+
+  const current = toAccountingTransactionDoc(snapshot.id, snapshot.data() as Record<string, unknown>);
+  if (!current) {
+    await deleteDoc(transactionRef);
+    return;
+  }
+
+  if (storage && current.attachments?.length) {
+    await Promise.all(
+      current.attachments.map(async (attachment) => {
+        try {
+          await deleteObject(ref(storage!, attachment.storagePath));
+        } catch {
+          return;
+        }
+      }),
+    );
+  }
+
+  await deleteDoc(transactionRef);
 };
 
 export const saveAccountingAccount = async (input: SaveAccountingAccountInput): Promise<void> => {
