@@ -703,6 +703,15 @@ TODO: 未決定（セッション名の最終表示ルール）
 - 投入スクリプトは dry-run を既定とし、明示的な実行指定がある場合のみ Firestore へ書き込む。
 - `2025-08-28` の `印鑑ケース` 支出 1 件は移行時例外として扱い、投入時に日付を `2025-09-01` へ補正して `2025年度` データへ含める。
 - Firestore 投入は `minamigaoka` で `node --env-file=.env ./scripts/import-accounting-migration.mjs --input <preview-json>` を dry-run として実行し、問題なければ `--apply` を付けて投入する。
+- 会計の危険操作（期削除・口座削除）は通常 UI には置かず、初期移行補助が必要な場合だけ管理用スクリプトで扱う。
+- 初期移行前の空データ掃除は、対象年度の `accountingPeriods` / `accountingPeriodAccounts` / `accountingTransactions` を dry-run で確認したうえで、管理用削除スクリプトで行う。
+- 口座マスタ `accountingAccounts` は今回の初期移行では削除せず、既存の `accountId` / `name` / `sortOrder` / `isActive` が一致するものを importer が再利用する。
+- 空データ掃除と再投入の基本手順は以下とする。
+  1. 削除スクリプト dry-run
+  2. 削除スクリプト本実行
+  3. importer dry-run
+  4. importer 本実行
+- 削除スクリプトは日常運用用 UI の代替ではなく、初期移行補助用途の管理手段としてのみ使う。
 
 ---
 
