@@ -14,11 +14,14 @@ import { siteConfig } from "../../config/site";
 
 type DraftNotes = Record<string, string>;
 
+type ReportType = "income" | "expense";
+
+const noteKey = (type: ReportType, subjectId: string) => `${type}:${subjectId}`;
+
 export function AccountingReport() {
   const { store, loading, error, saveAccountingReportNote } = useAccountingStore();
   const [searchParams] = useSearchParams();
   const [savingKey, setSavingKey] = useState<string | null>(null);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [draftNotes, setDraftNotes] = useState<DraftNotes>({});
   const periodId = searchParams.get("period") ?? store.currentPeriodId ?? "";
@@ -37,7 +40,7 @@ export function AccountingReport() {
     return (
       <section className="card accounting-page">
         <h1>収支計算書</h1>
-        <p className="muted">会計データを読み込んでいます...</p>
+        <p className="muted">会計データを読み込み中です...</p>
       </section>
     );
   }
@@ -47,7 +50,7 @@ export function AccountingReport() {
       <section className="card accounting-page">
         <h1>収支計算書</h1>
         {error && <p className="field-error">{error}</p>}
-        <p>対象期が見つかりません。</p>
+        <p>表示対象の会計期が見つかりません。</p>
         <Link to="/accounting" className="button">
           会計トップへ戻る
         </Link>
@@ -63,18 +66,25 @@ export function AccountingReport() {
   const expenseTotal = currentExpenseTotal + carryOut;
   const fiscalRange = buildAccountingFiscalYearRange(period.fiscalYear);
 
-  const noteValueFor = (subjectId: string, currentNote: string) =>
-    draftNotes[subjectId] !== undefined ? draftNotes[subjectId] : currentNote;
+  const noteValueFor = (type: ReportType, subjectId: string, currentNote: string) =>
+    draftNotes[noteKey(type, subjectId)] !== undefined ? draftNotes[noteKey(type, subjectId)] : currentNote;
+
+  const changeNote = (type: ReportType, subjectId: string, value: string) => {
+    setDraftNotes((current) => ({
+      ...current,
+      [noteKey(type, subjectId)]: value,
+    }));
+  };
 
   const saveNote = async (
-    type: "income" | "expense",
+    type: ReportType,
     categoryId: string,
     subjectId: string,
     note: string,
   ) => {
-    setSaveMessage(null);
     setSaveError(null);
-    setSavingKey(subjectId);
+    const currentKey = noteKey(type, subjectId);
+    setSavingKey(currentKey);
     try {
       await saveAccountingReportNote({
         periodId: period.periodId,
@@ -85,10 +95,9 @@ export function AccountingReport() {
       });
       setDraftNotes((current) => {
         const next = { ...current };
-        delete next[subjectId];
+        delete next[currentKey];
         return next;
       });
-      setSaveMessage("帳票用摘要を保存しました。");
     } catch (nextError) {
       setSaveError(nextError instanceof Error ? nextError.message : "帳票用摘要の保存に失敗しました。");
     } finally {
@@ -96,9 +105,20 @@ export function AccountingReport() {
     }
   };
 
+  const blurNote = async (
+    type: ReportType,
+    categoryId: string,
+    subjectId: string,
+    note: string,
+    currentNote: string,
+  ) => {
+    if (note.trim() === currentNote.trim()) return;
+    await saveNote(type, categoryId, subjectId, note);
+  };
+
   const renderSection = (
     title: string,
-    type: "income" | "expense",
+    type: ReportType,
     groups: typeof incomeGroups,
   ) => (
     <section className="accounting-report-card">
@@ -113,21 +133,18 @@ export function AccountingReport() {
         </thead>
         <tbody>
           {groups.map((group) => (
-            <FragmentCategory
+            <ReportCategorySection
               key={group.categoryId}
+              type={type}
               categoryLabel={group.categoryLabel}
               rows={group.items.map((item) => ({
                 ...item,
-                inputValue: noteValueFor(item.subjectId, item.note),
+                inputValue: noteValueFor(type, item.subjectId, item.note),
               }))}
-              onChangeNote={(subjectId, value) =>
-                setDraftNotes((current) => ({
-                  ...current,
-                  [subjectId]: value,
-                }))
-              }
-              onSaveNote={(categoryId, subjectId, note) => saveNote(type, categoryId, subjectId, note)}
               savingKey={savingKey}
+              onChangeNote={changeNote}
+              onBlurNote={blurNote}
+              onSaveNote={saveNote}
             />
           ))}
         </tbody>
@@ -145,7 +162,7 @@ export function AccountingReport() {
 
       <div className="accounting-small-links print-hidden">
         <Link to="/accounting" className="button button-small button-secondary">
-          会計トップ
+          会計トップへ
         </Link>
         <button type="button" className="button button-small" onClick={() => window.print()}>
           PDF出力
@@ -154,33 +171,38 @@ export function AccountingReport() {
 
       {error && <p className="field-error">{error}</p>}
       {saveError && <p className="field-error">{saveError}</p>}
-      {saveMessage && <p className="muted">{saveMessage}</p>}
 
       <div className="accounting-report-summary">
-        <div className="accounting-report-total-row">
-          <span>前年度繰越金</span>
-          <strong>{formatMoney(carryIn)}</strong>
-        </div>
-        <div className="accounting-report-total-row">
-          <span>当期収入合計</span>
-          <strong>{formatMoney(currentIncomeTotal)}</strong>
-        </div>
-        <div className="accounting-report-total-row is-strong">
-          <span>収入合計</span>
-          <strong>{formatMoney(incomeTotal)}</strong>
-        </div>
-        <div className="accounting-report-total-row">
-          <span>当期支出合計</span>
-          <strong>{formatMoney(currentExpenseTotal)}</strong>
-        </div>
-        <div className="accounting-report-total-row">
-          <span>次年度繰越金</span>
-          <strong>{formatMoney(carryOut)}</strong>
-        </div>
-        <div className="accounting-report-total-row is-strong">
-          <span>支出合計</span>
-          <strong>{formatMoney(expenseTotal)}</strong>
-        </div>
+        <section className="accounting-report-summary-group">
+          <h2>収入</h2>
+          <div className="accounting-report-total-row">
+            <span>前年度繰越金</span>
+            <strong>{formatMoney(carryIn)}</strong>
+          </div>
+          <div className="accounting-report-total-row">
+            <span>当期収入合計</span>
+            <strong>{formatMoney(currentIncomeTotal)}</strong>
+          </div>
+          <div className="accounting-report-total-row is-strong">
+            <span>収入合計</span>
+            <strong>{formatMoney(incomeTotal)}</strong>
+          </div>
+        </section>
+        <section className="accounting-report-summary-group">
+          <h2>支出</h2>
+          <div className="accounting-report-total-row">
+            <span>当期支出合計</span>
+            <strong>{formatMoney(currentExpenseTotal)}</strong>
+          </div>
+          <div className="accounting-report-total-row">
+            <span>次年度繰越金</span>
+            <strong>{formatMoney(carryOut)}</strong>
+          </div>
+          <div className="accounting-report-total-row is-strong">
+            <span>支出合計</span>
+            <strong>{formatMoney(expenseTotal)}</strong>
+          </div>
+        </section>
       </div>
 
       <div className="accounting-report-sections">
@@ -189,63 +211,87 @@ export function AccountingReport() {
       </div>
 
       <div className="accounting-signature">
-        <div>会長署名 ____________________</div>
-        <div>会計署名 ____________________</div>
+        <div>会長印 ____________________</div>
+        <div>会計印 ____________________</div>
       </div>
     </section>
   );
 }
 
-type FragmentCategoryProps = {
+type ReportCategorySectionProps = {
+  type: ReportType;
   categoryLabel: string;
   rows: Array<{
     categoryId: string;
     subjectId: string;
     subjectLabel: string;
     amount: number;
+    note: string;
     inputValue: string;
   }>;
   savingKey: string | null;
-  onChangeNote: (subjectId: string, value: string) => void;
-  onSaveNote: (categoryId: string, subjectId: string, note: string) => Promise<void>;
+  onChangeNote: (type: ReportType, subjectId: string, value: string) => void;
+  onBlurNote: (
+    type: ReportType,
+    categoryId: string,
+    subjectId: string,
+    note: string,
+    currentNote: string,
+  ) => Promise<void>;
+  onSaveNote: (type: ReportType, categoryId: string, subjectId: string, note: string) => Promise<void>;
 };
 
-function FragmentCategory({
+function ReportCategorySection({
+  type,
   categoryLabel,
   rows,
   savingKey,
   onChangeNote,
+  onBlurNote,
   onSaveNote,
-}: FragmentCategoryProps) {
+}: ReportCategorySectionProps) {
   return (
     <>
       <tr className="accounting-report-category-row">
         <th colSpan={3}>{categoryLabel}</th>
       </tr>
-      {rows.map((item) => (
-        <tr key={item.subjectId}>
-          <td className="accounting-report-subject-cell">{item.subjectLabel}</td>
-          <td className="accounting-report-note-cell">
-            <div className="accounting-report-note-editor">
-              <textarea
-                value={item.inputValue}
-                onChange={(event) => onChangeNote(item.subjectId, event.target.value)}
-                rows={2}
-                placeholder="帳票用摘要を入力"
-              />
-              <button
-                type="button"
-                className="button button-small button-secondary print-hidden"
-                onClick={() => void onSaveNote(item.categoryId, item.subjectId, item.inputValue)}
-                disabled={savingKey === item.subjectId}
-              >
-                {savingKey === item.subjectId ? "保存中..." : "保存"}
-              </button>
-            </div>
-          </td>
-          <td className="accounting-report-amount-cell">{formatMoney(item.amount)}</td>
-        </tr>
-      ))}
+      {rows.map((item) => {
+        const currentKey = noteKey(type, item.subjectId);
+        const isDirty = item.inputValue.trim() !== item.note.trim();
+        const isSaving = savingKey === currentKey;
+
+        return (
+          <tr key={item.subjectId}>
+            <td className="accounting-report-subject-cell">{item.subjectLabel}</td>
+            <td className="accounting-report-note-cell">
+              <div className="accounting-report-note-editor">
+                <textarea
+                  value={item.inputValue}
+                  onChange={(event) => onChangeNote(type, item.subjectId, event.target.value)}
+                  onBlur={() => void onBlurNote(type, item.categoryId, item.subjectId, item.inputValue, item.note)}
+                  rows={1}
+                  placeholder="帳票用摘要を入力"
+                />
+                <div className="accounting-report-note-meta print-hidden">
+                  {isSaving ? (
+                    <span className="muted">保存中...</span>
+                  ) : isDirty ? (
+                    <button
+                      type="button"
+                      className="button button-small button-secondary"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => void onSaveNote(type, item.categoryId, item.subjectId, item.inputValue)}
+                    >
+                      保存
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            </td>
+            <td className="accounting-report-amount-cell">{formatMoney(item.amount)}</td>
+          </tr>
+        );
+      })}
     </>
   );
 }

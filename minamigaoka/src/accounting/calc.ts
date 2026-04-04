@@ -1,5 +1,9 @@
 import { FIXED_CATEGORIES } from "./fixedCategories";
-import { groupedAccountingSubjects, findAccountingSubject } from "./fixedSubjects";
+import {
+  groupedAccountingSubjects,
+  findAccountingSubject,
+  accountingSubjectsForType,
+} from "./fixedSubjects";
 import { accountingFiscalMonthLabels } from "./fiscalYear";
 import type {
   AccountingPeriod,
@@ -95,6 +99,63 @@ const resolveStoredCategory = (
     label: storedCategoryId,
     sortOrder: 999,
   };
+};
+
+const findSubjectByCategoryAndMemo = (
+  type: "income" | "expense",
+  categoryId: string,
+  memo?: string,
+): string | undefined => {
+  const subjects = accountingSubjectsForType(type).filter((subject) => subject.categoryId === categoryId);
+  if (subjects.length === 0) return undefined;
+  if (subjects.length === 1) return subjects[0].subjectId;
+
+  const text = (memo ?? "").trim();
+  if (!text) return subjects[0].subjectId;
+
+  if (categoryId === "income_subsidy_grant") {
+    if (/助成/i.test(text)) return "INCOME_GRANT";
+    return "INCOME_SUBSIDY";
+  }
+
+  if (categoryId === "expense_instructor") {
+    if (/謝礼/i.test(text)) return "EXPENSE_INSTRUCTOR_HONORARIUM";
+    return "EXPENSE_INSTRUCTOR_OTHER";
+  }
+
+  if (categoryId === "expense_instrument_supply") {
+    if (/修理/i.test(text)) return "EXPENSE_INSTRUMENT_REPAIR";
+    if (/楽譜/i.test(text)) return "EXPENSE_SCORE_PURCHASE";
+    return "EXPENSE_INSTRUMENT_ACCESSORY";
+  }
+
+  if (categoryId === "expense_concert") {
+    if (/施設|会場/i.test(text)) return "EXPENSE_FACILITY_FEE";
+    if (/参加/i.test(text)) return "EXPENSE_CONTEST_FEE";
+    if (/運搬|輸送/i.test(text)) return "EXPENSE_INSTRUMENT_TRANSPORT";
+    return "EXPENSE_CONCERT_MISC";
+  }
+
+  if (categoryId === "expense_misc") {
+    if (/印刷/i.test(text)) return "EXPENSE_PRINTING";
+    if (/旅費|交通/i.test(text)) return "EXPENSE_TRAVEL";
+    if (/慶弔|交際/i.test(text)) return "EXPENSE_CEREMONIAL";
+    if (/消耗品|用品|ケース/i.test(text)) return "EXPENSE_SUPPLIES";
+    return "EXPENSE_MISC";
+  }
+
+  return subjects[0].subjectId;
+};
+
+const resolveReportSubjectId = (
+  type: "income" | "expense",
+  storedCategoryId: string,
+  memo?: string,
+): string | undefined => {
+  const subject = findAccountingSubject(storedCategoryId);
+  if (subject) return subject.subjectId;
+
+  return findSubjectByCategoryAndMemo(type, storedCategoryId, memo);
 };
 
 export const accountDeltaForTransaction = (
@@ -234,8 +295,9 @@ export const reportCategoryGroups = (
     .forEach((transaction) => {
       const categoryId = transaction.categoryId;
       if (!categoryId) return;
-      const resolved = resolveStoredCategory(categoryId);
-      amountBySubjectId.set(resolved.itemId, (amountBySubjectId.get(resolved.itemId) ?? 0) + transaction.amount);
+      const subjectId = resolveReportSubjectId(type, categoryId, transaction.memo);
+      if (!subjectId) return;
+      amountBySubjectId.set(subjectId, (amountBySubjectId.get(subjectId) ?? 0) + transaction.amount);
     });
 
   const noteBySubjectId = new Map(
