@@ -288,7 +288,7 @@ export function ScorePage({
       )}
 
       {mode && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={closeModal}>
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section
             className="modal-panel purchases-create-modal"
             onClick={(event) => event.stopPropagation()}

@@ -662,7 +662,7 @@ export function ActivityPlanPage() {
         </table>
       </div>
       {sessionCreateDraft && (
-        <div className="modal-backdrop" onClick={() => setSessionCreateDraft(null)}>
+        <div className="modal-backdrop">
           <div className="modal-panel activity-modal-panel" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setSessionCreateDraft(null)}>
               ×
@@ -699,7 +699,7 @@ export function ActivityPlanPage() {
         </div>
       )}
       {noteEditDraft && (
-        <div className="modal-backdrop" onClick={() => setNoteEditDraft(null)}>
+        <div className="modal-backdrop">
           <div className="modal-panel activity-modal-panel" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setNoteEditDraft(null)}>
               ×
@@ -731,7 +731,7 @@ export function ActivityPlanPage() {
         </div>
       )}
       {isSurveyModalOpen && (
-        <div className="modal-backdrop" onClick={() => setIsSurveyModalOpen(false)}>
+        <div className="modal-backdrop">
           <div className="modal-panel activity-modal-panel" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsSurveyModalOpen(false)}>
               ×
@@ -778,7 +778,7 @@ export function ActivityPlanPage() {
         </div>
       )}
       {isAiDraftModalOpen && (
-        <div className="modal-backdrop" onClick={() => setIsAiDraftModalOpen(false)}>
+        <div className="modal-backdrop">
           <div className="modal-panel activity-modal-panel" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsAiDraftModalOpen(false)}>
               ×
@@ -798,7 +798,7 @@ export function ActivityPlanPage() {
         </div>
       )}
       {isManualDraftModalOpen && (
-        <div className="modal-backdrop" onClick={() => setIsManualDraftModalOpen(false)}>
+        <div className="modal-backdrop">
           <div className="modal-panel activity-modal-panel" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsManualDraftModalOpen(false)}>
               ×
@@ -825,7 +825,7 @@ export function ActivityPlanPage() {
         </div>
       )}
       {isShiftConfirmModalOpen && (
-        <div className="modal-backdrop" onClick={() => setIsShiftConfirmModalOpen(false)}>
+        <div className="modal-backdrop">
           <div className="modal-panel activity-modal-panel" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsShiftConfirmModalOpen(false)}>
               ×
@@ -851,7 +851,7 @@ export function ActivityPlanPage() {
         </div>
       )}
       {isNotifyConfirmModalOpen && (
-        <div className="modal-backdrop" onClick={() => setIsNotifyConfirmModalOpen(false)}>
+        <div className="modal-backdrop">
           <div className="modal-panel activity-modal-panel" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsNotifyConfirmModalOpen(false)}>
               ×
@@ -877,7 +877,7 @@ export function ActivityPlanPage() {
         </div>
       )}
       {isDutyEditorModalOpen && dutyEditorSession && (
-        <div className="modal-backdrop" onClick={closeDutyEditorModal}>
+        <div className="modal-backdrop">
           <div className="modal-panel activity-modal-panel" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeDutyEditorModal}>
               ×

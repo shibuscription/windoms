@@ -919,7 +919,7 @@ export function TodosPage({
       )}
 
       {deleteTarget && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setDeleteTargetId(null)}>
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setDeleteTargetId(null)}>
               ×

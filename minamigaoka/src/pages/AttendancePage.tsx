@@ -769,7 +769,12 @@ export function AttendancePage({
       )}
 
       {selectedMemberState && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={closeMemberModal}>
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onClick={selectedMemberState.editable ? undefined : closeMemberModal}
+        >
           <section className="modal-panel attendance-member-modal" onClick={(event) => event.stopPropagation()}>
             <button
               type="button"
@@ -959,7 +964,7 @@ export function AttendancePage({
       )}
 
       {selectedCellState && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={closeCellModal}>
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="modal-panel attendance-cell-modal" onClick={(event) => event.stopPropagation()}>
             <button
               type="button"
@@ -1028,7 +1033,12 @@ export function AttendancePage({
       )}
 
       {selectedCommentState && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={closeCommentModal}>
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onClick={selectedCommentState.editable ? undefined : closeCommentModal}
+        >
           <section className="modal-panel attendance-comment-modal" onClick={(event) => event.stopPropagation()}>
             <button
               type="button"

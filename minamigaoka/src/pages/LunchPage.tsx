@@ -291,7 +291,7 @@ export function LunchPage({
       </div>
 
       {isAddModalOpen && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={closeAddModal}>
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section
             className="modal-panel purchases-complete-modal lunch-add-modal"
             onClick={(event) => event.stopPropagation()}

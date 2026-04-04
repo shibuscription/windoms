@@ -314,7 +314,7 @@ export function InstrumentsPage({ data, updateInstruments }: InstrumentsPageProp
       )}
 
       {formMode && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={closeForm}>
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="modal-panel instruments-form-modal" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeForm}>
               ×
@@ -420,7 +420,7 @@ export function InstrumentsPage({ data, updateInstruments }: InstrumentsPageProp
       )}
 
       {deleteTarget && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setDeleteTargetId(null)}>
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setDeleteTargetId(null)}>
               ×

@@ -391,7 +391,7 @@ export function PurchasesPage({
       </div>
 
       {isCreateModalOpen && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={closeCreateModal}>
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="modal-panel purchases-create-modal" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeCreateModal}>
               ×
@@ -450,7 +450,7 @@ export function PurchasesPage({
       )}
 
       {modalTarget && completeDraft && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={closeCompleteModal}>
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="modal-panel purchases-complete-modal" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeCompleteModal}>
               ×
@@ -553,7 +553,7 @@ export function PurchasesPage({
       )}
 
       {confirmDialog && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setConfirmDialog(null)}>
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setConfirmDialog(null)}>
               ×

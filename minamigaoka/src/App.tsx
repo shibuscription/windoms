@@ -1486,7 +1486,7 @@ export function App() {
         </div>
       )}
       {isLogoutConfirmOpen && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setIsLogoutConfirmOpen(false)}>
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
             <button
               type="button"

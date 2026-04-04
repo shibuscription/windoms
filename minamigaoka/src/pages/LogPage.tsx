@@ -1415,7 +1415,7 @@ export function LogPage({
       </div>
 
       {pendingDeleteActivityIndex !== null && (
-        <div className="modal-backdrop" onClick={() => setPendingDeleteActivityIndex(null)}>
+        <div className="modal-backdrop">
           <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
             <button
               type="button"
@@ -1443,7 +1443,7 @@ export function LogPage({
       )}
 
       {pendingStampSession && (
-        <div className="modal-backdrop" onClick={() => setPendingStampSession(null)}>
+        <div className="modal-backdrop">
           <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" onClick={() => setPendingStampSession(null)} aria-label="閉じる" title="閉じる">
               ×
@@ -1483,7 +1483,7 @@ export function LogPage({
       )}
 
       {isActivityModalOpen && (
-        <div className="modal-backdrop" onClick={closeActivityModal}>
+        <div className="modal-backdrop">
           <div className="modal-panel activity-modal-panel" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" onClick={closeActivityModal} aria-label="閉じる" title="閉じる">
               ×
@@ -1641,7 +1641,7 @@ export function LogPage({
       )}
 
       {selectedRsvpSession && (
-        <div className="modal-backdrop" onClick={closeRsvpModal}>
+        <div className="modal-backdrop">
           <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" onClick={closeRsvpModal} aria-label="閉じる" title="閉じる">
               ×

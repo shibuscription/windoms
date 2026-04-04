@@ -613,7 +613,7 @@ export function EventsPage({
       )}
 
       {selectedEvent && isSessionBindModalOpen && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setIsSessionBindModalOpen(false)}>
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="modal-panel events-bind-sessions-modal" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsSessionBindModalOpen(false)}>
               ×
@@ -659,7 +659,7 @@ export function EventsPage({
       )}
 
       {unlinkTargetSession && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setUnlinkTargetSessionId(null)}>
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setUnlinkTargetSessionId(null)}>
               ×
@@ -681,7 +681,7 @@ export function EventsPage({
       )}
 
       {editingEventId && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={closeEditModal}>
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="modal-panel events-editor-modal" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeEditModal}>
               ×
@@ -734,7 +734,7 @@ export function EventsPage({
       )}
 
       {deleteTargetEvent && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setDeleteTargetId(null)}>
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setDeleteTargetId(null)}>
               ×
