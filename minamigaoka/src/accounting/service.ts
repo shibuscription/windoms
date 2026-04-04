@@ -21,6 +21,7 @@ import type {
   AccountDefinition,
   AccountingAttachment,
   AccountingPeriod,
+  AccountingReportNote,
   AccountingStore,
   AccountingTransactionInput,
   AccountingTransaction,
@@ -33,6 +34,7 @@ const periodsCollection = db ? collection(db, "accountingPeriods") : null;
 const accountsCollection = db ? collection(db, "accountingAccounts") : null;
 const periodAccountsCollection = db ? collection(db, "accountingPeriodAccounts") : null;
 const transactionsCollection = db ? collection(db, "accountingTransactions") : null;
+const reportNotesCollection = db ? collection(db, "accountingReportNotes") : null;
 
 type AccountingPeriodDoc = {
   id: string;
@@ -61,8 +63,10 @@ type AccountingPeriodAccountDoc = {
 
 type AccountingTransactionDoc = AccountingTransaction;
 
+type AccountingReportNoteDoc = AccountingReportNote;
+
 const ensureDb = () => {
-  if (!db || !hasFirebaseAppConfig || !periodsCollection || !accountsCollection || !periodAccountsCollection || !transactionsCollection) {
+  if (!db || !hasFirebaseAppConfig || !periodsCollection || !accountsCollection || !periodAccountsCollection || !transactionsCollection || !reportNotesCollection) {
     throw new Error("Firebase 設定が未完了のため、会計データを Firestore で扱えません。");
   }
 };
@@ -175,6 +179,27 @@ const toAccountingTransactionDoc = (id: string, value: Record<string, unknown>):
   };
 };
 
+const toAccountingReportNoteDoc = (id: string, value: Record<string, unknown>): AccountingReportNoteDoc | null => {
+  const periodId = toOptionalString(value.periodId);
+  const type = value.type;
+  const categoryId = toOptionalString(value.categoryId);
+  const subjectId = toOptionalString(value.subjectId);
+  const note = typeof value.note === "string" ? value.note : "";
+  if (!periodId || !categoryId || !subjectId) return null;
+  if (type !== "income" && type !== "expense") return null;
+
+  return {
+    id,
+    periodId,
+    type,
+    categoryId,
+    subjectId,
+    note,
+    createdAt: toIsoString(value.createdAt),
+    updatedAt: toIsoString(value.updatedAt),
+  };
+};
+
 const sanitizeFileName = (value: string): string => value.replace(/[\\/:*?"<>|]/g, "_");
 
 const buildAccountingStore = (
@@ -182,6 +207,7 @@ const buildAccountingStore = (
   accounts: AccountingAccountDoc[],
   periodAccounts: AccountingPeriodAccountDoc[],
   transactions: AccountingTransactionDoc[],
+  reportNotes: AccountingReportNoteDoc[],
 ): AccountingStore => {
   const normalizedAccounts: AccountDefinition[] = accounts
     .map((item) => ({
@@ -239,6 +265,14 @@ const buildAccountingStore = (
     currentPeriodId: currentPeriod?.periodId ?? null,
     accounts: normalizedAccounts,
     periods: normalizedPeriods,
+    reportNotes: reportNotes
+      .slice()
+      .sort((a, b) => {
+        if (a.periodId !== b.periodId) return a.periodId.localeCompare(b.periodId);
+        if (a.type !== b.type) return a.type.localeCompare(b.type);
+        if (a.categoryId !== b.categoryId) return a.categoryId.localeCompare(b.categoryId);
+        return a.subjectId.localeCompare(b.subjectId);
+      }),
   };
 };
 
@@ -252,14 +286,16 @@ export const subscribeAccountingStore = (
   let latestAccounts: AccountingAccountDoc[] = [];
   let latestPeriodAccounts: AccountingPeriodAccountDoc[] = [];
   let latestTransactions: AccountingTransactionDoc[] = [];
+  let latestReportNotes: AccountingReportNoteDoc[] = [];
   let readyPeriods = false;
   let readyAccounts = false;
   let readyPeriodAccounts = false;
   let readyTransactions = false;
+  let readyReportNotes = false;
 
   const emit = () => {
-    if (!readyPeriods || !readyAccounts || !readyPeriodAccounts || !readyTransactions) return;
-    callback(buildAccountingStore(latestPeriods, latestAccounts, latestPeriodAccounts, latestTransactions));
+    if (!readyPeriods || !readyAccounts || !readyPeriodAccounts || !readyTransactions || !readyReportNotes) return;
+    callback(buildAccountingStore(latestPeriods, latestAccounts, latestPeriodAccounts, latestTransactions, latestReportNotes));
   };
 
   const unsubscribes = [
@@ -303,6 +339,17 @@ export const subscribeAccountingStore = (
       },
       (error) => onError?.(error instanceof Error ? error : new Error("accountingTransactions subscription failed")),
     ),
+    onSnapshot(
+      reportNotesCollection!,
+      (snapshot) => {
+        latestReportNotes = snapshot.docs
+          .map((item) => toAccountingReportNoteDoc(item.id, item.data() as Record<string, unknown>))
+          .filter((item): item is AccountingReportNoteDoc => Boolean(item));
+        readyReportNotes = true;
+        emit();
+      },
+      (error) => onError?.(error instanceof Error ? error : new Error("accountingReportNotes subscription failed")),
+    ),
   ];
 
   return () => {
@@ -320,6 +367,14 @@ export type SaveAccountingAccountInput = {
   name: string;
   sortOrder: number;
   isActive: boolean;
+};
+
+export type SaveAccountingReportNoteInput = {
+  periodId: string;
+  type: "income" | "expense";
+  categoryId: string;
+  subjectId: string;
+  note: string;
 };
 
 const uploadAttachments = async (transactionId: string, files: File[]): Promise<AccountingAttachment[]> => {
@@ -454,6 +509,40 @@ export const saveAccountingAccount = async (input: SaveAccountingAccountInput): 
   }
   await setDoc(
     accountRef,
+    payload,
+    { merge: true },
+  );
+};
+
+export const saveAccountingReportNote = async (input: SaveAccountingReportNoteInput): Promise<void> => {
+  ensureDb();
+  const noteId = `${input.periodId}_${input.type}_${input.subjectId}`;
+  const noteRef = doc(reportNotesCollection!, noteId);
+  const normalizedNote = input.note.trim();
+
+  if (!normalizedNote) {
+    const existing = await getDoc(noteRef);
+    if (existing.exists()) {
+      await deleteDoc(noteRef);
+    }
+    return;
+  }
+
+  const existing = await getDoc(noteRef);
+  const payload: Record<string, unknown> = {
+    periodId: input.periodId,
+    type: input.type,
+    categoryId: input.categoryId,
+    subjectId: input.subjectId,
+    note: normalizedNote,
+    updatedAt: serverTimestamp(),
+  };
+  if (!existing.exists()) {
+    payload.createdAt = serverTimestamp();
+  }
+
+  await setDoc(
+    noteRef,
     payload,
     { merge: true },
   );

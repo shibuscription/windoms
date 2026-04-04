@@ -67,6 +67,17 @@ export type AccountingTransactionInput = {
   source?: "manual" | "reimbursement" | "purchase";
 };
 
+export type AccountingReportNote = {
+  id: string;
+  periodId: string;
+  type: "income" | "expense";
+  categoryId: string;
+  subjectId: string;
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type PeriodStatus = "editing" | "closed";
 
 export type AccountingPeriod = {
@@ -86,6 +97,7 @@ export type AccountingStore = {
   currentPeriodId: string | null;
   accounts: AccountDefinition[];
   periods: AccountingPeriod[];
+  reportNotes: AccountingReportNote[];
 };
 
 export type TransactionDraft = {

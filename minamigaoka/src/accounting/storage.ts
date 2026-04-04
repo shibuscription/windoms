@@ -39,6 +39,7 @@ const seedStore = (): AccountingStore => {
     currentPeriodId: period.periodId,
     accounts: FIXED_ACCOUNTS,
     periods: [period],
+    reportNotes: [],
   };
 };
 
@@ -71,6 +72,7 @@ export const loadAccountingStore = (): AccountingStore => {
     return {
       ...parsed,
       periods: normalizedPeriods,
+      reportNotes: Array.isArray(parsed.reportNotes) ? parsed.reportNotes : [],
     };
   } catch {
     return seedStore();

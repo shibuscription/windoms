@@ -6,6 +6,7 @@ import {
   closeAccountingPeriodAndCarryOver,
   createAccountingTransaction,
   deleteAccountingTransaction,
+  saveAccountingReportNote,
   saveAccountingAccount,
   startAccountingPeriod,
   subscribeAccountingStore,
@@ -30,7 +31,7 @@ export type StartAccountingPeriodInput = {
 };
 
 export const useAccountingStore = () => {
-  const [store, setStore] = useState<AccountingStore>({ currentPeriodId: null, accounts: [], periods: [] });
+  const [store, setStore] = useState<AccountingStore>({ currentPeriodId: null, accounts: [], periods: [], reportNotes: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,6 +79,16 @@ export const useAccountingStore = () => {
     await saveAccountingAccount(input);
   };
 
+  const saveReportNote = async (input: {
+    periodId: string;
+    type: "income" | "expense";
+    categoryId: string;
+    subjectId: string;
+    note: string;
+  }) => {
+    await saveAccountingReportNote(input);
+  };
+
   const createInitialAccounts = async () => {
     await createInitialAccountingAccounts();
   };
@@ -102,6 +113,7 @@ export const useAccountingStore = () => {
     addTransaction,
     updateTransaction,
     deleteTransaction,
+    saveAccountingReportNote: saveReportNote,
     saveAccountingAccount: saveAccount,
     createInitialAccountingAccounts: createInitialAccounts,
     startAccountingPeriod: createPeriod,

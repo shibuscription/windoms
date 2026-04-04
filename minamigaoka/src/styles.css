@@ -2965,6 +2965,103 @@ body {
   gap: 12px;
 }
 
+.accounting-report-card {
+  display: grid;
+  gap: 8px;
+}
+
+.accounting-report-card h2 {
+  margin: 0;
+}
+
+.accounting-report-summary {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.accounting-report-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 10px 12px;
+}
+
+.accounting-report-total-row.is-strong {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  font-weight: 700;
+}
+
+.accounting-report-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.accounting-report-table th,
+.accounting-report-table td {
+  border: 1px solid #d6dde8;
+  padding: 8px 10px;
+  vertical-align: top;
+}
+
+.accounting-report-col-subject {
+  width: 20%;
+  min-width: 8rem;
+}
+
+.accounting-report-col-note {
+  width: 55%;
+}
+
+.accounting-report-col-amount,
+.accounting-report-amount-cell {
+  width: 25%;
+  min-width: 8rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.accounting-report-category-row th {
+  background: #eef2f7;
+  color: #334155;
+  text-align: left;
+}
+
+.accounting-report-subject-cell {
+  white-space: nowrap;
+}
+
+.accounting-report-note-editor {
+  display: grid;
+  gap: 8px;
+}
+
+.accounting-report-note-editor textarea {
+  width: 100%;
+  min-height: 64px;
+  resize: vertical;
+}
+
+@media (max-width: 767px) {
+  .accounting-report-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .accounting-report-table th,
+  .accounting-report-table td {
+    padding: 8px;
+  }
+
+  .accounting-report-subject-cell {
+    white-space: normal;
+  }
+}
+
 .accounting-signature {
   display: grid;
   gap: 8px;

@@ -1,7 +1,13 @@
 import { FIXED_CATEGORIES } from "./fixedCategories";
-import { findAccountingSubject } from "./fixedSubjects";
+import { groupedAccountingSubjects, findAccountingSubject } from "./fixedSubjects";
 import { accountingFiscalMonthLabels } from "./fiscalYear";
-import type { AccountingPeriod, AccountingTransaction, CategoryDefinition, TransactionType } from "./model";
+import type {
+  AccountingPeriod,
+  AccountingReportNote,
+  AccountingTransaction,
+  CategoryDefinition,
+  TransactionType,
+} from "./model";
 
 type CategoryItemSummary = {
   categoryId: string;
@@ -27,6 +33,22 @@ export type LedgerRow = {
   incomeAmount: number;
   expenseAmount: number;
   balance: number;
+};
+
+export type ReportSubjectRow = {
+  categoryId: string;
+  categoryLabel: string;
+  subjectId: string;
+  subjectLabel: string;
+  amount: number;
+  note: string;
+};
+
+export type ReportCategoryGroup = {
+  categoryId: string;
+  categoryLabel: string;
+  items: ReportSubjectRow[];
+  totalAmount: number;
 };
 
 export const sortTransactions = (transactions: AccountingTransaction[]): AccountingTransaction[] =>
@@ -198,6 +220,47 @@ export const reportCategorySummary = (
       const cb = findCategory(b.categoryId)?.sortOrder ?? 999;
       return ca - cb;
     });
+};
+
+export const reportCategoryGroups = (
+  period: AccountingPeriod,
+  type: "income" | "expense",
+  reportNotes: AccountingReportNote[],
+): ReportCategoryGroup[] => {
+  const amountBySubjectId = new Map<string, number>();
+
+  period.transactions
+    .filter((item) => item.type === type)
+    .forEach((transaction) => {
+      const categoryId = transaction.categoryId;
+      if (!categoryId) return;
+      const resolved = resolveStoredCategory(categoryId);
+      amountBySubjectId.set(resolved.itemId, (amountBySubjectId.get(resolved.itemId) ?? 0) + transaction.amount);
+    });
+
+  const noteBySubjectId = new Map(
+    reportNotes
+      .filter((item) => item.periodId === period.periodId && item.type === type)
+      .map((item) => [item.subjectId, item.note] as const),
+  );
+
+  return groupedAccountingSubjects(type).map((group) => {
+    const items = group.subjects.map((subject) => ({
+      categoryId: group.category.categoryId,
+      categoryLabel: group.category.label,
+      subjectId: subject.subjectId,
+      subjectLabel: subject.label,
+      amount: amountBySubjectId.get(subject.subjectId) ?? 0,
+      note: noteBySubjectId.get(subject.subjectId) ?? "",
+    }));
+
+    return {
+      categoryId: group.category.categoryId,
+      categoryLabel: group.category.label,
+      items,
+      totalAmount: items.reduce((sum, item) => sum + item.amount, 0),
+    };
+  });
 };
 
 export const expenseTopSubjects = (period: AccountingPeriod, limit = 5): CategoryItemSummary[] => {
