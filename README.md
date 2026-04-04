@@ -3051,7 +3051,7 @@ TODO：
 
 #### 30.9.11.4 minamigaoka Storage CORS
 - 購入依頼 / 立替 / お弁当 / 会計の画像アップロードは Firebase Storage を使う。
-- 対象バケットは `windoms-minamigaoka.firebasestorage.app` とする。
+- default bucket は `gs://windoms-minamigaoka.firebasestorage.app` とする。
 - 本番 origin や開発 origin を追加した場合は、Storage バケットの CORS 設定も更新する。
 - 画像アップロードで CORS エラーが出た場合は、まずアプリコードではなくバケットの CORS 設定を確認する。
 - CORS 設定ファイルは `minamigaoka/scripts/storage-cors.minamigaoka.json` を正とする。
@@ -3077,6 +3077,23 @@ powershell -ExecutionPolicy Bypass -File .\scripts\apply-storage-cors.ps1 -Apply
 ```
 
 または `npm run storage:cors` を使ってよい。`-Apply` を付けない実行は dry-run とし、現在設定の確認だけを行う。
+
+#### 30.9.11.5 minamigaoka Storage Rules
+- minamigaoka の Firebase Storage は、当面は画像添付用途で使う。
+- Storage Rules は `minamigaoka/storage.rules` を正とし、`firebase.json` から deploy できる状態を保つ。
+- 仮運用フェーズでは、画像添付機能追加時の rules 漏れで詰まることを避けるため、当面の Storage Rules は `allow read, write: if request.auth != null;` とする。
+- つまり、認証済みユーザーなら read / write を許可する。
+- 画像アップロードで 403 が出た場合は、CORS 設定確認後、Storage Rules を優先確認対象とする。
+- 保存先パス、添付用途、閲覧権限の整理が進んだ段階で、必要に応じて tighter な Rules に見直す。
+
+Rules の反映手順:
+
+```powershell
+cd d:\projects\windoms\minamigaoka
+firebase deploy --only storage
+```
+
+- Hosting / Firestore / Functions とまとめて反映する場合を除き、Storage Rules だけの反映では `firebase deploy --only storage` を優先する。
 
 #### 30.9.12 不整合チェック
 - 最低限次を管理画面で可視化する。

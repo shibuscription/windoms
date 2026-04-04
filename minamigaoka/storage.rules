@@ -1,0 +1,11 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      // Temporary broad rule for the trial operation phase.
+      // Tighten this after upload paths and access patterns are stabilized.
+      allow read, write: if request.auth != null;
+    }
+  }
+}
