@@ -3049,6 +3049,35 @@ TODO：
 - リポジトリルートで `firebase deploy --only functions` を実行する。
 - Firestore / Hosting とまとめて反映する場合はリポジトリルートで `firebase deploy` を実行してよい。
 
+#### 30.9.11.4 minamigaoka Storage CORS
+- 購入依頼 / 立替 / お弁当 / 会計の画像アップロードは Firebase Storage を使う。
+- 対象バケットは `windoms-minamigaoka.firebasestorage.app` とする。
+- 本番 origin や開発 origin を追加した場合は、Storage バケットの CORS 設定も更新する。
+- 画像アップロードで CORS エラーが出た場合は、まずアプリコードではなくバケットの CORS 設定を確認する。
+- CORS 設定ファイルは `minamigaoka/scripts/storage-cors.minamigaoka.json` を正とする。
+- 適用前に現在の設定を確認し、適用後に再確認する。
+- 反映は認証済みのローカル環境で `gcloud storage buckets update` を使って行い、リポジトリ側では設定ファイルと手順のみを管理する。
+- `describe` で 404 / 403 になる場合は、gcloud の認証状態と対象バケット名を先に確認する。
+
+PowerShell での基本手順:
+
+```powershell
+cd d:\projects\windoms\minamigaoka
+gcloud storage buckets describe gs://windoms-minamigaoka.firebasestorage.app --format="default(cors_config)"
+gcloud storage buckets update gs://windoms-minamigaoka.firebasestorage.app --cors-file=.\scripts\storage-cors.minamigaoka.json
+gcloud storage buckets describe gs://windoms-minamigaoka.firebasestorage.app --format="default(cors_config)"
+```
+
+補助スクリプトを使う場合:
+
+```powershell
+cd d:\projects\windoms\minamigaoka
+powershell -ExecutionPolicy Bypass -File .\scripts\apply-storage-cors.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\apply-storage-cors.ps1 -Apply
+```
+
+または `npm run storage:cors` を使ってよい。`-Apply` を付けない実行は dry-run とし、現在設定の確認だけを行う。
+
 #### 30.9.12 不整合チェック
 - 最低限次を管理画面で可視化する。
   - `authUid` が空の `member`

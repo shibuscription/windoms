@@ -10,7 +10,8 @@
     "seed:links": "node --env-file=.env ./scripts/seed-links.mjs",
     "migrate:accounting-csv": "powershell -ExecutionPolicy Bypass -File ./scripts/normalize-accounting-csv.ps1",
     "cleanup:accounting-migration": "node --env-file=.env ./scripts/cleanup-accounting-period.mjs",
-    "import:accounting-migration": "node --env-file=.env ./scripts/import-accounting-migration.mjs"
+    "import:accounting-migration": "node --env-file=.env ./scripts/import-accounting-migration.mjs",
+    "storage:cors": "powershell -ExecutionPolicy Bypass -File ./scripts/apply-storage-cors.ps1"
   },
   "dependencies": {
     "firebase": "^12.0.0",
