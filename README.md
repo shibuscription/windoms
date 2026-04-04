@@ -674,6 +674,31 @@ TODO: 未決定（セッション名の最終表示ルール）
 
 ---
 
+#### ■ 旧会計 CSV からの初期データ移行
+
+- 旧会計 CSV からの初期データ移行時は、旧 CSV をそのまま 1 行 1 取引で投入せず、口座間移動を `transfer` へ正規化してから Windoms 用データへ変換する。
+- 旧 CSV 上の `前年度より繰越` は、各口座の期首残高として扱う。
+- 旧 CSV 上で同日・同額・片側が収入、片側が支出で、摘要や科目から `振替` / `引出` / `預け入れ` 等の対応関係が取れる口座間移動は、1 件の `transfer` に統合する。
+- 無理に自動統合して誤るより、未統合候補として残すことを優先する。
+- 科目体系は既存の固定定義を優先し、旧 CSV の科目名を可能な限り既存 `categoryId` に対応づける。
+- 変換結果は一度 JSON などの中間成果物で確認してから投入する運用とし、変換スクリプトから本番 Firestore へ直接書き込まない。
+- `2025年度` の移行対象期間は `2025-09-01` から `2026-08-31` とする。
+- 旧 CSV での口座対応は以下を基本とする。
+  - `現金出納帳` → `現金（会計手元金）`
+  - `預金出納帳` 内の `ゆうちょ銀行` → `ゆうちょ銀行`
+  - `預金出納帳` 内の `会長手元金` → `現金（会長手元金）`
+- 変換スクリプトは少なくとも以下を出力できるようにする。
+  - `period`
+  - `accounts`
+  - `openingBalances`
+  - `normalizedTransactions`
+  - `unmatchedTransferCandidates`
+  - `categoryMappingResults`
+  - `summary`
+- 変換プレビューは `minamigaoka` で `powershell -ExecutionPolicy Bypass -File .\scripts\normalize-accounting-csv.ps1 -CashCsv <現金CSV> -DepositCsv <預金CSV> -FiscalYear 2025 -OutJson <出力JSON> -OutMarkdown <出力MD>` のように実行できるようにする。
+
+---
+
 #### ■ 画像添付
 
 - 収入・支出のみ画像添付可能とする。
