@@ -128,11 +128,24 @@ export type Todo = {
 };
 
 export type PurchaseRequestStatus = "OPEN" | "BOUGHT";
-export type PaymentMethod = "reimbursement" | "quo";
+export type PaymentMethod = "reimbursement" | "direct_accounting";
+export type AccountingSourceType = "purchaseRequest" | "reimbursement" | "lunch";
 export type ReceiptFileMeta = {
   name: string;
   size: number;
   type: string;
+  downloadUrl?: string;
+  storagePath?: string;
+};
+export type AccountingBridgeFields = {
+  accountingRequested?: boolean;
+  accountingLinked?: boolean;
+  accountingEntryId?: string;
+  accountingSourceType?: AccountingSourceType;
+  accountingSourceId?: string;
+  accountingAccountId?: string;
+  accountingCategoryId?: string;
+  accountingMemo?: string;
 };
 export type LunchPaymentSplit =
   | {
@@ -166,8 +179,10 @@ export type PurchaseRequest = {
     receiptFilesMeta?: ReceiptFileMeta[];
     accountingRecordRequested?: boolean;
     reimbursementRecordRequested?: boolean;
+    reimbursementLinked?: boolean;
+    reimbursementId?: string;
   };
-};
+} & AccountingBridgeFields;
 
 export type ReimbursementStatus =
   | "OPEN"
@@ -188,7 +203,7 @@ export type Reimbursement = {
   relatedPurchaseRequestId?: string;
   paidByTreasurerAt?: string;
   receivedByBuyerAt?: string;
-};
+} & AccountingBridgeFields;
 
 export type LunchRecord = {
   id: string;
@@ -200,10 +215,13 @@ export type LunchRecord = {
   dutyMemberId?: string;
   dutyHouseholdId?: string;
   memo?: string;
-  paymentSplits: LunchPaymentSplit[];
+  paymentMethod?: PaymentMethod;
+  paymentSplits?: LunchPaymentSplit[];
+  reimbursementLinked?: boolean;
+  reimbursementId?: string;
   imageUrls?: string[];
   receiptFilesMeta?: ReceiptFileMeta[];
-};
+} & AccountingBridgeFields;
 
 export type LunchDutySlotType = "WEEKEND_PM";
 

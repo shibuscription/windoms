@@ -33,10 +33,6 @@ import type {
   DemoRsvp,
   EventRecord,
   Instrument,
-  LunchRecord,
-  PurchaseRequest,
-  QuoCard,
-  Reimbursement,
   Score,
   Todo,
 } from "./types";
@@ -92,6 +88,18 @@ import {
   saveTodo as saveFirestoreTodo,
   subscribeTodos,
 } from "./todos/service";
+import {
+  completePurchaseRequest as completeFirestorePurchaseRequest,
+  createLunchRecord as createFirestoreLunchRecord,
+  createPurchaseRequest as createFirestorePurchaseRequest,
+  createReimbursement as createFirestoreReimbursement,
+  deletePurchaseRequest as deleteFirestorePurchaseRequest,
+  deleteReimbursement as deleteFirestoreReimbursement,
+  saveReimbursement as saveFirestoreReimbursement,
+  subscribeLunchRecords,
+  subscribePurchaseRequests,
+  subscribeReimbursements,
+} from "./operations/service";
 
 type MenuItem = {
   id: ModuleMenuId;
@@ -390,6 +398,9 @@ export function App() {
       scheduleDays: {},
       dayLogs: {},
       todos: hasFirebaseAppConfig ? [] : initialData.todos,
+      purchaseRequests: [],
+      reimbursements: [],
+      lunchRecords: [],
     };
   });
   const [authUser, setAuthUser] = useState<AuthenticatedUser | null>(null);
@@ -401,6 +412,12 @@ export function App() {
   );
   const [isScoresLoading, setIsScoresLoading] = useState(true);
   const [scoresLoadError, setScoresLoadError] = useState("");
+  const [isPurchaseRequestsLoading, setIsPurchaseRequestsLoading] = useState(hasFirebaseAppConfig);
+  const [purchaseRequestsLoadError, setPurchaseRequestsLoadError] = useState("");
+  const [isReimbursementsLoading, setIsReimbursementsLoading] = useState(hasFirebaseAppConfig);
+  const [reimbursementsLoadError, setReimbursementsLoadError] = useState("");
+  const [isLunchRecordsLoading, setIsLunchRecordsLoading] = useState(hasFirebaseAppConfig);
+  const [lunchRecordsLoadError, setLunchRecordsLoadError] = useState("");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [activeStatusPanel, setActiveStatusPanel] = useState<"notice" | "todo" | null>(
@@ -668,6 +685,138 @@ export function App() {
       }));
       setIsScoresLoading(false);
       setScoresLoadError("楽譜データの読み込みに失敗しました。");
+      return undefined;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hasFirebaseAppConfig) {
+      setData((prev) => ({
+        ...prev,
+        purchaseRequests: [],
+      }));
+      setIsPurchaseRequestsLoading(false);
+      setPurchaseRequestsLoadError("Firebase 設定が未完了のため、購入依頼を読み込めません。");
+      return undefined;
+    }
+
+    setIsPurchaseRequestsLoading(true);
+    setPurchaseRequestsLoadError("");
+
+    try {
+      return subscribePurchaseRequests(
+        (purchaseRequests) => {
+          setData((prev) => ({
+            ...prev,
+            purchaseRequests,
+          }));
+          setIsPurchaseRequestsLoading(false);
+          setPurchaseRequestsLoadError("");
+        },
+        () => {
+          setData((prev) => ({
+            ...prev,
+            purchaseRequests: [],
+          }));
+          setIsPurchaseRequestsLoading(false);
+          setPurchaseRequestsLoadError("購入依頼の読み込みに失敗しました。");
+        },
+      );
+    } catch {
+      setData((prev) => ({
+        ...prev,
+        purchaseRequests: [],
+      }));
+      setIsPurchaseRequestsLoading(false);
+      setPurchaseRequestsLoadError("購入依頼の読み込みに失敗しました。");
+      return undefined;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hasFirebaseAppConfig) {
+      setData((prev) => ({
+        ...prev,
+        reimbursements: [],
+      }));
+      setIsReimbursementsLoading(false);
+      setReimbursementsLoadError("Firebase 設定が未完了のため、立替を読み込めません。");
+      return undefined;
+    }
+
+    setIsReimbursementsLoading(true);
+    setReimbursementsLoadError("");
+
+    try {
+      return subscribeReimbursements(
+        (reimbursements) => {
+          setData((prev) => ({
+            ...prev,
+            reimbursements,
+          }));
+          setIsReimbursementsLoading(false);
+          setReimbursementsLoadError("");
+        },
+        () => {
+          setData((prev) => ({
+            ...prev,
+            reimbursements: [],
+          }));
+          setIsReimbursementsLoading(false);
+          setReimbursementsLoadError("立替の読み込みに失敗しました。");
+        },
+      );
+    } catch {
+      setData((prev) => ({
+        ...prev,
+        reimbursements: [],
+      }));
+      setIsReimbursementsLoading(false);
+      setReimbursementsLoadError("立替の読み込みに失敗しました。");
+      return undefined;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hasFirebaseAppConfig) {
+      setData((prev) => ({
+        ...prev,
+        lunchRecords: [],
+      }));
+      setIsLunchRecordsLoading(false);
+      setLunchRecordsLoadError("Firebase 設定が未完了のため、お弁当を読み込めません。");
+      return undefined;
+    }
+
+    setIsLunchRecordsLoading(true);
+    setLunchRecordsLoadError("");
+
+    try {
+      return subscribeLunchRecords(
+        (lunchRecords) => {
+          setData((prev) => ({
+            ...prev,
+            lunchRecords,
+          }));
+          setIsLunchRecordsLoading(false);
+          setLunchRecordsLoadError("");
+        },
+        () => {
+          setData((prev) => ({
+            ...prev,
+            lunchRecords: [],
+          }));
+          setIsLunchRecordsLoading(false);
+          setLunchRecordsLoadError("お弁当の読み込みに失敗しました。");
+        },
+      );
+    } catch {
+      setData((prev) => ({
+        ...prev,
+        lunchRecords: [],
+      }));
+      setIsLunchRecordsLoading(false);
+      setLunchRecordsLoadError("お弁当の読み込みに失敗しました。");
       return undefined;
     }
   }, []);
@@ -950,34 +1099,6 @@ export function App() {
 
   const deleteEvent = useCallback((eventId: string) => deleteFirestoreEvent(eventId), []);
 
-  const updatePurchaseRequests = (updater: (prev: PurchaseRequest[]) => PurchaseRequest[]) => {
-    setData((prev) => ({
-      ...prev,
-      purchaseRequests: updater(prev.purchaseRequests),
-    }));
-  };
-
-  const updateReimbursements = (updater: (prev: Reimbursement[]) => Reimbursement[]) => {
-    setData((prev) => ({
-      ...prev,
-      reimbursements: updater(prev.reimbursements),
-    }));
-  };
-
-  const updateLunchRecords = (updater: (prev: LunchRecord[]) => LunchRecord[]) => {
-    setData((prev) => ({
-      ...prev,
-      lunchRecords: updater(prev.lunchRecords),
-    }));
-  };
-
-  const updateQuoCards = (updater: (prev: QuoCard[]) => QuoCard[]) => {
-    setData((prev) => ({
-      ...prev,
-      quoCards: updater(prev.quoCards),
-    }));
-  };
-
   const updateScores = (updater: (prev: Score[]) => Score[]) => {
     setData((prev) => ({
       ...prev,
@@ -1145,9 +1266,9 @@ export function App() {
                 data={data}
                 currentUid={currentUid}
                 demoRole={currentOperatorRole}
-                updateLunchRecords={updateLunchRecords}
-                updateReimbursements={updateReimbursements}
-                updateQuoCards={updateQuoCards}
+                isLoading={isLunchRecordsLoading}
+                loadError={lunchRecordsLoadError}
+                createLunchRecord={createFirestoreLunchRecord}
               />
             }
           />
@@ -1214,8 +1335,11 @@ export function App() {
                 data={data}
                 currentUid={currentUid}
                 demoRole={currentOperatorRole}
-                updatePurchaseRequests={updatePurchaseRequests}
-                updateReimbursements={updateReimbursements}
+                isLoading={isPurchaseRequestsLoading}
+                loadError={purchaseRequestsLoadError}
+                createPurchaseRequest={createFirestorePurchaseRequest}
+                completePurchaseRequest={completeFirestorePurchaseRequest}
+                deletePurchaseRequest={deleteFirestorePurchaseRequest}
               />
             }
           />
@@ -1226,7 +1350,11 @@ export function App() {
                 data={data}
                 currentUid={currentUid}
                 demoRole={currentOperatorRole}
-                updateReimbursements={updateReimbursements}
+                isLoading={isReimbursementsLoading}
+                loadError={reimbursementsLoadError}
+                createReimbursement={createFirestoreReimbursement}
+                saveReimbursement={saveFirestoreReimbursement}
+                deleteReimbursement={deleteFirestoreReimbursement}
               />
             }
           />

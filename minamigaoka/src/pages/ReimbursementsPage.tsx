@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DemoData, Reimbursement, ReimbursementStatus } from "../types";
-import { useAccountingStore } from "../accounting/useAccountingStore";
 import { LinkifiedText } from "../components/LinkifiedText";
 import { ReceiptImagePicker } from "../components/ReceiptImagePicker";
 import { useReceiptPreviews } from "../hooks/useReceiptPreviews";
@@ -12,7 +11,11 @@ type ReimbursementsPageProps = {
   data: DemoData;
   currentUid: string;
   demoRole: "admin" | "parent";
-  updateReimbursements: (updater: (prev: Reimbursement[]) => Reimbursement[]) => void;
+  isLoading: boolean;
+  loadError: string;
+  createReimbursement: (reimbursement: Omit<Reimbursement, "id">, files?: File[]) => Promise<void>;
+  saveReimbursement: (reimbursement: Reimbursement) => Promise<void>;
+  deleteReimbursement: (reimbursementId: string) => Promise<void>;
 };
 
 type ConfirmDialogState =
@@ -55,17 +58,6 @@ const toIsoFromInput = (value: string): string => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return new Date().toISOString();
   return date.toISOString();
-};
-
-const createReimbursementId = (rows: Reimbursement[]): string => {
-  const numbers = rows
-    .map((row) => /^rb-(\d+)$/.exec(row.id)?.[1])
-    .filter((value): value is string => Boolean(value))
-    .map((value) => Number(value))
-    .filter((value) => Number.isFinite(value));
-  if (numbers.length === 0) return "rb-001";
-  const next = Math.max(...numbers) + 1;
-  return `rb-${String(next).padStart(3, "0")}`;
 };
 
 type ReimbursementUiStatus = "unpaid" | "paid" | "done";
@@ -111,9 +103,12 @@ export function ReimbursementsPage({
   data,
   currentUid,
   demoRole,
-  updateReimbursements,
+  isLoading,
+  loadError,
+  createReimbursement,
+  saveReimbursement,
+  deleteReimbursement,
 }: ReimbursementsPageProps) {
-  const { currentPeriod, addTransaction } = useAccountingStore();
   const [activeTab, setActiveTab] = useState<ReimbursementTab>("unfinished");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [paidModalTarget, setPaidModalTarget] = useState<Reimbursement | null>(null);
@@ -133,6 +128,8 @@ export function ReimbursementsPage({
   );
   const [ocrPhaseLabel, setOcrPhaseLabel] = useState("画像を準備中");
   const [ocrProgress, setOcrProgress] = useState(0);
+  const [submitError, setSubmitError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const ocrToastTimerRef = useRef<number | null>(null);
   const ocrRunIdRef = useRef(0);
   const lastOcrTargetReceiptIdRef = useRef<string | null>(null);
@@ -169,6 +166,7 @@ export function ReimbursementsPage({
     setIsOcrDebugOpen(false);
     setOcrPhaseLabel("画像を準備中");
     setOcrProgress(0);
+    setSubmitError("");
     ocrRunIdRef.current += 1;
     lastOcrTargetReceiptIdRef.current = null;
     setIsCreateModalOpen(true);
@@ -183,6 +181,7 @@ export function ReimbursementsPage({
     setIsOcrDebugOpen(false);
     setOcrPhaseLabel("画像を準備中");
     setOcrProgress(0);
+    setSubmitError("");
     ocrRunIdRef.current += 1;
     lastOcrTargetReceiptIdRef.current = null;
     clearCreateReceiptPreviews();
@@ -417,7 +416,7 @@ export function ReimbursementsPage({
     void runReceiptOcr("auto_select");
   }, [createReceiptPreviews, isCreateModalOpen, isReadingReceipt]);
 
-  const submitCreate = () => {
+  const submitCreate = async () => {
     const nextErrors: { title?: string; amount?: string; purchasedAt?: string } = {};
     const amountNumber = Number(createAmount);
     if (!createTitle.trim()) nextErrors.title = "タイトルは必須です";
@@ -433,68 +432,65 @@ export function ReimbursementsPage({
     }
 
     const purchasedAtIso = toIsoFromInput(createPurchasedAt);
-    const receiptFilesMeta = createReceiptPreviews.map((item) => ({
-      name: item.name,
-      size: item.size,
-      type: item.type,
-    }));
-    updateReimbursements((prev) => [
-      {
-        id: createReimbursementId(prev),
-        title: createTitle.trim(),
-        amount: amountNumber,
-        purchasedAt: purchasedAtIso,
-        buyer: currentUid,
-        memo: createMemo.trim() || undefined,
-        receipt: receiptFilesMeta.length > 0 ? `画像${receiptFilesMeta.length}件` : undefined,
-        receiptFilesMeta: receiptFilesMeta.length > 0 ? receiptFilesMeta : undefined,
-      },
-      ...prev,
-    ]);
-    setActiveTab("unfinished");
-    closeCreateModal();
+    setIsSubmitting(true);
+    setSubmitError("");
+    try {
+      await createReimbursement(
+        {
+          title: createTitle.trim(),
+          amount: amountNumber,
+          purchasedAt: purchasedAtIso,
+          buyer: currentUid,
+          memo: createMemo.trim() || undefined,
+          accountingSourceType: "reimbursement",
+          accountingSourceId: "",
+        },
+        createReceiptPreviews.map((item) => item.file),
+      );
+      setActiveTab("unfinished");
+      closeCreateModal();
+    } catch {
+      setSubmitError("立替の保存に失敗しました。");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const openMarkPaidModal = (item: Reimbursement) => {
     setPaidModalTarget(item);
     setShouldRecordAccountingExpense(true);
+    setSubmitError("");
   };
 
   const closeMarkPaidModal = () => {
     setPaidModalTarget(null);
     setShouldRecordAccountingExpense(true);
+    setSubmitError("");
   };
 
-  const confirmMarkPaid = () => {
+  const confirmMarkPaid = async () => {
     if (!paidModalTarget) return;
     const now = new Date().toISOString();
-
-    updateReimbursements((prev) =>
-      prev.map((row) =>
-        row.id === paidModalTarget.id && !row.paidByTreasurerAt
-          ? { ...row, paidByTreasurerAt: now }
-          : row,
-      ),
-    );
-
-    if (shouldRecordAccountingExpense) {
-      const accountKey = currentPeriod?.accounts[0]?.accountId;
-      const canRecord = Boolean(currentPeriod && currentPeriod.state === "editing" && accountKey);
-      if (canRecord && currentPeriod) {
-        void addTransaction({
-          periodId: currentPeriod.periodId,
-          type: "expense",
-          source: "reimbursement",
-          date: now.slice(0, 10),
-          amount: paidModalTarget.amount,
-          categoryId: "expense_misc",
-          accountId: accountKey,
-          memo: `[source:reimbursement] ${paidModalTarget.title} (${paidModalTarget.id})`,
-        }).catch(() => undefined);
-      }
+    setIsSubmitting(true);
+    setSubmitError("");
+    try {
+      await saveReimbursement({
+        ...paidModalTarget,
+        paidByTreasurerAt: paidModalTarget.paidByTreasurerAt ?? now,
+        accountingRequested: shouldRecordAccountingExpense,
+        accountingSourceType: "reimbursement",
+        accountingSourceId: paidModalTarget.id,
+        accountingMemo:
+          shouldRecordAccountingExpense
+            ? paidModalTarget.accountingMemo ?? paidModalTarget.title
+            : paidModalTarget.accountingMemo,
+      });
+      closeMarkPaidModal();
+    } catch {
+      setSubmitError("立替の更新に失敗しました。");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    closeMarkPaidModal();
   };
 
   const confirmDialogTitle = (() => {
@@ -503,32 +499,41 @@ export function ReimbursementsPage({
     return "この立替を削除しますか？";
   })();
 
-  const runConfirmAction = () => {
+  const runConfirmAction = async () => {
     if (!confirmDialog) return;
     const { reimbursement } = confirmDialog;
-    if (confirmDialog.mode === "markReceived") {
-      const now = new Date().toISOString();
-      updateReimbursements((prev) =>
-        prev.map((row) =>
-          row.id === reimbursement.id && !row.receivedByBuyerAt
-            ? { ...row, receivedByBuyerAt: now }
-            : row,
-        ),
+    setIsSubmitting(true);
+    setSubmitError("");
+    try {
+      if (confirmDialog.mode === "markReceived") {
+        const now = new Date().toISOString();
+        await saveReimbursement({
+          ...reimbursement,
+          receivedByBuyerAt: reimbursement.receivedByBuyerAt ?? now,
+        });
+      } else {
+        await deleteReimbursement(reimbursement.id);
+      }
+      setConfirmDialog(null);
+    } catch {
+      setSubmitError(
+        confirmDialog.mode === "delete" ? "立替の削除に失敗しました。" : "立替の更新に失敗しました。",
       );
-    } else {
-      updateReimbursements((prev) => prev.filter((row) => row.id !== reimbursement.id));
+    } finally {
+      setIsSubmitting(false);
     }
-    setConfirmDialog(null);
   };
 
   return (
     <section className="card reimbursements-page">
       <header className="reimbursements-header">
         <h1>立替</h1>
-        <button type="button" className="button button-small" onClick={openCreateModal}>
+        <button type="button" className="button button-small" onClick={openCreateModal} disabled={isSubmitting}>
           ＋ 追加
         </button>
       </header>
+      {loadError && <p className="field-error">{loadError}</p>}
+      {submitError && <p className="field-error">{submitError}</p>}
       <div className="purchases-tabs">
         <button
           type="button"
@@ -621,7 +626,8 @@ export function ReimbursementsPage({
             </article>
           );
         })}
-        {rows.length === 0 && (
+        {isLoading && rows.length === 0 && <p className="muted">読み込み中...</p>}
+        {!isLoading && rows.length === 0 && (
           <p className="muted">
             {activeTab === "unfinished"
               ? "未完了の立替データはありません。"
@@ -802,10 +808,10 @@ export function ReimbursementsPage({
             </label>
 
             <div className="modal-actions">
-              <button type="button" className="button button-secondary" onClick={closeCreateModal}>
+              <button type="button" className="button button-secondary" onClick={closeCreateModal} disabled={isSubmitting}>
                 キャンセル
               </button>
-              <button type="button" className="button" onClick={submitCreate}>
+              <button type="button" className="button" onClick={() => void submitCreate()} disabled={isSubmitting}>
                 追加
               </button>
             </div>
@@ -848,14 +854,14 @@ export function ReimbursementsPage({
                 checked={shouldRecordAccountingExpense}
                 onChange={(event) => setShouldRecordAccountingExpense(event.target.checked)}
               />
-              <span>会計に支出を記録する</span>
+              <span>会計連携の準備情報を残す</span>
             </label>
-            <p className="muted">会計側への反映は片方向で、逆同期は行いません。</p>
+            <p className="muted">今回は会計への直接追加は行わず、後続実装で使う連携情報だけを保存します。</p>
             <div className="modal-actions">
-              <button type="button" className="button button-secondary" onClick={closeMarkPaidModal}>
+              <button type="button" className="button button-secondary" onClick={closeMarkPaidModal} disabled={isSubmitting}>
                 キャンセル
               </button>
-              <button type="button" className="button" onClick={confirmMarkPaid}>
+              <button type="button" className="button" onClick={() => void confirmMarkPaid()} disabled={isSubmitting}>
                 支払済にする
               </button>
             </div>
@@ -872,13 +878,14 @@ export function ReimbursementsPage({
             <h3>{confirmDialogTitle}</h3>
             <p className="modal-summary">{confirmDialog.reimbursement.title}</p>
             <div className="modal-actions">
-              <button type="button" className="button button-secondary" onClick={() => setConfirmDialog(null)}>
+              <button type="button" className="button button-secondary" onClick={() => setConfirmDialog(null)} disabled={isSubmitting}>
                 キャンセル
               </button>
               <button
                 type="button"
                 className={`button ${confirmDialog.mode === "delete" ? "events-danger-button" : ""}`}
-                onClick={runConfirmAction}
+                onClick={() => void runConfirmAction()}
+                disabled={isSubmitting}
               >
                 {confirmDialog.mode === "delete" ? "削除" : "確定"}
               </button>

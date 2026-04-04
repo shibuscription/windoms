@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LinkifiedText } from "../components/LinkifiedText";
-import type { DemoData, PurchaseRequest, Reimbursement } from "../types";
+import type { DemoData, PurchaseRequest } from "../types";
 import { ReceiptImagePicker } from "../components/ReceiptImagePicker";
 import { useReceiptPreviews } from "../hooks/useReceiptPreviews";
 import { toDemoFamilyName } from "../utils/demoName";
@@ -26,8 +26,20 @@ type PurchasesPageProps = {
   data: DemoData;
   currentUid: string;
   demoRole: DemoRole;
-  updatePurchaseRequests: (updater: (prev: PurchaseRequest[]) => PurchaseRequest[]) => void;
-  updateReimbursements: (updater: (prev: Reimbursement[]) => Reimbursement[]) => void;
+  isLoading: boolean;
+  loadError: string;
+  createPurchaseRequest: (purchase: Omit<PurchaseRequest, "id">) => Promise<void>;
+  completePurchaseRequest: (input: {
+    purchase: PurchaseRequest;
+    completedBy: string;
+    itemName: string;
+    quantity?: string;
+    amount?: number;
+    purchasedAt: string;
+    files?: File[];
+    createReimbursement?: boolean;
+  }) => Promise<void>;
+  deletePurchaseRequest: (purchaseId: string) => Promise<void>;
 };
 
 type PurchaseConfirmDialogState =
@@ -72,8 +84,11 @@ export function PurchasesPage({
   data,
   currentUid,
   demoRole,
-  updatePurchaseRequests,
-  updateReimbursements,
+  isLoading,
+  loadError,
+  createPurchaseRequest,
+  completePurchaseRequest,
+  deletePurchaseRequest,
 }: PurchasesPageProps) {
   const [activeTab, setActiveTab] = useState<PurchaseTab>("open");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -85,6 +100,8 @@ export function PurchasesPage({
   const [completeDraft, setCompleteDraft] = useState<PurchaseCompleteDraft | null>(null);
   const [itemNameError, setItemNameError] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<PurchaseConfirmDialogState>(null);
+  const [submitError, setSubmitError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { previews: receiptPreviews, addFiles, removePreview, clearPreviews } =
     useReceiptPreviews();
 
@@ -167,6 +184,7 @@ export function PurchasesPage({
   const openCreateModal = () => {
     setCreateDraft(createPurchaseDraft());
     setCreateTitleError(null);
+    setSubmitError("");
     setIsTitleSuggestOpen(false);
     setIsCreateModalOpen(true);
   };
@@ -174,33 +192,39 @@ export function PurchasesPage({
   const closeCreateModal = () => {
     setIsCreateModalOpen(false);
     setCreateTitleError(null);
+    setSubmitError("");
     setIsTitleSuggestOpen(false);
   };
 
-  const submitCreate = () => {
+  const submitCreate = async () => {
     if (!createDraft.title.trim()) {
       setCreateTitleError("タイトルは必須です");
       return;
     }
-    const now = new Date().toISOString();
-    updatePurchaseRequests((prev) => [
-      {
-        id: `pr-${Date.now()}`,
+    setIsSubmitting(true);
+    setSubmitError("");
+    try {
+      const now = new Date().toISOString();
+      await createPurchaseRequest({
         title: createDraft.title.trim(),
         memo: createDraft.memo.trim() || undefined,
         createdBy: currentUid,
         createdAt: now,
         status: "OPEN",
-      },
-      ...prev,
-    ]);
-    setActiveTab("open");
-    setIsTitleSuggestOpen(false);
-    closeCreateModal();
+      });
+      setActiveTab("open");
+      setIsTitleSuggestOpen(false);
+      closeCreateModal();
+    } catch {
+      setSubmitError("購入依頼の保存に失敗しました。");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const openCompleteModal = (item: PurchaseRequest) => {
     clearPreviews();
+    setSubmitError("");
     setModalTarget(item);
     setCompleteDraft({
       itemName: item.title,
@@ -218,15 +242,24 @@ export function PurchasesPage({
     setModalTarget(null);
     setCompleteDraft(null);
     setItemNameError(null);
+    setSubmitError("");
   };
 
-  const runConfirmAction = () => {
+  const runConfirmAction = async () => {
     if (!confirmDialog) return;
-    updatePurchaseRequests((prev) => prev.filter((item) => item.id !== confirmDialog.purchase.id));
-    setConfirmDialog(null);
+    setIsSubmitting(true);
+    setSubmitError("");
+    try {
+      await deletePurchaseRequest(confirmDialog.purchase.id);
+      setConfirmDialog(null);
+    } catch {
+      setSubmitError("購入依頼の削除に失敗しました。");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const commitComplete = () => {
+  const commitComplete = async () => {
     if (!modalTarget || !completeDraft) return;
     if (!completeDraft.itemName.trim()) {
       setItemNameError("買ったものは必須です");
@@ -242,59 +275,51 @@ export function PurchasesPage({
       type: item.type,
     }));
 
-    updatePurchaseRequests((prev) =>
-      prev.map((item) =>
-        item.id === modalTarget.id
-          ? {
-              ...item,
-              status: "BOUGHT",
-              boughtBy: currentUid,
-              boughtAt: purchasedAtIso,
-              purchaseResult: {
-                itemName: completeDraft.itemName.trim(),
-                quantity: completeDraft.quantity.trim() || undefined,
-                amount: normalizedAmount,
-                purchasedAt: purchasedAtIso,
-                receiptFilesMeta,
-                reimbursementRecordRequested:
-                  demoRole === "parent" ? completeDraft.recordToReimbursement : undefined,
-                accountingRecordRequested:
-                  demoRole === "admin" ? completeDraft.recordToAccounting : undefined,
-              },
-            }
-          : item,
-      ),
-    );
-
-    if (demoRole === "parent" && completeDraft.recordToReimbursement) {
-      updateReimbursements((prev) => [
-        {
-          id: `rb-${Date.now()}`,
-          title: completeDraft.itemName.trim(),
-          amount: normalizedAmount ?? 0,
-          purchasedAt: purchasedAtIso,
-          buyer: currentUid,
-          receipt:
-            receiptFilesMeta.length > 0
-              ? receiptFilesMeta.map((item) => item.name).join(", ")
-              : undefined,
-          relatedPurchaseRequestId: modalTarget.id,
+    setIsSubmitting(true);
+    setSubmitError("");
+    try {
+      await completePurchaseRequest({
+        purchase: {
+          ...modalTarget,
+          accountingRequested: demoRole === "admin" ? completeDraft.recordToAccounting : false,
+          accountingSourceType: "purchaseRequest",
+          accountingSourceId: modalTarget.id,
+          purchaseResult: {
+            itemName: completeDraft.itemName.trim(),
+            quantity: completeDraft.quantity.trim() || undefined,
+            amount: normalizedAmount,
+            purchasedAt: purchasedAtIso,
+            receiptFilesMeta,
+            reimbursementRecordRequested: demoRole === "parent" ? completeDraft.recordToReimbursement : false,
+            accountingRecordRequested: demoRole === "admin" ? completeDraft.recordToAccounting : false,
+          },
         },
-        ...prev,
-      ]);
+        completedBy: currentUid,
+        itemName: completeDraft.itemName.trim(),
+        quantity: completeDraft.quantity.trim() || undefined,
+        amount: normalizedAmount,
+        purchasedAt: purchasedAtIso,
+        files: receiptPreviews.map((item) => item.file),
+        createReimbursement: demoRole === "parent" && completeDraft.recordToReimbursement,
+      });
+      closeCompleteModal();
+    } catch {
+      setSubmitError("購入完了の保存に失敗しました。");
+    } finally {
+      setIsSubmitting(false);
     }
-
-    closeCompleteModal();
   };
 
   return (
     <section className="card purchases-page">
       <header className="purchases-header">
         <h1>購入依頼</h1>
-        <button type="button" className="button button-small" onClick={openCreateModal}>
+        <button type="button" className="button button-small" onClick={openCreateModal} disabled={isSubmitting}>
           ＋ 追加
         </button>
       </header>
+      {loadError && <p className="field-error">{loadError}</p>}
+      {submitError && <p className="field-error">{submitError}</p>}
 
       <div className="purchases-tabs" role="tablist" aria-label="購入依頼状態">
         <button
@@ -361,7 +386,8 @@ export function PurchasesPage({
             )}
           </article>
         ))}
-        {rows.length === 0 && <p className="muted">該当する購入依頼はありません。</p>}
+        {isLoading && rows.length === 0 && <p className="muted">読み込み中...</p>}
+        {!isLoading && rows.length === 0 && <p className="muted">該当する購入依頼はありません。</p>}
       </div>
 
       {isCreateModalOpen && (
@@ -412,10 +438,10 @@ export function PurchasesPage({
               />
             </label>
             <div className="modal-actions">
-              <button type="button" className="button button-secondary" onClick={closeCreateModal}>
+              <button type="button" className="button button-secondary" onClick={closeCreateModal} disabled={isSubmitting}>
                 キャンセル
               </button>
-              <button type="button" className="button" onClick={submitCreate}>
+              <button type="button" className="button" onClick={() => void submitCreate()} disabled={isSubmitting}>
                 追加
               </button>
             </div>
@@ -515,10 +541,10 @@ export function PurchasesPage({
             )}
 
             <div className="modal-actions">
-              <button type="button" className="button button-secondary" onClick={closeCompleteModal}>
+              <button type="button" className="button button-secondary" onClick={closeCompleteModal} disabled={isSubmitting}>
                 キャンセル
               </button>
-              <button type="button" className="button" onClick={commitComplete}>
+              <button type="button" className="button" onClick={() => void commitComplete()} disabled={isSubmitting}>
                 確定
               </button>
             </div>
@@ -535,13 +561,14 @@ export function PurchasesPage({
             <h3>この購入依頼を削除しますか？</h3>
             <p className="modal-summary">{confirmDialog.purchase.title}</p>
             <div className="modal-actions">
-              <button type="button" className="button button-secondary" onClick={() => setConfirmDialog(null)}>
+              <button type="button" className="button button-secondary" onClick={() => setConfirmDialog(null)} disabled={isSubmitting}>
                 キャンセル
               </button>
               <button
                 type="button"
                 className="button events-danger-button"
-                onClick={runConfirmAction}
+                onClick={() => void runConfirmAction()}
+                disabled={isSubmitting}
               >
                 削除
               </button>
