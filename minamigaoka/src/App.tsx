@@ -812,7 +812,8 @@ export function App() {
     return (tone === "sat" || tone === "sun") && nextDutySession.session.startTime >= "12:00";
   }, [nextDutySession]);
   const lunchPath = "/lunch";
-  const usesWidePageLayout = location.pathname === "/settings/modules";
+  const usesWidePageLayout =
+    location.pathname === "/settings/modules" || location.pathname === "/accounting/ledger";
 
   const updateDayLog = useCallback((date: string, updater: (prev: DayLog) => DayLog) => {
     setData((prev) => {

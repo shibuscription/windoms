@@ -2547,6 +2547,10 @@ body {
   gap: 12px;
 }
 
+.accounting-ledger-page {
+  min-width: 0;
+}
+
 .accounting-action-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2754,10 +2758,16 @@ body {
   margin: 0;
 }
 
+.accounting-ledger-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .accounting-ledger-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.86rem;
+  table-layout: auto;
 }
 
 .accounting-ledger-table th,
@@ -2781,10 +2791,173 @@ body {
   white-space: nowrap;
 }
 
+.accounting-ledger-col-date,
+.accounting-ledger-col-kind,
+.accounting-ledger-col-subject,
+.accounting-ledger-col-income,
+.accounting-ledger-col-expense,
+.accounting-ledger-col-balance,
+.accounting-ledger-col-actions {
+  white-space: nowrap;
+}
+
+.accounting-ledger-col-date {
+  min-width: 7.5rem;
+}
+
+.accounting-ledger-col-kind {
+  min-width: 7rem;
+}
+
+.accounting-ledger-col-subject {
+  min-width: 8.5rem;
+}
+
+.accounting-ledger-col-memo {
+  min-width: 14rem;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.accounting-ledger-col-income,
+.accounting-ledger-col-expense,
+.accounting-ledger-col-balance {
+  min-width: 8.5rem;
+}
+
+.accounting-ledger-col-actions {
+  min-width: 8.5rem;
+}
+
 .accounting-ledger-actions {
   display: inline-flex;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.accounting-ledger-cards {
+  display: none;
+}
+
+.accounting-ledger-card {
+  border: 1px solid #d6dde8;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.accounting-ledger-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.accounting-ledger-card-heading {
+  display: grid;
+  gap: 6px;
+}
+
+.accounting-ledger-badge {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.accounting-ledger-badge.is-income {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.accounting-ledger-badge.is-expense {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.accounting-ledger-badge.is-transfer-in,
+.accounting-ledger-badge.is-transfer-out {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.accounting-ledger-badge.is-opening {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.accounting-ledger-card-date {
+  font-size: 0.82rem;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.accounting-ledger-card-amount {
+  display: grid;
+  gap: 4px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.accounting-ledger-card-amount-label {
+  font-size: 0.76rem;
+  color: #64748b;
+}
+
+.accounting-ledger-card-amount strong {
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.accounting-ledger-card-body {
+  display: grid;
+  gap: 8px;
+}
+
+.accounting-ledger-card-memo {
+  margin: 0;
+  color: #1f2937;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.accounting-ledger-card-meta {
+  display: grid;
+  gap: 4px;
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.accounting-ledger-card-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 767px) {
+  .accounting-ledger-table-wrap {
+    display: none;
+  }
+
+  .accounting-ledger-cards {
+    display: grid;
+    gap: 10px;
+  }
+
+  .accounting-ledger-card-top {
+    align-items: flex-start;
+  }
+
+  .accounting-ledger-card-footer .accounting-ledger-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 
 .accounting-report-sections {

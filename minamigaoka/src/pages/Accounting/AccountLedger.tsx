@@ -15,6 +15,14 @@ type AccountLedgerProps = {
 
 type SortDirection = "asc" | "desc";
 
+const ledgerMobileKindLabel = (kindLabel: string): string => {
+  if (kindLabel === "収入") return "収入";
+  if (kindLabel === "支出") return "支出";
+  if (kindLabel.includes("入金")) return "振替（入金）";
+  if (kindLabel.includes("出金")) return "振替（出金）";
+  return kindLabel;
+};
+
 export function AccountLedger({ isAdmin, canManageAccounting }: AccountLedgerProps) {
   const { store, addTransaction, updateTransaction, deleteTransaction, loading, error } = useAccountingStore();
   const [searchParams] = useSearchParams();
@@ -103,6 +111,31 @@ export function AccountLedger({ isAdmin, canManageAccounting }: AccountLedgerPro
     }
   };
 
+  const renderActionButtons = (transactionId: string, transactionType: TransactionType) => {
+    if (!(canManageAccounting && !transactionLocked)) {
+      return null;
+    }
+
+    return (
+      <div className="accounting-ledger-actions">
+        <button
+          type="button"
+          className="button button-small button-secondary"
+          onClick={() => openEditModal(transactionId, transactionType)}
+        >
+          編集
+        </button>
+        <button
+          type="button"
+          className="button button-small button-danger"
+          onClick={() => void handleDelete(transactionId)}
+        >
+          削除
+        </button>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <section className="card accounting-page">
@@ -126,7 +159,7 @@ export function AccountLedger({ isAdmin, canManageAccounting }: AccountLedgerPro
   }
 
   return (
-    <section className="card accounting-page">
+    <section className="card accounting-page accounting-ledger-page">
       <div className="accounting-ledger-heading">
         <h1>口座通帳：{account.label}</h1>
         <p className="muted">
@@ -177,43 +210,44 @@ export function AccountLedger({ isAdmin, canManageAccounting }: AccountLedgerPro
           収支計算書
         </Link>
       </div>
+      <div className="accounting-ledger-toolbar">
+        <button type="button" className="button button-small button-secondary" onClick={toggleSortDirection}>
+          日付順: {sortDirection === "asc" ? "昇順" : "降順"}
+        </button>
+      </div>
       <div className="accounting-ledger-table-wrap">
         <table className="accounting-ledger-table">
           <thead>
             <tr>
-              <th>
-                <button type="button" className="accounting-ledger-sort" onClick={toggleSortDirection}>
-                  日付 {sortDirection === "asc" ? "▲" : "▼"}
-                </button>
-              </th>
-              <th>種別</th>
-              <th>科目</th>
-              <th>摘要 / 備考</th>
-              <th className="accounting-ledger-money">収入金額</th>
-              <th className="accounting-ledger-money">支出金額</th>
-              <th className="accounting-ledger-money">残高</th>
-              <th>操作</th>
+              <th className="accounting-ledger-col-date">日付</th>
+              <th className="accounting-ledger-col-kind">種別</th>
+              <th className="accounting-ledger-col-subject">科目</th>
+              <th className="accounting-ledger-col-memo">摘要 / 備考</th>
+              <th className="accounting-ledger-money accounting-ledger-col-income">収入金額</th>
+              <th className="accounting-ledger-money accounting-ledger-col-expense">支出金額</th>
+              <th className="accounting-ledger-money accounting-ledger-col-balance">残高</th>
+              <th className="accounting-ledger-col-actions">操作</th>
             </tr>
           </thead>
           <tbody>
             {sortDirection === "asc" && (
               <tr>
-                <td>{period.startDate}</td>
-                <td>繰越</td>
-                <td>-</td>
-                <td>-</td>
+                <td className="accounting-ledger-col-date">{period.startDate}</td>
+                <td className="accounting-ledger-col-kind">繰越</td>
+                <td className="accounting-ledger-col-subject">-</td>
+                <td className="accounting-ledger-col-memo">-</td>
                 <td className="accounting-ledger-money">-</td>
                 <td className="accounting-ledger-money">-</td>
                 <td className="accounting-ledger-money">{formatMoney(account.openingBalance)}</td>
-                <td>-</td>
+                <td className="accounting-ledger-col-actions">-</td>
               </tr>
             )}
             {sortedRows.map((row) => (
               <tr key={row.transactionId}>
-                <td>{row.date}</td>
-                <td>{row.kindLabel}</td>
-                <td>{row.subjectLabel}</td>
-                <td>
+                <td className="accounting-ledger-col-date">{row.date}</td>
+                <td className="accounting-ledger-col-kind">{row.kindLabel}</td>
+                <td className="accounting-ledger-col-subject">{row.subjectLabel}</td>
+                <td className="accounting-ledger-col-memo">
                   {row.memo ? <LinkifiedText text={row.memo} className="todo-linkified-text" /> : "-"}
                 </td>
                 <td className="accounting-ledger-money">
@@ -223,44 +257,103 @@ export function AccountLedger({ isAdmin, canManageAccounting }: AccountLedgerPro
                   {row.expenseAmount > 0 ? formatMoney(row.expenseAmount) : "-"}
                 </td>
                 <td className="accounting-ledger-money">{formatMoney(row.balance)}</td>
-                <td>
-                  {canManageAccounting && !transactionLocked ? (
-                    <div className="accounting-ledger-actions">
-                      <button
-                        type="button"
-                        className="button button-small button-secondary"
-                        onClick={() => openEditModal(row.transactionId, row.transaction.type)}
-                      >
-                        編集
-                      </button>
-                      <button
-                        type="button"
-                        className="button button-small button-danger"
-                        onClick={() => void handleDelete(row.transactionId)}
-                      >
-                        削除
-                      </button>
-                    </div>
-                  ) : (
-                    "-"
-                  )}
+                <td className="accounting-ledger-col-actions">
+                  {renderActionButtons(row.transactionId, row.transaction.type) ?? "-"}
                 </td>
               </tr>
             ))}
             {sortDirection === "desc" && (
               <tr>
-                <td>{period.startDate}</td>
-                <td>繰越</td>
-                <td>-</td>
-                <td>-</td>
+                <td className="accounting-ledger-col-date">{period.startDate}</td>
+                <td className="accounting-ledger-col-kind">繰越</td>
+                <td className="accounting-ledger-col-subject">-</td>
+                <td className="accounting-ledger-col-memo">-</td>
                 <td className="accounting-ledger-money">-</td>
                 <td className="accounting-ledger-money">-</td>
                 <td className="accounting-ledger-money">{formatMoney(account.openingBalance)}</td>
-                <td>-</td>
+                <td className="accounting-ledger-col-actions">-</td>
               </tr>
             )}
           </tbody>
         </table>
+      </div>
+      <div className="accounting-ledger-cards">
+        {sortDirection === "asc" && (
+          <article className="accounting-ledger-card accounting-ledger-card-opening">
+            <div className="accounting-ledger-card-top">
+              <div className="accounting-ledger-card-heading">
+                <span className="accounting-ledger-badge is-opening">期首</span>
+                <span className="accounting-ledger-card-date">{period.startDate}</span>
+              </div>
+              <div className="accounting-ledger-card-amount">
+                <span className="accounting-ledger-card-amount-label">残高</span>
+                <strong>{formatMoney(account.openingBalance)}</strong>
+              </div>
+            </div>
+            <div className="accounting-ledger-card-meta">
+              <span>科目: -</span>
+              <span>摘要 / 備考: -</span>
+            </div>
+          </article>
+        )}
+        {sortedRows.map((row) => (
+          <article key={row.transactionId} className="accounting-ledger-card">
+            <div className="accounting-ledger-card-top">
+              <div className="accounting-ledger-card-heading">
+                <span
+                  className={`accounting-ledger-badge ${
+                    row.kindLabel === "収入"
+                      ? "is-income"
+                      : row.kindLabel === "支出"
+                        ? "is-expense"
+                        : row.incomeAmount > 0
+                          ? "is-transfer-in"
+                          : "is-transfer-out"
+                  }`}
+                >
+                  {ledgerMobileKindLabel(row.kindLabel)}
+                </span>
+                <span className="accounting-ledger-card-date">{row.date}</span>
+              </div>
+              <div className="accounting-ledger-card-amount">
+                <span className="accounting-ledger-card-amount-label">
+                  {row.incomeAmount > 0 ? "収入金額" : "支出金額"}
+                </span>
+                <strong>{formatMoney(row.incomeAmount > 0 ? row.incomeAmount : row.expenseAmount)}</strong>
+              </div>
+            </div>
+            <div className="accounting-ledger-card-body">
+              <p className="accounting-ledger-card-memo">
+                {row.memo ? <LinkifiedText text={row.memo} className="todo-linkified-text" /> : "-"}
+              </p>
+              <div className="accounting-ledger-card-meta">
+                <span>科目: {row.subjectLabel}</span>
+                <span>残高: {formatMoney(row.balance)}</span>
+              </div>
+            </div>
+            <div className="accounting-ledger-card-footer">
+              {renderActionButtons(row.transactionId, row.transaction.type) ?? <span className="muted">閲覧のみ</span>}
+            </div>
+          </article>
+        ))}
+        {sortDirection === "desc" && (
+          <article className="accounting-ledger-card accounting-ledger-card-opening">
+            <div className="accounting-ledger-card-top">
+              <div className="accounting-ledger-card-heading">
+                <span className="accounting-ledger-badge is-opening">期首</span>
+                <span className="accounting-ledger-card-date">{period.startDate}</span>
+              </div>
+              <div className="accounting-ledger-card-amount">
+                <span className="accounting-ledger-card-amount-label">残高</span>
+                <strong>{formatMoney(account.openingBalance)}</strong>
+              </div>
+            </div>
+            <div className="accounting-ledger-card-meta">
+              <span>科目: -</span>
+              <span>摘要 / 備考: -</span>
+            </div>
+          </article>
+        )}
       </div>
       {canManageAccounting && mode && (
         <TransactionForm
