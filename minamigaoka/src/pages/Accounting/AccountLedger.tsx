@@ -4,6 +4,7 @@ import { ledgerRowsForAccount, transactionMemoSuggestions } from "../../accounti
 import { formatMoney } from "../../accounting/format";
 import { buildAccountingFiscalYearRange } from "../../accounting/fiscalYear";
 import type { AccountingTransactionInput, TransactionType } from "../../accounting/model";
+import { ConfirmationDialog } from "../../components/ConfirmationDialog";
 import { useAccountingStore } from "../../accounting/useAccountingStore";
 import { LinkifiedText } from "../../components/LinkifiedText";
 import { TransactionForm } from "./TransactionForm";
@@ -28,6 +29,8 @@ export function AccountLedger({ isAdmin, canManageAccounting }: AccountLedgerPro
   const [searchParams] = useSearchParams();
   const [mode, setMode] = useState<TransactionType | null>(null);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const periodId = searchParams.get("period") ?? store.currentPeriodId ?? "";
@@ -45,6 +48,8 @@ export function AccountLedger({ isAdmin, canManageAccounting }: AccountLedgerPro
   );
   const editingRow =
     editingTransactionId ? rows.find((row) => row.transactionId === editingTransactionId) ?? null : null;
+  const deleteTargetRow =
+    deleteTargetId ? rows.find((row) => row.transactionId === deleteTargetId) ?? null : null;
   const transactionLocked = period?.state === "closed";
   const memoSuggestions =
     mode === "income" || mode === "expense" ? transactionMemoSuggestions(store.periods, mode) : [];
@@ -53,6 +58,11 @@ export function AccountLedger({ isAdmin, canManageAccounting }: AccountLedgerPro
   const closeModal = () => {
     setMode(null);
     setEditingTransactionId(null);
+  };
+
+  const closeDeleteDialog = () => {
+    if (isDeleting) return;
+    setDeleteTargetId(null);
   };
 
   const openCreateModal = (nextMode: TransactionType) => {
@@ -97,17 +107,18 @@ export function AccountLedger({ isAdmin, canManageAccounting }: AccountLedgerPro
     };
   };
 
-  const handleDelete = async (transactionId: string) => {
-    const baseMessage = "この明細を削除しますか？";
-    const confirmed = window.confirm(baseMessage);
-    if (!confirmed) return;
-
+  const handleDelete = async () => {
+    if (!deleteTargetRow) return;
     try {
+      setIsDeleting(true);
       setSubmitError(null);
-      await deleteTransaction(transactionId);
+      await deleteTransaction(deleteTargetRow.transactionId);
+      setDeleteTargetId(null);
     } catch (nextError) {
       const message = nextError instanceof Error ? nextError.message : "削除に失敗しました。";
       setSubmitError(message);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -128,7 +139,7 @@ export function AccountLedger({ isAdmin, canManageAccounting }: AccountLedgerPro
         <button
           type="button"
           className="button button-small button-danger"
-          onClick={() => void handleDelete(transactionId)}
+          onClick={() => setDeleteTargetId(transactionId)}
         >
           削除
         </button>
@@ -396,6 +407,18 @@ export function AccountLedger({ isAdmin, canManageAccounting }: AccountLedgerPro
         <p className="muted">
           会計取引の作成者情報はまだ保存していないため、他ユーザー作成分の追加確認は今回入れていません。
         </p>
+      )}
+      {deleteTargetRow && (
+        <ConfirmationDialog
+          title="会計明細を削除しますか？"
+          message="この操作は取り消せません。対象の会計明細を削除します。"
+          summary={`${deleteTargetRow.date} / ${deleteTargetRow.kindLabel} / ${deleteTargetRow.subjectLabel}`}
+          confirmLabel="削除"
+          danger
+          busy={isDeleting}
+          onClose={closeDeleteDialog}
+          onConfirm={handleDelete}
+        />
       )}
     </section>
   );
