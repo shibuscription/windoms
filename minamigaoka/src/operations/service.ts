@@ -9,9 +9,9 @@ import {
   Timestamp,
   writeBatch,
 } from "firebase/firestore";
-import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { db, hasFirebaseAppConfig, storage } from "../config/firebase";
 import type { LunchRecord, PurchaseRequest, ReceiptFileMeta, Reimbursement } from "../types";
+import { uploadFilesToStorage } from "../uploads/storageUpload";
 
 const purchaseRequestsCollection = db ? collection(db, "purchaseRequests") : null;
 const reimbursementsCollection = db ? collection(db, "reimbursements") : null;
@@ -50,8 +50,6 @@ const toBoolean = (value: unknown): boolean | undefined => {
   if (value === false) return false;
   return undefined;
 };
-
-const sanitizeFileName = (value: string): string => value.replace(/[\\/:*?"<>|]/g, "_");
 
 const toReceiptFilesMeta = (value: unknown): ReceiptFileMeta[] =>
   Array.isArray(value)
@@ -193,21 +191,7 @@ const toLunchRecord = (id: string, value: Record<string, unknown>): LunchRecord 
 const uploadReceiptFiles = async (folder: string, files: File[]): Promise<ReceiptFileMeta[]> => {
   if (files.length === 0) return [];
   ensureStorage();
-
-  return Promise.all(
-    files.map(async (file, index) => {
-      const storagePath = `${folder}/${Date.now()}-${index}-${sanitizeFileName(file.name)}`;
-      const attachmentRef = ref(storage!, storagePath);
-      await uploadBytes(attachmentRef, file, file.type ? { contentType: file.type } : undefined);
-      return {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        storagePath,
-        downloadUrl: await getDownloadURL(attachmentRef),
-      } satisfies ReceiptFileMeta;
-    }),
-  );
+  return uploadFilesToStorage(storage!, folder, files);
 };
 
 const toPurchasePayload = (purchase: Omit<PurchaseRequest, "id">, createdAt?: unknown) => ({

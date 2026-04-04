@@ -34,7 +34,7 @@ export type AccountingAttachment = {
   name: string;
   size: number;
   type: string;
-  downloadUrl: string;
+  downloadUrl?: string;
   storagePath: string;
 };
 

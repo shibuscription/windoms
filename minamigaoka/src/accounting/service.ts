@@ -12,8 +12,9 @@ import {
   Timestamp,
   writeBatch,
 } from "firebase/firestore";
-import { deleteObject, getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { deleteObject, ref } from "firebase/storage";
 import { db, hasFirebaseAppConfig, storage } from "../config/firebase";
+import { uploadFilesToStorage } from "../uploads/storageUpload";
 import { FIXED_ACCOUNTS } from "./fixedAccounts";
 import { buildAccountingFiscalYearRange } from "./fiscalYear";
 import { compareAccountingAccounts, comparePeriodAccounts } from "./sort";
@@ -137,16 +138,16 @@ const toAttachments = (value: unknown): AccountingAttachment[] =>
           if (!item || typeof item !== "object") return null;
           const raw = item as Record<string, unknown>;
           const name = toOptionalString(raw.name);
-          const downloadUrl = toOptionalString(raw.downloadUrl);
           const storagePath = toOptionalString(raw.storagePath);
-          if (!name || !downloadUrl || !storagePath) return null;
-          return {
+          if (!name || !storagePath) return null;
+          const next: AccountingAttachment = {
             name,
-            downloadUrl,
+            downloadUrl: toOptionalString(raw.downloadUrl),
             storagePath,
             size: toNonNegativeNumber(raw.size),
             type: toOptionalString(raw.type) ?? "",
           };
+          return next;
         })
         .filter((item): item is AccountingAttachment => Boolean(item))
     : [];
@@ -199,8 +200,6 @@ const toAccountingReportNoteDoc = (id: string, value: Record<string, unknown>): 
     updatedAt: toIsoString(value.updatedAt),
   };
 };
-
-const sanitizeFileName = (value: string): string => value.replace(/[\\/:*?"<>|]/g, "_");
 
 const buildAccountingStore = (
   periods: AccountingPeriodDoc[],
@@ -380,22 +379,7 @@ export type SaveAccountingReportNoteInput = {
 const uploadAttachments = async (transactionId: string, files: File[]): Promise<AccountingAttachment[]> => {
   if (files.length === 0) return [];
   ensureStorage();
-
-  return Promise.all(
-    files.map(async (file, index) => {
-      const storagePath = `accountingTransactions/${transactionId}/${Date.now()}-${index}-${sanitizeFileName(file.name)}`;
-      const attachmentRef = ref(storage!, storagePath);
-      await uploadBytes(attachmentRef, file, file.type ? { contentType: file.type } : undefined);
-      const downloadUrl = await getDownloadURL(attachmentRef);
-      return {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        downloadUrl,
-        storagePath,
-      };
-    }),
-  );
+  return uploadFilesToStorage(storage!, `accountingTransactions/${transactionId}`, files);
 };
 
 export const createAccountingTransaction = async (input: CreateAccountingTransactionInput): Promise<void> => {
