@@ -503,7 +503,9 @@ export function ReimbursementsPage({
     setPaidModalTarget(item);
     setShouldRecordAccountingExpense(true);
     setPaidAccountingAccountId(item.accountingAccountId ?? defaultAccountingAccountId);
-    setPaidAccountingCategoryId(item.accountingCategoryId ?? "");
+    setPaidAccountingCategoryId(
+      item.accountingCategoryId ?? (item.source === "lunch" ? "EXPENSE_INSTRUCTOR_OTHER" : ""),
+    );
     setPaidAccountingMemo(item.accountingMemo ?? item.title);
     setPaidErrors({});
     setSubmitError("");
