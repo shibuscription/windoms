@@ -153,7 +153,9 @@ const toAttachments = (value: unknown): AccountingAttachment[] =>
     : [];
 
 const toTransactionSource = (value: unknown): AccountingTransaction["source"] =>
-  value === "reimbursement" || value === "purchase" || value === "lunch" ? value : "manual";
+  value === "reimbursement" || value === "purchase" || value === "lunch" || value === "membershipFee"
+    ? value
+    : "manual";
 
 const toAccountingTransactionDoc = (id: string, value: Record<string, unknown>): AccountingTransactionDoc | null => {
   const periodId = toOptionalString(value.periodId);

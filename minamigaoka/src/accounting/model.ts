@@ -45,7 +45,7 @@ export type AccountingTransaction = {
   updatedAt: string;
   date: string;
   type: TransactionType;
-  source?: "manual" | "reimbursement" | "purchase" | "lunch";
+  source?: "manual" | "reimbursement" | "purchase" | "lunch" | "membershipFee";
   amount: number;
   categoryId?: string;
   memo?: string;
@@ -64,7 +64,7 @@ export type AccountingTransactionInput = {
   fromAccountId?: string;
   toAccountId?: string;
   files?: File[];
-  source?: "manual" | "reimbursement" | "purchase" | "lunch";
+  source?: "manual" | "reimbursement" | "purchase" | "lunch" | "membershipFee";
   transactionId?: string;
 };
 

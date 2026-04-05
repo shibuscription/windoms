@@ -10,6 +10,7 @@ import { AttendancePage } from "./pages/AttendancePage";
 import { WatchPage } from "./pages/WatchPage";
 import { ShiftSurveyPage } from "./pages/ShiftSurveyPage";
 import { LunchPage } from "./pages/LunchPage";
+import { FeesPage } from "./pages/FeesPage";
 import { LinksPage } from "./pages/LinksPage";
 import { MemberDirectoryPage } from "./pages/MemberDirectoryPage";
 import { MembersManagementPage } from "./pages/MembersPage";
@@ -182,6 +183,7 @@ const resolvePageLabel = (pathname: string, search: string): string | null => {
   if (pathname === "/purchases") return "購入依頼";
   if (pathname === "/reimbursements") return "立替";
   if (pathname.startsWith("/lunch")) return "お弁当";
+  if (pathname === "/dues") return "会費管理";
   if (pathname === "/accounting" || pathname.startsWith("/accounting/")) return "会計";
   if (pathname === "/instruments") return "楽器";
   if (pathname === "/scores") return "楽譜";
@@ -293,6 +295,13 @@ const menuSections = (
           icon: "🍱",
           to: "/lunch",
           isActive: (location) => location.pathname.startsWith("/lunch"),
+        },
+        {
+          id: "dues",
+          label: "会費管理",
+          icon: "◉",
+          to: "/dues",
+          isActive: (location) => location.pathname.startsWith("/dues"),
         },
         {
           id: "accounting",
@@ -1279,6 +1288,7 @@ export function App() {
               />
             }
           />
+          <Route path="/dues" element={<FeesPage currentUid={currentUid} isAdmin={isAdmin} />} />
           <Route
             path="/events"
             element={

@@ -7457,3 +7457,167 @@ textarea {
     width: min(100%, calc(100vw - 16px));
   }
 }
+.fees-page {
+  display: grid;
+  gap: 16px;
+}
+
+.fees-page-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.fees-year-switcher {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fees-table-wrap {
+  overflow-x: auto;
+}
+
+.fees-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 780px;
+}
+
+.fees-table th,
+.fees-table td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 10px 8px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.fees-table th:first-child,
+.fees-table td:first-child {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  background: #fff;
+}
+
+.fees-member-button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #1f2937;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.fees-member-button:hover,
+.fees-member-button:focus-visible {
+  color: #0f766e;
+}
+
+.fees-status-icon {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.fees-status-unrequested {
+  color: #9ca3af;
+  background: #f3f4f6;
+}
+
+.fees-status-requested {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.fees-status-received {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.fees-modal-panel {
+  max-width: 720px;
+}
+
+.fees-month-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.fees-month-row {
+  display: grid;
+  grid-template-columns: 28px 72px 32px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.fees-month-row-requested {
+  background: #fffbeb;
+}
+
+.fees-month-row-received {
+  background: #f0fdf4;
+}
+
+.fees-month-check {
+  display: inline-flex;
+  justify-content: center;
+}
+
+.fees-check-placeholder {
+  width: 16px;
+  height: 16px;
+}
+
+.fees-month-label {
+  font-weight: 700;
+}
+
+.fees-month-state {
+  color: #374151;
+}
+
+.fees-month-meta {
+  color: #6b7280;
+  font-size: 13px;
+  text-align: right;
+}
+
+.fees-action-card {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+@media (max-width: 767px) {
+  .fees-year-switcher {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .fees-month-row {
+    grid-template-columns: 28px 60px 28px 1fr;
+  }
+
+  .fees-month-meta {
+    grid-column: 2 / -1;
+    text-align: left;
+  }
+}

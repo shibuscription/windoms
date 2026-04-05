@@ -15,6 +15,7 @@ export type ModuleMenuId =
   | "purchase-request"
   | "reimbursement"
   | "lunch"
+  | "dues"
   | "accounting"
   | "instruments"
   | "scores"
@@ -65,6 +66,7 @@ export const menuModuleDefinitions: MenuModuleDefinition[] = [
   { id: "purchase-request", label: "購入依頼", icon: "🛒", sectionId: "accounting", defaultAudienceRoles: ["parent", "admin"] },
   { id: "reimbursement", label: "立替", icon: "💴", sectionId: "accounting", defaultAudienceRoles: ["parent", "admin"] },
   { id: "lunch", label: "お弁当", icon: "🍱", sectionId: "accounting", defaultAudienceRoles: ["parent", "admin"] },
+  { id: "dues", label: "会費管理", icon: "◉", sectionId: "accounting", defaultAudienceRoles: ["parent", "admin"] },
   {
     id: "accounting",
     label: "会計",

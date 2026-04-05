@@ -129,7 +129,7 @@ export type Todo = {
 
 export type PurchaseRequestStatus = "OPEN" | "BOUGHT";
 export type PaymentMethod = "reimbursement" | "direct_accounting";
-export type AccountingSourceType = "purchaseRequest" | "reimbursement" | "lunch";
+export type AccountingSourceType = "purchaseRequest" | "reimbursement" | "lunch" | "membershipFee";
 export type ReceiptFileMeta = {
   name: string;
   size: number;
@@ -232,6 +232,26 @@ export type LunchDuty = {
   slotType: LunchDutySlotType;
   assigneeHouseholdId: string;
 };
+
+export type MembershipFeeRecordStatus = "requested" | "received";
+
+export type MembershipFeeRecord = {
+  id: string;
+  memberId: string;
+  memberNameSnapshot: string;
+  fiscalYear: number;
+  monthKeys: string[];
+  title: string;
+  monthlyAmount: number;
+  amount: number;
+  status: MembershipFeeRecordStatus;
+  requestedOn: string;
+  receivedOn?: string;
+  createdByUid: string;
+  receivedByUid?: string;
+  createdAt: string;
+  updatedAt: string;
+} & AccountingBridgeFields;
 
 export type QuoCard = {
   id: string;
