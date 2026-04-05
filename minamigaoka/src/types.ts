@@ -210,6 +210,8 @@ export type LunchRecord = {
   title: string;
   amount: number;
   purchasedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
   date: string;
   buyer: string;
   dutyMemberId?: string;

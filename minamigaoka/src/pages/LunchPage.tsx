@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { LinkifiedText } from "../components/LinkifiedText";
 import { ReceiptImagePicker } from "../components/ReceiptImagePicker";
+import { ConfirmationDialog } from "../components/ConfirmationDialog";
 import { useReceiptPreviews } from "../hooks/useReceiptPreviews";
 import type { DemoData, LunchRecord } from "../types";
 import { isValidDateKey, todayDateKey, weekdayTone } from "../utils/date";
@@ -22,6 +23,7 @@ type LunchPageProps = {
     createReimbursement?: boolean;
   }) => Promise<void>;
   saveLunchRecord: (lunchRecord: LunchRecord) => Promise<void>;
+  deleteLunchRecord: (lunchRecordId: string) => Promise<void>;
 };
 
 type LunchDraft = {
@@ -108,9 +110,11 @@ export function LunchPage({
   isLoading,
   loadError,
   createLunchRecord,
-  saveLunchRecord: _saveLunchRecord,
+  saveLunchRecord,
+  deleteLunchRecord,
 }: LunchPageProps) {
   const { currentPeriod } = useAccountingStore();
+  const isAdmin = demoRole === "admin";
   const [searchParams] = useSearchParams();
   const fallbackDate = todayDateKey();
   const queryDate = searchParams.get("date") ?? "";
@@ -121,6 +125,8 @@ export function LunchPage({
   const [draft, setDraft] = useState<LunchDraft>(createInitialDraft);
   const [errors, setErrors] = useState<{ title?: string; amount?: string; purchasedAt?: string; accountingAccountId?: string; accountingCategoryId?: string; accountingMemo?: string }>({});
   const [detailTarget, setDetailTarget] = useState<LunchRecord | null>(null);
+  const [editingTarget, setEditingTarget] = useState<LunchRecord | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<LunchRecord | null>(null);
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const {
@@ -137,7 +143,13 @@ export function LunchPage({
   const accountingSubjectGroups = useMemo(() => groupedAccountingSubjects("expense"), []);
 
   const sortedRecords = useMemo(
-    () => [...data.lunchRecords].sort((a, b) => b.purchasedAt.localeCompare(a.purchasedAt)),
+    () =>
+      [...data.lunchRecords].sort((a, b) => {
+        if (a.purchasedAt !== b.purchasedAt) return b.purchasedAt.localeCompare(a.purchasedAt);
+        const createdDiff = (b.createdAt ?? "").localeCompare(a.createdAt ?? "");
+        if (createdDiff !== 0) return createdDiff;
+        return b.id.localeCompare(a.id);
+      }),
     [data.lunchRecords],
   );
 
@@ -166,11 +178,25 @@ export function LunchPage({
 
   const amountNumber = Number(draft.amount || "0");
 
-  const openAddModal = () => {
-    setDraft({
-      ...createInitialDraft(),
-      accountingAccountId: defaultAccountingAccountId,
-    });
+  const openAddModal = (target?: LunchRecord) => {
+    setEditingTarget(target ?? null);
+    setDraft(
+      target
+        ? {
+            title: target.title,
+            amount: String(target.amount),
+            purchasedAt: toDateInputValue(new Date(target.purchasedAt)),
+            memo: target.memo ?? "",
+            paymentMethod: target.paymentMethod ?? "reimbursement",
+            accountingAccountId: target.accountingAccountId ?? defaultAccountingAccountId,
+            accountingCategoryId: target.accountingCategoryId ?? "EXPENSE_INSTRUCTOR_OTHER",
+            accountingMemo: target.accountingMemo ?? "お弁当代",
+          }
+        : {
+            ...createInitialDraft(),
+            accountingAccountId: defaultAccountingAccountId,
+          },
+    );
     setErrors({});
     setSubmitError("");
     setIsMemoDetailsOpen(false);
@@ -181,6 +207,7 @@ export function LunchPage({
 
   const closeAddModal = () => {
     setIsAddModalOpen(false);
+    setEditingTarget(null);
     setErrors({});
     setSubmitError("");
     clearReceiptPreviews();
@@ -217,31 +244,64 @@ export function LunchPage({
     setIsSubmitting(true);
     setSubmitError("");
     try {
-      await createLunchRecord({
-        lunchRecord: {
+      if (editingTarget) {
+        await saveLunchRecord({
+          ...editingTarget,
           title: draft.title.trim(),
           amount: amountNumber,
           purchasedAt: purchasedAtIso,
           date: dateKey,
-          buyer: currentUid,
-          dutyMemberId: resolveDutyMemberId(dateKey),
-          dutyHouseholdId: resolveDutyHouseholdId(),
           memo: draft.memo.trim() || undefined,
           paymentMethod: canManageAccounting ? draft.paymentMethod : "reimbursement",
-          reimbursementLinked: (canManageAccounting ? draft.paymentMethod : "reimbursement") === "reimbursement",
-          accountingSourceType: "lunch",
-          accountingSourceId: "",
           accountingRequested: canManageAccounting && draft.paymentMethod === "direct_accounting",
           accountingAccountId: canManageAccounting && draft.paymentMethod === "direct_accounting" ? draft.accountingAccountId : undefined,
           accountingCategoryId: canManageAccounting && draft.paymentMethod === "direct_accounting" ? draft.accountingCategoryId : undefined,
           accountingMemo: canManageAccounting && draft.paymentMethod === "direct_accounting" ? draft.accountingMemo.trim() : undefined,
-        },
-        files: receiptPreviews.map((preview) => preview.file),
-        createReimbursement: (canManageAccounting ? draft.paymentMethod : "reimbursement") === "reimbursement",
-      });
+        });
+      } else {
+        await createLunchRecord({
+          lunchRecord: {
+            title: draft.title.trim(),
+            amount: amountNumber,
+            purchasedAt: purchasedAtIso,
+            date: dateKey,
+            buyer: currentUid,
+            dutyMemberId: resolveDutyMemberId(dateKey),
+            dutyHouseholdId: resolveDutyHouseholdId(),
+            memo: draft.memo.trim() || undefined,
+            paymentMethod: canManageAccounting ? draft.paymentMethod : "reimbursement",
+            reimbursementLinked: (canManageAccounting ? draft.paymentMethod : "reimbursement") === "reimbursement",
+            accountingSourceType: "lunch",
+            accountingSourceId: "",
+            accountingRequested: canManageAccounting && draft.paymentMethod === "direct_accounting",
+            accountingAccountId: canManageAccounting && draft.paymentMethod === "direct_accounting" ? draft.accountingAccountId : undefined,
+            accountingCategoryId: canManageAccounting && draft.paymentMethod === "direct_accounting" ? draft.accountingCategoryId : undefined,
+            accountingMemo: canManageAccounting && draft.paymentMethod === "direct_accounting" ? draft.accountingMemo.trim() : undefined,
+          },
+          files: receiptPreviews.map((preview) => preview.file),
+          createReimbursement: (canManageAccounting ? draft.paymentMethod : "reimbursement") === "reimbursement",
+        });
+      }
       closeAddModal();
     } catch {
-      setSubmitError("お弁当の保存に失敗しました。");
+      setSubmitError(editingTarget ? "お弁当の更新に失敗しました。" : "お弁当の保存に失敗しました。");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const canEditRecord = (record: LunchRecord): boolean => isAdmin || record.buyer === currentUid;
+
+  const runDelete = async () => {
+    if (!deleteTarget) return;
+    setIsSubmitting(true);
+    setSubmitError("");
+    try {
+      await deleteLunchRecord(deleteTarget.id);
+      if (detailTarget?.id === deleteTarget.id) setDetailTarget(null);
+      setDeleteTarget(null);
+    } catch {
+      setSubmitError("お弁当の削除に失敗しました。");
     } finally {
       setIsSubmitting(false);
     }
@@ -251,7 +311,7 @@ export function LunchPage({
     <section className="card lunch-page">
       <header className="lunch-header">
         <h1>お弁当</h1>
-        <button type="button" className="button button-small" onClick={openAddModal} disabled={isSubmitting}>
+        <button type="button" className="button button-small" onClick={() => openAddModal()} disabled={isSubmitting}>
           ＋ 追加
         </button>
       </header>
@@ -316,7 +376,7 @@ export function LunchPage({
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeAddModal}>
               ×
             </button>
-            <h3>お弁当を追加</h3>
+            <h3>{editingTarget ? "お弁当を編集" : "お弁当を追加"}</h3>
             <div className="lunch-add-modal-content">
               <label>
                 タイトル
@@ -463,7 +523,7 @@ export function LunchPage({
                 キャンセル
               </button>
               <button type="button" className="button" disabled={isSubmitting} onClick={() => void submitLunchRecord()}>
-                追加
+                {editingTarget ? "更新" : "追加"}
               </button>
             </div>
           </section>
@@ -500,8 +560,42 @@ export function LunchPage({
                 ))}
               </div>
             )}
+            {canEditRecord(detailTarget) && (
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="button button-secondary"
+                  onClick={() => {
+                    setDetailTarget(null);
+                    openAddModal(detailTarget);
+                  }}
+                >
+                  編集
+                </button>
+                <button
+                  type="button"
+                  className="button events-danger-button"
+                  onClick={() => setDeleteTarget(detailTarget)}
+                >
+                  削除
+                </button>
+              </div>
+            )}
           </section>
         </div>
+      )}
+
+      {deleteTarget && (
+        <ConfirmationDialog
+          title="このお弁当記録を削除しますか？"
+          summary={deleteTarget.title}
+          message={`${formatDateWithWeekday(deleteTarget.date || toDateKeyFromIso(deleteTarget.purchasedAt))} / ${deleteTarget.amount.toLocaleString()}円`}
+          confirmLabel="削除"
+          danger
+          busy={isSubmitting}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={runDelete}
+        />
       )}
     </section>
   );

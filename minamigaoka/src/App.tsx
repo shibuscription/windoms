@@ -93,6 +93,7 @@ import {
   createLunchRecord as createFirestoreLunchRecord,
   createPurchaseRequest as createFirestorePurchaseRequest,
   createReimbursement as createFirestoreReimbursement,
+  deleteLunchRecord as deleteFirestoreLunchRecord,
   deletePurchaseRequest as deleteFirestorePurchaseRequest,
   deleteReimbursement as deleteFirestoreReimbursement,
   markReimbursementPaid as markFirestoreReimbursementPaid,
@@ -1274,6 +1275,7 @@ export function App() {
                 loadError={lunchRecordsLoadError}
                 createLunchRecord={createFirestoreLunchRecord}
                 saveLunchRecord={saveFirestoreLunchRecord}
+                deleteLunchRecord={deleteFirestoreLunchRecord}
               />
             }
           />

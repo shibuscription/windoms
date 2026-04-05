@@ -164,6 +164,8 @@ const toLunchRecord = (id: string, value: Record<string, unknown>): LunchRecord 
   title: typeof value.title === "string" ? value.title : "",
   amount: toNonNegativeNumber(value.amount),
   purchasedAt: typeof value.purchasedAt === "string" ? value.purchasedAt : "",
+  createdAt: toOptionalString(value.createdAt) ?? toIsoString(value.createdAt),
+  updatedAt: toOptionalString(value.updatedAt) ?? toIsoString(value.updatedAt),
   date: typeof value.date === "string" ? value.date : "",
   buyer: typeof value.buyer === "string" ? value.buyer : "",
   dutyMemberId: toOptionalString(value.dutyMemberId),
