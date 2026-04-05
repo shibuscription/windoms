@@ -76,6 +76,16 @@ const toReceiptFilesMeta = (value: unknown): ReceiptFileMeta[] =>
     : [];
 
 const sortByDateDesc = (left: string, right: string): number => right.localeCompare(left);
+const sortLunchRecordsDesc = (left: LunchRecord, right: LunchRecord): number => {
+  const leftDate = left.date || left.purchasedAt.slice(0, 10);
+  const rightDate = right.date || right.purchasedAt.slice(0, 10);
+  if (leftDate !== rightDate) return rightDate.localeCompare(leftDate);
+  const createdDiff = (right.createdAt ?? "").localeCompare(left.createdAt ?? "");
+  if (createdDiff !== 0) return createdDiff;
+  const purchasedDiff = right.purchasedAt.localeCompare(left.purchasedAt);
+  if (purchasedDiff !== 0) return purchasedDiff;
+  return right.id.localeCompare(left.id);
+};
 
 const toPurchaseRequest = (id: string, value: Record<string, unknown>): PurchaseRequest => {
   const rawResult =
@@ -365,7 +375,7 @@ export const subscribeLunchRecords = (
     lunchRecordsCollection,
     toLunchRecord,
     callback,
-    (left, right) => sortByDateDesc(left.purchasedAt, right.purchasedAt),
+    sortLunchRecordsDesc,
     onError,
   );
 

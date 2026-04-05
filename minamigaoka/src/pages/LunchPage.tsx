@@ -145,9 +145,13 @@ export function LunchPage({
   const sortedRecords = useMemo(
     () =>
       [...data.lunchRecords].sort((a, b) => {
-        if (a.purchasedAt !== b.purchasedAt) return b.purchasedAt.localeCompare(a.purchasedAt);
+        const aDate = a.date || toDateKeyFromIso(a.purchasedAt);
+        const bDate = b.date || toDateKeyFromIso(b.purchasedAt);
+        if (aDate !== bDate) return bDate.localeCompare(aDate);
         const createdDiff = (b.createdAt ?? "").localeCompare(a.createdAt ?? "");
         if (createdDiff !== 0) return createdDiff;
+        const purchasedDiff = b.purchasedAt.localeCompare(a.purchasedAt);
+        if (purchasedDiff !== 0) return purchasedDiff;
         return b.id.localeCompare(a.id);
       }),
     [data.lunchRecords],
