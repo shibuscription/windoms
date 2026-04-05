@@ -31,7 +31,7 @@ export function AccountLedger({ isAdmin, canManageAccounting }: AccountLedgerPro
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [submitError, setSubmitError] = useState<string | null>(null);
   const periodId = searchParams.get("period") ?? store.currentPeriodId ?? "";
   const accountId = searchParams.get("account") ?? "";
