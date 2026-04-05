@@ -343,6 +343,11 @@ export const createPurchaseRequest = async (purchase: Omit<PurchaseRequest, "id"
   await setDoc(purchaseRef, toPurchasePayload(purchase));
 };
 
+export const savePurchaseRequest = async (purchase: PurchaseRequest): Promise<void> => {
+  ensureDb();
+  await setDoc(doc(purchaseRequestsCollection!, purchase.id), toPurchasePayload(purchase), { merge: true });
+};
+
 export const deletePurchaseRequest = async (purchaseId: string): Promise<void> => {
   ensureDb();
   await deleteDoc(doc(purchaseRequestsCollection!, purchaseId));
@@ -372,6 +377,8 @@ export const completePurchaseRequest = async ({
   ensureDb();
   const purchaseRef = doc(purchaseRequestsCollection!, purchase.id);
   const uploadedFiles = await uploadReceiptFiles(`purchaseRequests/${purchase.id}/receipts`, files);
+  const nextReceiptFilesMeta =
+    uploadedFiles.length > 0 ? uploadedFiles : (purchase.purchaseResult?.receiptFilesMeta ?? []);
   const reimbursementRef = createReimbursement ? doc(reimbursementsCollection!) : null;
   const batch = writeBatch(db!);
 
@@ -385,8 +392,8 @@ export const completePurchaseRequest = async ({
           purchasedAt,
           buyer: completedBy,
           memo: purchase.memo,
-          receipt: uploadedFiles.length > 0 ? `画像${uploadedFiles.length}件` : undefined,
-          receiptFilesMeta: uploadedFiles,
+          receipt: nextReceiptFilesMeta.length > 0 ? `画像${nextReceiptFilesMeta.length}件` : undefined,
+          receiptFilesMeta: nextReceiptFilesMeta,
           source: "purchase",
           relatedPurchaseRequestId: purchase.id,
           accountingRequested: false,
@@ -412,7 +419,7 @@ export const completePurchaseRequest = async ({
           quantity: quantity?.trim() || undefined,
           amount,
           purchasedAt,
-          receiptFilesMeta: uploadedFiles,
+          receiptFilesMeta: nextReceiptFilesMeta,
           accountingRecordRequested: purchase.purchaseResult?.accountingRecordRequested === true,
           reimbursementRecordRequested: createReimbursement,
           reimbursementLinked: Boolean(reimbursementRef),
@@ -489,7 +496,7 @@ export const createLunchRecord = async ({
           amount: lunchRecord.amount,
           purchasedAt: lunchRecord.purchasedAt,
           buyer: lunchRecord.buyer,
-          memo: lunchRecord.memo ? `[source:lunch] ${lunchRecord.memo}` : "[source:lunch]",
+          memo: lunchRecord.memo?.trim() || `お弁当代 ${lunchRecord.date}`,
           receipt: uploadedFiles.length > 0 ? `画像${uploadedFiles.length}件` : undefined,
           receiptFilesMeta: uploadedFiles,
           source: "lunch",

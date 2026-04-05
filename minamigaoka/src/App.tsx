@@ -95,6 +95,8 @@ import {
   createReimbursement as createFirestoreReimbursement,
   deletePurchaseRequest as deleteFirestorePurchaseRequest,
   deleteReimbursement as deleteFirestoreReimbursement,
+  saveLunchRecord as saveFirestoreLunchRecord,
+  savePurchaseRequest as saveFirestorePurchaseRequest,
   saveReimbursement as saveFirestoreReimbursement,
   subscribeLunchRecords,
   subscribePurchaseRequests,
@@ -1266,9 +1268,11 @@ export function App() {
                 data={data}
                 currentUid={currentUid}
                 demoRole={currentOperatorRole}
+                canManageAccounting={canManageAccounting}
                 isLoading={isLunchRecordsLoading}
                 loadError={lunchRecordsLoadError}
                 createLunchRecord={createFirestoreLunchRecord}
+                saveLunchRecord={saveFirestoreLunchRecord}
               />
             }
           />
@@ -1335,9 +1339,11 @@ export function App() {
                 data={data}
                 currentUid={currentUid}
                 demoRole={currentOperatorRole}
+                canManageAccounting={canManageAccounting}
                 isLoading={isPurchaseRequestsLoading}
                 loadError={purchaseRequestsLoadError}
                 createPurchaseRequest={createFirestorePurchaseRequest}
+                savePurchaseRequest={saveFirestorePurchaseRequest}
                 completePurchaseRequest={completeFirestorePurchaseRequest}
                 deletePurchaseRequest={deleteFirestorePurchaseRequest}
               />
@@ -1350,6 +1356,7 @@ export function App() {
                 data={data}
                 currentUid={currentUid}
                 demoRole={currentOperatorRole}
+                canManageAccounting={canManageAccounting}
                 isLoading={isReimbursementsLoading}
                 loadError={reimbursementsLoadError}
                 createReimbursement={createFirestoreReimbursement}

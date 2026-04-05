@@ -1,15 +1,19 @@
 import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { LinkifiedText } from "../components/LinkifiedText";
 import { ReceiptImagePicker } from "../components/ReceiptImagePicker";
 import { useReceiptPreviews } from "../hooks/useReceiptPreviews";
 import type { DemoData, LunchRecord } from "../types";
 import { isValidDateKey, todayDateKey, weekdayTone } from "../utils/date";
+import { useAccountingStore } from "../accounting/useAccountingStore";
+import { groupedAccountingSubjects } from "../accounting/fixedSubjects";
+import { comparePeriodAccounts } from "../accounting/sort";
 
 type LunchPageProps = {
   data: DemoData;
   currentUid: string;
   demoRole: "admin" | "parent";
+  canManageAccounting: boolean;
   isLoading: boolean;
   loadError: string;
   createLunchRecord: (input: {
@@ -17,6 +21,7 @@ type LunchPageProps = {
     files?: File[];
     createReimbursement?: boolean;
   }) => Promise<void>;
+  saveLunchRecord: (lunchRecord: LunchRecord) => Promise<void>;
 };
 
 type LunchDraft = {
@@ -24,6 +29,10 @@ type LunchDraft = {
   amount: string;
   purchasedAt: string;
   memo: string;
+  paymentMethod: "reimbursement" | "direct_accounting";
+  accountingAccountId: string;
+  accountingCategoryId: string;
+  accountingMemo: string;
 };
 
 const toDateInputValue = (date: Date): string => {
@@ -65,6 +74,10 @@ const createInitialDraft = (): LunchDraft => ({
   amount: "",
   purchasedAt: toDateInputValue(new Date()),
   memo: "",
+  paymentMethod: "reimbursement",
+  accountingAccountId: "",
+  accountingCategoryId: "EXPENSE_INSTRUCTOR_OTHER",
+  accountingMemo: "お弁当代",
 });
 
 const resolveDisplayName = (data: DemoData, uid?: string, fallback = "未定"): string => {
@@ -75,7 +88,8 @@ const resolveDisplayName = (data: DemoData, uid?: string, fallback = "未定"): 
 
 const resolveDutyName = (data: DemoData, record: LunchRecord): string => {
   if (record.dutyHouseholdId) {
-    return data.households[record.dutyHouseholdId]?.label ?? record.dutyHouseholdId;
+    const label = data.households[record.dutyHouseholdId]?.label ?? record.dutyHouseholdId;
+    return label.endsWith("家") ? label.slice(0, -1) : label;
   }
   if (record.dutyMemberId) {
     return resolveDisplayName(data, record.dutyMemberId, record.dutyMemberId);
@@ -90,10 +104,13 @@ export function LunchPage({
   data,
   currentUid,
   demoRole,
+  canManageAccounting,
   isLoading,
   loadError,
   createLunchRecord,
+  saveLunchRecord: _saveLunchRecord,
 }: LunchPageProps) {
+  const { currentPeriod } = useAccountingStore();
   const [searchParams] = useSearchParams();
   const fallbackDate = todayDateKey();
   const queryDate = searchParams.get("date") ?? "";
@@ -102,7 +119,7 @@ export function LunchPage({
   const [isMemoDetailsOpen, setIsMemoDetailsOpen] = useState(false);
   const [isReceiptDetailsOpen, setIsReceiptDetailsOpen] = useState(false);
   const [draft, setDraft] = useState<LunchDraft>(createInitialDraft);
-  const [errors, setErrors] = useState<{ title?: string; amount?: string; purchasedAt?: string }>({});
+  const [errors, setErrors] = useState<{ title?: string; amount?: string; purchasedAt?: string; accountingAccountId?: string; accountingCategoryId?: string; accountingMemo?: string }>({});
   const [detailTarget, setDetailTarget] = useState<LunchRecord | null>(null);
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -112,6 +129,12 @@ export function LunchPage({
     removePreview: removeReceiptPreview,
     clearPreviews: clearReceiptPreviews,
   } = useReceiptPreviews();
+  const availableAccounts = useMemo(() => [...(currentPeriod?.accounts ?? [])].sort(comparePeriodAccounts), [currentPeriod]);
+  const defaultAccountingAccountId =
+    availableAccounts.find((account) =>
+      demoRole === "admin" ? account.label === "現金（会長手元金）" : account.label === "現金（会計手元金）",
+    )?.accountId ?? "";
+  const accountingSubjectGroups = useMemo(() => groupedAccountingSubjects("expense"), []);
 
   const sortedRecords = useMemo(
     () => [...data.lunchRecords].sort((a, b) => b.purchasedAt.localeCompare(a.purchasedAt)),
@@ -142,15 +165,12 @@ export function LunchPage({
   }, [currentUid, data, targetDate]);
 
   const amountNumber = Number(draft.amount || "0");
-  const canSubmit =
-    draft.title.trim().length > 0 &&
-    draft.purchasedAt.trim().length > 0 &&
-    Number.isFinite(amountNumber) &&
-    amountNumber > 0 &&
-    !isSubmitting;
 
   const openAddModal = () => {
-    setDraft(createInitialDraft());
+    setDraft({
+      ...createInitialDraft(),
+      accountingAccountId: defaultAccountingAccountId,
+    });
     setErrors({});
     setSubmitError("");
     setIsMemoDetailsOpen(false);
@@ -175,13 +195,18 @@ export function LunchPage({
   const resolveDutyHouseholdId = (): string | undefined => data.users[currentUid]?.householdId;
 
   const submitLunchRecord = async () => {
-    const nextErrors: { title?: string; amount?: string; purchasedAt?: string } = {};
+    const nextErrors: { title?: string; amount?: string; purchasedAt?: string; accountingAccountId?: string; accountingCategoryId?: string; accountingMemo?: string } = {};
     if (!draft.title.trim()) nextErrors.title = "タイトルは必須です";
     if (!draft.amount.trim() || !Number.isFinite(amountNumber) || amountNumber <= 0) {
       nextErrors.amount = "金額は1以上の数値で入力してください";
     }
     if (!draft.purchasedAt.trim() || Number.isNaN(Date.parse(draft.purchasedAt))) {
       nextErrors.purchasedAt = "購入日は必須です";
+    }
+    if (canManageAccounting && draft.paymentMethod === "direct_accounting") {
+      if (!draft.accountingAccountId) nextErrors.accountingAccountId = "出金元口座を選択してください";
+      if (!draft.accountingCategoryId) nextErrors.accountingCategoryId = "科目を選択してください";
+      if (!draft.accountingMemo.trim()) nextErrors.accountingMemo = "摘要は必須です";
     }
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
@@ -202,14 +227,17 @@ export function LunchPage({
           dutyMemberId: resolveDutyMemberId(dateKey),
           dutyHouseholdId: resolveDutyHouseholdId(),
           memo: draft.memo.trim() || undefined,
-          paymentMethod: "reimbursement",
-          reimbursementLinked: true,
+          paymentMethod: canManageAccounting ? draft.paymentMethod : "reimbursement",
+          reimbursementLinked: (canManageAccounting ? draft.paymentMethod : "reimbursement") === "reimbursement",
           accountingSourceType: "lunch",
           accountingSourceId: "",
-          accountingRequested: false,
+          accountingRequested: canManageAccounting && draft.paymentMethod === "direct_accounting",
+          accountingAccountId: canManageAccounting && draft.paymentMethod === "direct_accounting" ? draft.accountingAccountId : undefined,
+          accountingCategoryId: canManageAccounting && draft.paymentMethod === "direct_accounting" ? draft.accountingCategoryId : undefined,
+          accountingMemo: canManageAccounting && draft.paymentMethod === "direct_accounting" ? draft.accountingMemo.trim() : undefined,
         },
         files: receiptPreviews.map((preview) => preview.file),
-        createReimbursement: true,
+        createReimbursement: (canManageAccounting ? draft.paymentMethod : "reimbursement") === "reimbursement",
       });
       closeAddModal();
     } catch {
@@ -251,11 +279,6 @@ export function LunchPage({
         </div>
       </div>
 
-      <p className="muted">
-        現在の標準導線は立替払いです。
-        {demoRole === "admin" ? " 直接会計払いの入力項目は後続フェーズで整備します。" : ""}
-      </p>
-
       <section className="lunch-grid">
         {sortedRecords.map((record) => {
           const thumbnail = record.imageUrls?.[0];
@@ -283,12 +306,6 @@ export function LunchPage({
       </section>
       {isLoading && sortedRecords.length === 0 && <p className="muted">読み込み中...</p>}
       {!isLoading && sortedRecords.length === 0 && <p className="muted">お弁当記録はまだありません。</p>}
-
-      <div className="modal-actions">
-        <Link to={`/today?date=${targetDate}`} className="button button-secondary">
-          Todayへ戻る
-        </Link>
-      </div>
 
       {isAddModalOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
@@ -338,6 +355,80 @@ export function LunchPage({
                 {errors.purchasedAt && <span className="field-error">{errors.purchasedAt}</span>}
               </label>
 
+              {canManageAccounting && (
+                <label>
+                  支払い方法
+                  <select
+                    value={draft.paymentMethod}
+                    onChange={(event) =>
+                      setDraft((prev) => ({
+                        ...prev,
+                        paymentMethod: event.target.value as "reimbursement" | "direct_accounting",
+                        accountingAccountId: prev.accountingAccountId || defaultAccountingAccountId,
+                      }))
+                    }
+                  >
+                    <option value="reimbursement">立替払い</option>
+                    <option value="direct_accounting">直接会計計上</option>
+                  </select>
+                </label>
+              )}
+
+              {canManageAccounting && draft.paymentMethod === "direct_accounting" && (
+                <div className="field-stack">
+                  <label>
+                    出金元口座
+                    <select
+                      value={draft.accountingAccountId}
+                      onChange={(event) => {
+                        setDraft((prev) => ({ ...prev, accountingAccountId: event.target.value }));
+                        setErrors((prev) => ({ ...prev, accountingAccountId: undefined }));
+                      }}
+                    >
+                      <option value="">選択してください</option>
+                      {availableAccounts.map((account) => (
+                        <option key={account.accountId} value={account.accountId}>
+                          {account.label}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.accountingAccountId && <span className="field-error">{errors.accountingAccountId}</span>}
+                  </label>
+                  <label>
+                    科目
+                    <select
+                      value={draft.accountingCategoryId}
+                      onChange={(event) => {
+                        setDraft((prev) => ({ ...prev, accountingCategoryId: event.target.value }));
+                        setErrors((prev) => ({ ...prev, accountingCategoryId: undefined }));
+                      }}
+                    >
+                      {accountingSubjectGroups.map((group) => (
+                        <optgroup key={group.category.categoryId} label={group.category.label}>
+                          {group.subjects.map((subject) => (
+                            <option key={subject.subjectId} value={subject.subjectId}>
+                              {subject.label}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                    {errors.accountingCategoryId && <span className="field-error">{errors.accountingCategoryId}</span>}
+                  </label>
+                  <label>
+                    摘要
+                    <input
+                      value={draft.accountingMemo}
+                      onChange={(event) => {
+                        setDraft((prev) => ({ ...prev, accountingMemo: event.target.value }));
+                        setErrors((prev) => ({ ...prev, accountingMemo: undefined }));
+                      }}
+                    />
+                    {errors.accountingMemo && <span className="field-error">{errors.accountingMemo}</span>}
+                  </label>
+                </div>
+              )}
+
               <details
                 className="lunch-fold-details"
                 open={isMemoDetailsOpen}
@@ -357,7 +448,8 @@ export function LunchPage({
                 open={isReceiptDetailsOpen}
                 onToggle={(event) => setIsReceiptDetailsOpen(event.currentTarget.open)}
               >
-                <summary>レシート画像（任意・複数）</summary>
+                <summary>添付画像（任意・複数）</summary>
+                <p className="muted">レシートやお弁当写真などを追加できます。先頭画像が一覧サムネイルになります。</p>
                 <ReceiptImagePicker
                   title=""
                   previews={receiptPreviews}
@@ -370,7 +462,7 @@ export function LunchPage({
               <button type="button" className="button button-secondary" onClick={closeAddModal} disabled={isSubmitting}>
                 キャンセル
               </button>
-              <button type="button" className="button" disabled={!canSubmit} onClick={() => void submitLunchRecord()}>
+              <button type="button" className="button" disabled={isSubmitting} onClick={() => void submitLunchRecord()}>
                 追加
               </button>
             </div>

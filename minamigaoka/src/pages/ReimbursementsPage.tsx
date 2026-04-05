@@ -6,11 +6,15 @@ import { useReceiptPreviews } from "../hooks/useReceiptPreviews";
 import { toDemoFamilyName } from "../utils/demoName";
 import { ReceiptOcrCanceledError, readReceiptSuggestion } from "../utils/receiptOcr";
 import { appRuntimeConfig } from "../config/runtime";
+import { useAccountingStore } from "../accounting/useAccountingStore";
+import { groupedAccountingSubjects } from "../accounting/fixedSubjects";
+import { comparePeriodAccounts } from "../accounting/sort";
 
 type ReimbursementsPageProps = {
   data: DemoData;
   currentUid: string;
   demoRole: "admin" | "parent";
+  canManageAccounting: boolean;
   isLoading: boolean;
   loadError: string;
   createReimbursement: (reimbursement: Omit<Reimbursement, "id">, files?: File[]) => Promise<void>;
@@ -46,16 +50,19 @@ const resolveReimbursementStatus = (
 const toDateLabel = (iso: string): string => {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleString("ja-JP", { hour12: false });
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 };
 
-const toDateTimeInputValue = (date: Date): string => {
+const toDateInputValue = (date: Date): string => {
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 };
 
 const toIsoFromInput = (value: string): string => {
-  const date = new Date(value);
+  const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return new Date().toISOString();
   return date.toISOString();
 };
@@ -99,24 +106,37 @@ const resolveOcrDebugEnabled = (): boolean => {
   return false;
 };
 
+const normalizeReimbursementMemo = (value?: string): string | undefined => {
+  const normalized = value?.replace(/^\[source:lunch\]\s*/i, "").trim();
+  return normalized || undefined;
+};
+
 export function ReimbursementsPage({
   data,
   currentUid,
   demoRole,
+  canManageAccounting,
   isLoading,
   loadError,
   createReimbursement,
   saveReimbursement,
   deleteReimbursement,
 }: ReimbursementsPageProps) {
+  const { currentPeriod } = useAccountingStore();
   const [activeTab, setActiveTab] = useState<ReimbursementTab>("unfinished");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [detailTarget, setDetailTarget] = useState<Reimbursement | null>(null);
+  const [editingTarget, setEditingTarget] = useState<Reimbursement | null>(null);
   const [paidModalTarget, setPaidModalTarget] = useState<Reimbursement | null>(null);
   const [shouldRecordAccountingExpense, setShouldRecordAccountingExpense] = useState(true);
+  const [paidAccountingAccountId, setPaidAccountingAccountId] = useState("");
+  const [paidAccountingCategoryId, setPaidAccountingCategoryId] = useState("");
+  const [paidAccountingMemo, setPaidAccountingMemo] = useState("");
+  const [paidErrors, setPaidErrors] = useState<{ accountId?: string; categoryId?: string; memo?: string }>({});
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
   const [createTitle, setCreateTitle] = useState("");
   const [createAmount, setCreateAmount] = useState("");
-  const [createPurchasedAt, setCreatePurchasedAt] = useState(toDateTimeInputValue(new Date()));
+  const [createPurchasedAt, setCreatePurchasedAt] = useState(toDateInputValue(new Date()));
   const [createMemo, setCreateMemo] = useState("");
   const [createErrors, setCreateErrors] = useState<{ title?: string; amount?: string; purchasedAt?: string }>({});
   const [isReadingReceipt, setIsReadingReceipt] = useState(false);
@@ -141,6 +161,15 @@ export function ReimbursementsPage({
   } = useReceiptPreviews();
 
   const isAdmin = demoRole === "admin";
+  const availableAccounts = useMemo(
+    () => [...(currentPeriod?.accounts ?? [])].sort(comparePeriodAccounts),
+    [currentPeriod],
+  );
+  const defaultAccountingAccountId =
+    availableAccounts.find((account) =>
+      isAdmin ? account.label === "現金（会長手元金）" : account.label === "現金（会計手元金）",
+    )?.accountId ?? "";
+  const accountingSubjectGroups = useMemo(() => groupedAccountingSubjects("expense"), []);
   const visibleByRole = useMemo(
     () =>
       data.reimbursements.filter((item) => (isAdmin ? true : item.buyer === currentUid)),
@@ -153,11 +182,12 @@ export function ReimbursementsPage({
       .sort((a, b) => b.item.purchasedAt.localeCompare(a.item.purchasedAt));
   }, [activeTab, visibleByRole]);
 
-  const openCreateModal = () => {
-    setCreateTitle("");
-    setCreateAmount("");
-    setCreatePurchasedAt(toDateTimeInputValue(new Date()));
-    setCreateMemo("");
+  const openCreateModal = (target?: Reimbursement) => {
+    setEditingTarget(target ?? null);
+    setCreateTitle(target?.title ?? "");
+    setCreateAmount(target ? String(target.amount) : "");
+    setCreatePurchasedAt(toDateInputValue(new Date(target?.purchasedAt ?? new Date())));
+    setCreateMemo(normalizeReimbursementMemo(target?.memo) ?? "");
     clearCreateReceiptPreviews();
     setCreateErrors({});
     setIsReadingReceipt(false);
@@ -174,6 +204,7 @@ export function ReimbursementsPage({
 
   const closeCreateModal = () => {
     setIsCreateModalOpen(false);
+    setEditingTarget(null);
     setCreateErrors({});
     setIsReadingReceipt(false);
     setOcrToastMessage("");
@@ -435,22 +466,32 @@ export function ReimbursementsPage({
     setIsSubmitting(true);
     setSubmitError("");
     try {
-      await createReimbursement(
-        {
+      if (editingTarget) {
+        await saveReimbursement({
+          ...editingTarget,
           title: createTitle.trim(),
           amount: amountNumber,
           purchasedAt: purchasedAtIso,
-          buyer: currentUid,
           memo: createMemo.trim() || undefined,
-          accountingSourceType: "reimbursement",
-          accountingSourceId: "",
-        },
-        createReceiptPreviews.map((item) => item.file),
-      );
+        });
+      } else {
+        await createReimbursement(
+          {
+            title: createTitle.trim(),
+            amount: amountNumber,
+            purchasedAt: purchasedAtIso,
+            buyer: currentUid,
+            memo: createMemo.trim() || undefined,
+            accountingSourceType: "reimbursement",
+            accountingSourceId: "",
+          },
+          createReceiptPreviews.map((item) => item.file),
+        );
+      }
       setActiveTab("unfinished");
       closeCreateModal();
     } catch {
-      setSubmitError("立替の保存に失敗しました。");
+      setSubmitError(editingTarget ? "立替の更新に失敗しました。" : "立替の保存に失敗しました。");
     } finally {
       setIsSubmitting(false);
     }
@@ -459,17 +500,33 @@ export function ReimbursementsPage({
   const openMarkPaidModal = (item: Reimbursement) => {
     setPaidModalTarget(item);
     setShouldRecordAccountingExpense(true);
+    setPaidAccountingAccountId(item.accountingAccountId ?? defaultAccountingAccountId);
+    setPaidAccountingCategoryId(item.accountingCategoryId ?? "");
+    setPaidAccountingMemo(item.accountingMemo ?? item.title);
+    setPaidErrors({});
     setSubmitError("");
   };
 
   const closeMarkPaidModal = () => {
     setPaidModalTarget(null);
     setShouldRecordAccountingExpense(true);
+    setPaidAccountingAccountId("");
+    setPaidAccountingCategoryId("");
+    setPaidAccountingMemo("");
+    setPaidErrors({});
     setSubmitError("");
   };
 
   const confirmMarkPaid = async () => {
     if (!paidModalTarget) return;
+    const nextErrors: { accountId?: string; categoryId?: string; memo?: string } = {};
+    if (canManageAccounting && shouldRecordAccountingExpense) {
+      if (!paidAccountingAccountId) nextErrors.accountId = "出金元口座を選択してください";
+      if (!paidAccountingCategoryId) nextErrors.categoryId = "科目を選択してください";
+      if (!paidAccountingMemo.trim()) nextErrors.memo = "摘要は必須です";
+    }
+    setPaidErrors(nextErrors);
+    if (Object.keys(nextErrors).length > 0) return;
     const now = new Date().toISOString();
     setIsSubmitting(true);
     setSubmitError("");
@@ -477,13 +534,12 @@ export function ReimbursementsPage({
       await saveReimbursement({
         ...paidModalTarget,
         paidByTreasurerAt: paidModalTarget.paidByTreasurerAt ?? now,
-        accountingRequested: shouldRecordAccountingExpense,
+        accountingRequested: canManageAccounting && shouldRecordAccountingExpense,
         accountingSourceType: "reimbursement",
         accountingSourceId: paidModalTarget.id,
-        accountingMemo:
-          shouldRecordAccountingExpense
-            ? paidModalTarget.accountingMemo ?? paidModalTarget.title
-            : paidModalTarget.accountingMemo,
+        accountingAccountId: canManageAccounting && shouldRecordAccountingExpense ? paidAccountingAccountId : undefined,
+        accountingCategoryId: canManageAccounting && shouldRecordAccountingExpense ? paidAccountingCategoryId : undefined,
+        accountingMemo: canManageAccounting && shouldRecordAccountingExpense ? paidAccountingMemo.trim() : undefined,
       });
       closeMarkPaidModal();
     } catch {
@@ -528,7 +584,7 @@ export function ReimbursementsPage({
     <section className="card reimbursements-page">
       <header className="reimbursements-header">
         <h1>立替</h1>
-        <button type="button" className="button button-small" onClick={openCreateModal} disabled={isSubmitting}>
+        <button type="button" className="button button-small" onClick={() => openCreateModal()} disabled={isSubmitting}>
           ＋ 追加
         </button>
       </header>
@@ -555,11 +611,28 @@ export function ReimbursementsPage({
           const isBuyer = item.buyer === currentUid;
           const canMarkPaid = uiStatus === "unpaid" && isAdmin;
           const canMarkReceived = uiStatus === "paid" && isBuyer;
-          const canDelete = uiStatus === "unpaid" && isBuyer;
+          const canEdit = isAdmin || (uiStatus === "unpaid" && isBuyer);
+          const canDelete = isAdmin || (uiStatus === "unpaid" && isBuyer);
+          const normalizedMemo = normalizeReimbursementMemo(item.memo);
           return (
-            <article key={item.id} className="reimbursement-card">
+            <article
+              key={item.id}
+              className="reimbursement-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => setDetailTarget(item)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setDetailTarget(item);
+                }
+              }}
+            >
               <div className="reimbursement-card-top">
-                <strong>{item.title}</strong>
+                <strong>
+                  {item.source === "lunch" ? "🍱 " : ""}
+                  {item.title}
+                </strong>
                 <span className={`reimbursement-status ${uiStatus === "done" ? "done" : uiStatus}`}>
                   {reimbursementStatusLabel[uiStatus]}
                 </span>
@@ -578,18 +651,21 @@ export function ReimbursementsPage({
               {item.relatedPurchaseRequestId && (
                 <p className="muted">関連購入依頼: {item.relatedPurchaseRequestId}</p>
               )}
-              {item.memo?.trim() && (
+              {normalizedMemo && (
                 <p className="todo-memo-preview compact">
-                  <LinkifiedText text={item.memo} className="todo-linkified-text" />
+                  <LinkifiedText text={normalizedMemo} className="todo-linkified-text" />
                 </p>
               )}
-              {(canMarkPaid || canMarkReceived) && (
+              {(canMarkPaid || canMarkReceived || canEdit) && (
                 <div className="reimbursement-actions">
                   {canMarkPaid && (
                     <button
                       type="button"
                       className="button button-small"
-                      onClick={() => openMarkPaidModal(item)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openMarkPaidModal(item);
+                      }}
                     >
                       支払済にする
                     </button>
@@ -598,9 +674,24 @@ export function ReimbursementsPage({
                     <button
                       type="button"
                       className="button button-small button-secondary"
-                      onClick={() => setConfirmDialog({ mode: "markReceived", reimbursement: item })}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setConfirmDialog({ mode: "markReceived", reimbursement: item });
+                      }}
                     >
                       領収済にする
+                    </button>
+                  )}
+                  {canEdit && (
+                    <button
+                      type="button"
+                      className="button button-small button-secondary"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openCreateModal(item);
+                      }}
+                    >
+                      編集
                     </button>
                   )}
                 </div>
@@ -611,7 +702,10 @@ export function ReimbursementsPage({
                     type="button"
                     className="link-icon-button"
                     aria-label="削除"
-                    onClick={() => setConfirmDialog({ mode: "delete", reimbursement: item })}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      setConfirmDialog({ mode: "delete", reimbursement: item });
+                    }}
                   >
                     🗑️
                   </button>
@@ -642,7 +736,7 @@ export function ReimbursementsPage({
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeCreateModal}>
               ×
             </button>
-            <h3>立替を追加</h3>
+            <h3>{editingTarget ? "立替を編集" : "立替を追加"}</h3>
             <div className="suggestion-anchor">
               {ocrToastMessage && <div className="inline-toast">{ocrToastMessage}</div>}
             </div>
@@ -791,9 +885,9 @@ export function ReimbursementsPage({
               {createErrors.amount && <span className="field-error">{createErrors.amount}</span>}
             </label>
             <label>
-              購入日時
+              購入日
               <input
-                type="datetime-local"
+                type="date"
                 value={createPurchasedAt}
                 onChange={(event) => {
                   setCreatePurchasedAt(event.target.value);
@@ -812,7 +906,7 @@ export function ReimbursementsPage({
                 キャンセル
               </button>
               <button type="button" className="button" onClick={() => void submitCreate()} disabled={isSubmitting}>
-                追加
+                {editingTarget ? "更新" : "追加"}
               </button>
             </div>
           </section>
@@ -837,6 +931,60 @@ export function ReimbursementsPage({
         </div>
       )}
 
+      {detailTarget && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setDetailTarget(null)}>
+          <section className="modal-panel purchases-complete-modal" onClick={(event) => event.stopPropagation()}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setDetailTarget(null)}>
+              ×
+            </button>
+            <h3>{detailTarget.source === "lunch" ? "🍱 " : ""}{detailTarget.title}</h3>
+            <p className="muted">購入者: {toDemoFamilyName(data.users[detailTarget.buyer]?.displayName ?? detailTarget.buyer, detailTarget.buyer)}</p>
+            <p className="muted">購入日: {toDateLabel(detailTarget.purchasedAt)}</p>
+            <p className="muted">金額: {detailTarget.amount.toLocaleString()}円</p>
+            <p className="muted">会計連携状態: {detailTarget.accountingLinked ? "会計連携済み" : detailTarget.accountingRequested ? "会計連携準備あり" : "会計連携なし"}</p>
+            {normalizeReimbursementMemo(detailTarget.memo) && (
+              <>
+                <p className="muted">メモ</p>
+                <p className="todo-memo-full">
+                  <LinkifiedText text={normalizeReimbursementMemo(detailTarget.memo) ?? ""} className="todo-linkified-text" />
+                </p>
+              </>
+            )}
+            {detailTarget.receiptFilesMeta && detailTarget.receiptFilesMeta.length > 0 && (
+              <div className="purchase-receipt-grid">
+                {detailTarget.receiptFilesMeta.map((file, index) => (
+                  <article key={`${detailTarget.id}-${file.name}-${index}`} className="purchase-receipt-card">
+                    {file.downloadUrl ? <img src={file.downloadUrl} alt={`${detailTarget.title}-${index + 1}`} className="purchase-receipt-image" /> : <div className="purchase-receipt-placeholder">{file.name}</div>}
+                  </article>
+                ))}
+              </div>
+            )}
+            <div className="modal-actions">
+              {(isAdmin || (resolveUiStatus(detailTarget) === "unpaid" && detailTarget.buyer === currentUid)) && (
+                <button type="button" className="button button-secondary" onClick={() => openCreateModal(detailTarget)}>
+                  編集
+                </button>
+              )}
+              {resolveUiStatus(detailTarget) === "unpaid" && isAdmin && (
+                <button type="button" className="button" onClick={() => openMarkPaidModal(detailTarget)}>
+                  支払済にする
+                </button>
+              )}
+              {resolveUiStatus(detailTarget) === "paid" && detailTarget.buyer === currentUid && (
+                <button type="button" className="button" onClick={() => setConfirmDialog({ mode: "markReceived", reimbursement: detailTarget })}>
+                  領収済にする
+                </button>
+              )}
+              {(isAdmin || (resolveUiStatus(detailTarget) === "unpaid" && detailTarget.buyer === currentUid)) && (
+                <button type="button" className="button events-danger-button" onClick={() => setConfirmDialog({ mode: "delete", reimbursement: detailTarget })}>
+                  削除
+                </button>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+
       {paidModalTarget && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
@@ -848,6 +996,7 @@ export function ReimbursementsPage({
             <p className="muted">金額: {paidModalTarget.amount.toLocaleString()}円</p>
             <p className="muted">購入者: {toDemoFamilyName(data.users[paidModalTarget.buyer]?.displayName ?? paidModalTarget.buyer, paidModalTarget.buyer)}</p>
             <p className="muted">購入日: {toDateLabel(paidModalTarget.purchasedAt)}</p>
+            {normalizeReimbursementMemo(paidModalTarget.memo) && <p className="muted">メモ: {normalizeReimbursementMemo(paidModalTarget.memo)}</p>}
             <label className="purchase-option-check">
               <input
                 type="checkbox"
@@ -856,6 +1005,61 @@ export function ReimbursementsPage({
               />
               <span>会計連携の準備情報を残す</span>
             </label>
+            {shouldRecordAccountingExpense && (
+              <div className="field-stack">
+                <label>
+                  出金元口座
+                  <select
+                    value={paidAccountingAccountId}
+                    onChange={(event) => {
+                      setPaidAccountingAccountId(event.target.value);
+                      setPaidErrors((prev) => ({ ...prev, accountId: undefined }));
+                    }}
+                  >
+                    <option value="">選択してください</option>
+                    {availableAccounts.map((account) => (
+                      <option key={account.accountId} value={account.accountId}>
+                        {account.label}
+                      </option>
+                    ))}
+                  </select>
+                  {paidErrors.accountId && <span className="field-error">{paidErrors.accountId}</span>}
+                </label>
+                <label>
+                  科目
+                  <select
+                    value={paidAccountingCategoryId}
+                    onChange={(event) => {
+                      setPaidAccountingCategoryId(event.target.value);
+                      setPaidErrors((prev) => ({ ...prev, categoryId: undefined }));
+                    }}
+                  >
+                    <option value="">選択してください</option>
+                    {accountingSubjectGroups.map((group) => (
+                      <optgroup key={group.category.categoryId} label={group.category.label}>
+                        {group.subjects.map((subject) => (
+                          <option key={subject.subjectId} value={subject.subjectId}>
+                            {subject.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                  {paidErrors.categoryId && <span className="field-error">{paidErrors.categoryId}</span>}
+                </label>
+                <label>
+                  摘要
+                  <input
+                    value={paidAccountingMemo}
+                    onChange={(event) => {
+                      setPaidAccountingMemo(event.target.value);
+                      setPaidErrors((prev) => ({ ...prev, memo: undefined }));
+                    }}
+                  />
+                  {paidErrors.memo && <span className="field-error">{paidErrors.memo}</span>}
+                </label>
+              </div>
+            )}
             <p className="muted">今回は会計への直接追加は行わず、後続実装で使う連携情報だけを保存します。</p>
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={closeMarkPaidModal} disabled={isSubmitting}>
@@ -877,6 +1081,11 @@ export function ReimbursementsPage({
             </button>
             <h3>{confirmDialogTitle}</h3>
             <p className="modal-summary">{confirmDialog.reimbursement.title}</p>
+            <p className="muted">金額: {confirmDialog.reimbursement.amount.toLocaleString()}円</p>
+            <p className="muted">購入者: {toDemoFamilyName(data.users[confirmDialog.reimbursement.buyer]?.displayName ?? confirmDialog.reimbursement.buyer, confirmDialog.reimbursement.buyer)}</p>
+            <p className="muted">購入日: {toDateLabel(confirmDialog.reimbursement.purchasedAt)}</p>
+            {normalizeReimbursementMemo(confirmDialog.reimbursement.memo) && <p className="muted">メモ: {normalizeReimbursementMemo(confirmDialog.reimbursement.memo)}</p>}
+            <p className="muted">会計連携状態: {confirmDialog.reimbursement.accountingLinked ? "会計連携済み" : confirmDialog.reimbursement.accountingRequested ? "会計連携準備あり" : "会計連携なし"}</p>
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={() => setConfirmDialog(null)} disabled={isSubmitting}>
                 キャンセル
