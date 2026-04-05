@@ -7566,8 +7566,7 @@ textarea {
   display: grid;
   gap: 12px;
   margin-top: 12px;
-  padding-right: 4px;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .fees-modal-footer {
@@ -7583,10 +7582,15 @@ textarea {
 .fees-month-list {
   display: grid;
   gap: 4px;
+  min-height: 0;
+  max-height: min(44vh, 420px);
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   background: #fff;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 }
 
 .fees-month-row {
@@ -7656,6 +7660,10 @@ textarea {
     grid-template-columns: 28px 56px 24px 1fr;
     gap: 8px;
     padding: 8px 10px;
+  }
+
+  .fees-month-list {
+    max-height: min(42vh, 360px);
   }
 
   .fees-month-meta {
