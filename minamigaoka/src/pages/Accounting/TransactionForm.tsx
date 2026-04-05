@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { groupedAccountingSubjects } from "../../accounting/fixedSubjects";
-import { todayYmd } from "../../accounting/format";
+import { formatAccountingDate, todayYmd } from "../../accounting/format";
 import type { AccountingPeriod, AccountingTransactionInput, TransactionType } from "../../accounting/model";
 import { comparePeriodAccounts } from "../../accounting/sort";
 import { ReceiptImagePicker } from "../../components/ReceiptImagePicker";
@@ -51,7 +51,7 @@ export function TransactionForm({
   onClose,
   onSubmit,
 }: Props) {
-  const [date, setDate] = useState<string>(initialValues?.date ?? todayYmd());
+  const [date, setDate] = useState<string>(formatAccountingDate(initialValues?.date) || todayYmd());
   const [amount, setAmount] = useState<string>(initialValues?.amount ? String(initialValues.amount) : "");
   const [categoryId, setCategoryId] = useState<string>(initialValues?.categoryId ?? "");
   const [memo, setMemo] = useState<string>(initialValues?.memo ?? "");
@@ -90,7 +90,7 @@ export function TransactionForm({
   }, []);
 
   useEffect(() => {
-    setDate(initialValues?.date ?? todayYmd());
+    setDate(formatAccountingDate(initialValues?.date) || todayYmd());
     setAmount(initialValues?.amount ? String(initialValues.amount) : "");
     setCategoryId(initialValues?.categoryId ?? "");
     setMemo(initialValues?.memo ?? "");

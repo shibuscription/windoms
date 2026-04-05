@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ledgerRowsForAccount, transactionMemoSuggestions } from "../../accounting/calc";
-import { formatMoney } from "../../accounting/format";
+import { formatAccountingDate, formatMoney } from "../../accounting/format";
 import { buildAccountingFiscalYearRange } from "../../accounting/fiscalYear";
 import type { AccountingTransactionInput, TransactionType } from "../../accounting/model";
 import { ConfirmationDialog } from "../../components/ConfirmationDialog";
@@ -95,10 +95,10 @@ export function AccountLedger({ isAdmin, canManageAccounting }: AccountLedgerPro
       };
     }
 
-    return {
-      date: editingRow.transaction.date,
-      amount: editingRow.transaction.amount,
-      categoryId: editingRow.transaction.categoryId,
+      return {
+        date: formatAccountingDate(editingRow.transaction.date),
+        amount: editingRow.transaction.amount,
+        categoryId: editingRow.transaction.categoryId,
       memo: editingRow.transaction.memo,
       accountId: editingRow.transaction.accountId,
       fromAccountId: editingRow.transaction.fromAccountId,

@@ -5,6 +5,7 @@ import {
   accountingSubjectsForType,
 } from "./fixedSubjects";
 import { accountingFiscalMonthLabels } from "./fiscalYear";
+import { formatAccountingDate } from "./format";
 import type {
   AccountingPeriod,
   AccountingReportNote,
@@ -222,7 +223,7 @@ export const ledgerRowsForAccount = (period: AccountingPeriod, accountId: string
       return {
         transactionId: transaction.id,
         transaction,
-        date: transaction.date,
+        date: formatAccountingDate(transaction.date),
         kindLabel: kindLabel(transaction.type, delta),
         subjectLabel: transaction.type === "transfer" ? "-" : category?.label ?? transaction.categoryId ?? "-",
         memo: transaction.memo ?? "",
