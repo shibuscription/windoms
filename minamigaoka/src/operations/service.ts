@@ -12,6 +12,10 @@ import {
 import { db, hasFirebaseAppConfig, storage } from "../config/firebase";
 import type { LunchRecord, PurchaseRequest, ReceiptFileMeta, Reimbursement } from "../types";
 import { uploadFilesToStorage } from "../uploads/storageUpload";
+import {
+  createAccountingTransaction,
+  getCurrentEditingAccountingPeriodId,
+} from "../accounting/service";
 
 const purchaseRequestsCollection = db ? collection(db, "purchaseRequests") : null;
 const reimbursementsCollection = db ? collection(db, "reimbursements") : null;
@@ -192,6 +196,32 @@ const uploadReceiptFiles = async (folder: string, files: File[]): Promise<Receip
   if (files.length === 0) return [];
   ensureStorage();
   return uploadFilesToStorage(storage!, folder, files);
+};
+
+const createLinkedAccountingExpense = async (input: {
+  transactionId: string;
+  source: "purchase" | "reimbursement" | "lunch";
+  accountId?: string;
+  categoryId?: string;
+  memo?: string;
+  amount: number;
+  date: string;
+}): Promise<string> => {
+  if (!input.accountId || !input.categoryId || !input.memo?.trim()) {
+    throw new Error("会計起票に必要な情報が不足しています。");
+  }
+  const periodId = await getCurrentEditingAccountingPeriodId();
+  return createAccountingTransaction({
+    transactionId: input.transactionId,
+    periodId,
+    type: "expense",
+    accountId: input.accountId,
+    categoryId: input.categoryId,
+    memo: input.memo.trim(),
+    amount: input.amount,
+    date: input.date,
+    source: input.source,
+  });
 };
 
 const toPurchasePayload = (purchase: Omit<PurchaseRequest, "id">, createdAt?: unknown) => ({
@@ -380,6 +410,22 @@ export const completePurchaseRequest = async ({
   const nextReceiptFilesMeta =
     uploadedFiles.length > 0 ? uploadedFiles : (purchase.purchaseResult?.receiptFilesMeta ?? []);
   const reimbursementRef = createReimbursement ? doc(reimbursementsCollection!) : null;
+  const alreadyLinked = purchase.accountingLinked === true && Boolean(purchase.accountingEntryId);
+  const shouldCreateAccountingEntry =
+    !alreadyLinked &&
+    purchase.accountingRequested === true &&
+    Boolean(purchase.accountingAccountId && purchase.accountingCategoryId && purchase.accountingMemo?.trim());
+  const accountingEntryId = shouldCreateAccountingEntry
+    ? await createLinkedAccountingExpense({
+        transactionId: `purchase_${purchase.id}`,
+        source: "purchase",
+        accountId: purchase.accountingAccountId,
+        categoryId: purchase.accountingCategoryId,
+        memo: purchase.accountingMemo,
+        amount: amount ?? 0,
+        date: purchasedAt,
+      })
+    : undefined;
   const batch = writeBatch(db!);
 
   if (reimbursementRef) {
@@ -420,16 +466,17 @@ export const completePurchaseRequest = async ({
           amount,
           purchasedAt,
           receiptFilesMeta: nextReceiptFilesMeta,
-          accountingRecordRequested: purchase.purchaseResult?.accountingRecordRequested === true,
-          reimbursementRecordRequested: createReimbursement,
-          reimbursementLinked: Boolean(reimbursementRef),
-          reimbursementId: reimbursementRef?.id,
-        },
-        accountingRequested: purchase.accountingRequested === true,
-        accountingLinked: purchase.accountingLinked === true,
-        accountingSourceType: "purchaseRequest",
-        accountingSourceId: purchase.id,
+        accountingRecordRequested: purchase.purchaseResult?.accountingRecordRequested === true,
+        reimbursementRecordRequested: createReimbursement,
+        reimbursementLinked: Boolean(reimbursementRef),
+        reimbursementId: reimbursementRef?.id,
       },
+      accountingRequested: alreadyLinked || shouldCreateAccountingEntry,
+      accountingLinked: alreadyLinked || Boolean(accountingEntryId),
+      accountingEntryId: purchase.accountingEntryId ?? accountingEntryId,
+      accountingSourceType: "purchaseRequest",
+      accountingSourceId: purchase.id,
+    },
       purchase.createdAt ?? serverTimestamp(),
     ),
   );
@@ -453,6 +500,39 @@ export const createReimbursement = async (
       accountingSourceType: reimbursement.accountingSourceType ?? "reimbursement",
       accountingSourceId: reimbursement.accountingSourceId ?? reimbursementRef.id,
     }),
+  );
+};
+
+export const markReimbursementPaid = async (reimbursement: Reimbursement): Promise<void> => {
+  ensureDb();
+  if (reimbursement.accountingLinked && reimbursement.accountingEntryId) {
+    throw new Error("この立替はすでに会計連携済みです。");
+  }
+  const shouldCreateAccountingEntry =
+    reimbursement.accountingRequested === true &&
+    Boolean(reimbursement.accountingAccountId && reimbursement.accountingCategoryId && reimbursement.accountingMemo?.trim());
+  const accountingEntryId = shouldCreateAccountingEntry
+    ? await createLinkedAccountingExpense({
+        transactionId: `reimbursement_${reimbursement.id}`,
+        source: "reimbursement",
+        accountId: reimbursement.accountingAccountId,
+        categoryId: reimbursement.accountingCategoryId,
+        memo: reimbursement.accountingMemo,
+        amount: reimbursement.amount,
+        date: reimbursement.purchasedAt,
+      })
+    : undefined;
+  await setDoc(
+    doc(reimbursementsCollection!, reimbursement.id),
+    toReimbursementPayload({
+      ...reimbursement,
+      accountingRequested: shouldCreateAccountingEntry,
+      accountingLinked: Boolean(accountingEntryId),
+      accountingEntryId,
+      accountingSourceType: "reimbursement",
+      accountingSourceId: reimbursement.id,
+    }),
+    { merge: true },
   );
 };
 
@@ -485,6 +565,21 @@ export const createLunchRecord = async ({
   const lunchRef = doc(lunchRecordsCollection!);
   const uploadedFiles = await uploadReceiptFiles(`lunchRecords/${lunchRef.id}/receipts`, files);
   const reimbursementRef = createReimbursement ? doc(reimbursementsCollection!) : null;
+  const shouldCreateAccountingEntry =
+    lunchRecord.paymentMethod === "direct_accounting" &&
+    lunchRecord.accountingRequested === true &&
+    Boolean(lunchRecord.accountingAccountId && lunchRecord.accountingCategoryId && lunchRecord.accountingMemo?.trim());
+  const accountingEntryId = shouldCreateAccountingEntry
+    ? await createLinkedAccountingExpense({
+        transactionId: `lunch_${lunchRef.id}`,
+        source: "lunch",
+        accountId: lunchRecord.accountingAccountId,
+        categoryId: lunchRecord.accountingCategoryId,
+        memo: lunchRecord.accountingMemo,
+        amount: lunchRecord.amount,
+        date: lunchRecord.purchasedAt,
+      })
+    : undefined;
   const batch = writeBatch(db!);
 
   if (reimbursementRef) {
@@ -520,6 +615,9 @@ export const createLunchRecord = async ({
         reimbursementId: reimbursementRef?.id,
         imageUrls: uploadedFiles.map((item) => item.downloadUrl).filter((item): item is string => Boolean(item)),
         receiptFilesMeta: uploadedFiles,
+        accountingRequested: shouldCreateAccountingEntry,
+        accountingLinked: Boolean(accountingEntryId),
+        accountingEntryId,
         accountingSourceType: "lunch",
         accountingSourceId: lunchRef.id,
       },

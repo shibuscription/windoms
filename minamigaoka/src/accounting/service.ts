@@ -153,7 +153,7 @@ const toAttachments = (value: unknown): AccountingAttachment[] =>
     : [];
 
 const toTransactionSource = (value: unknown): AccountingTransaction["source"] =>
-  value === "reimbursement" || value === "purchase" ? value : "manual";
+  value === "reimbursement" || value === "purchase" || value === "lunch" ? value : "manual";
 
 const toAccountingTransactionDoc = (id: string, value: Record<string, unknown>): AccountingTransactionDoc | null => {
   const periodId = toOptionalString(value.periodId);
@@ -382,9 +382,23 @@ const uploadAttachments = async (transactionId: string, files: File[]): Promise<
   return uploadFilesToStorage(storage!, `accountingTransactions/${transactionId}`, files);
 };
 
-export const createAccountingTransaction = async (input: CreateAccountingTransactionInput): Promise<void> => {
+export const getCurrentEditingAccountingPeriodId = async (): Promise<string> => {
   ensureDb();
-  const transactionRef = doc(transactionsCollection!);
+  const snapshot = await getDocs(query(periodsCollection!, orderBy("fiscalYear", "desc")));
+  const period = snapshot.docs
+    .map((item) => toAccountingPeriodDoc(item.id, item.data() as Record<string, unknown>))
+    .find((item) => item.state === "editing");
+  if (!period) {
+    throw new Error("現在の会計期が見つかりません。");
+  }
+  return period.id;
+};
+
+export const createAccountingTransaction = async (input: CreateAccountingTransactionInput): Promise<string> => {
+  ensureDb();
+  const transactionRef = input.transactionId
+    ? doc(transactionsCollection!, input.transactionId)
+    : doc(transactionsCollection!);
   const attachments =
     input.type === "transfer" ? [] : await uploadAttachments(transactionRef.id, input.files ?? []);
 
@@ -403,6 +417,7 @@ export const createAccountingTransaction = async (input: CreateAccountingTransac
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+  return transactionRef.id;
 };
 
 export const updateAccountingTransaction = async (

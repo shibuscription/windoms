@@ -95,6 +95,7 @@ import {
   createReimbursement as createFirestoreReimbursement,
   deletePurchaseRequest as deleteFirestorePurchaseRequest,
   deleteReimbursement as deleteFirestoreReimbursement,
+  markReimbursementPaid as markFirestoreReimbursementPaid,
   saveLunchRecord as saveFirestoreLunchRecord,
   savePurchaseRequest as saveFirestorePurchaseRequest,
   saveReimbursement as saveFirestoreReimbursement,
@@ -1360,6 +1361,7 @@ export function App() {
                 isLoading={isReimbursementsLoading}
                 loadError={reimbursementsLoadError}
                 createReimbursement={createFirestoreReimbursement}
+                markReimbursementPaid={markFirestoreReimbursementPaid}
                 saveReimbursement={saveFirestoreReimbursement}
                 deleteReimbursement={deleteFirestoreReimbursement}
               />

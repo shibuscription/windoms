@@ -41,7 +41,7 @@ const toDateInputValue = (date: Date): string => {
 };
 
 const toIsoFromInput = (value: string): string => {
-  const date = new Date(value);
+  const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return new Date().toISOString();
   return date.toISOString();
 };

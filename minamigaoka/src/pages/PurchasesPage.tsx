@@ -90,8 +90,7 @@ const createPurchaseDraft = (): PurchaseCreateDraft => ({ title: "", memo: "" })
 const buildAccountingMemo = (purchase: PurchaseRequest, itemName: string): string =>
   itemName.trim() || purchase.title.trim() || purchase.memo?.trim() || "";
 const accountingStateLabel = (purchase: PurchaseRequest): string => {
-  if (purchase.accountingLinked) return "会計連携済み";
-  if (purchase.accountingRequested || purchase.purchaseResult?.accountingRecordRequested) return "会計連携準備あり";
+  if (purchase.accountingLinked || purchase.accountingEntryId) return "会計連携済み";
   return "会計連携なし";
 };
 
@@ -573,7 +572,7 @@ export function PurchasesPage({
               <>
                 <label className="purchase-option-check">
                   <input type="checkbox" checked={completeDraft.recordToAccounting} onChange={(event) => setCompleteDraft((prev) => prev ? { ...prev, recordToAccounting: event.target.checked } : prev)} />
-                  <span>会計連携の準備情報を残す</span>
+                  <span>会計に支出を記録する</span>
                 </label>
                 {completeDraft.recordToAccounting && (
                   <div className="field-stack">

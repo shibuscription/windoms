@@ -18,6 +18,7 @@ type ReimbursementsPageProps = {
   isLoading: boolean;
   loadError: string;
   createReimbursement: (reimbursement: Omit<Reimbursement, "id">, files?: File[]) => Promise<void>;
+  markReimbursementPaid: (reimbursement: Reimbursement) => Promise<void>;
   saveReimbursement: (reimbursement: Reimbursement) => Promise<void>;
   deleteReimbursement: (reimbursementId: string) => Promise<void>;
 };
@@ -119,6 +120,7 @@ export function ReimbursementsPage({
   isLoading,
   loadError,
   createReimbursement,
+  markReimbursementPaid,
   saveReimbursement,
   deleteReimbursement,
 }: ReimbursementsPageProps) {
@@ -531,7 +533,7 @@ export function ReimbursementsPage({
     setIsSubmitting(true);
     setSubmitError("");
     try {
-      await saveReimbursement({
+      await markReimbursementPaid({
         ...paidModalTarget,
         paidByTreasurerAt: paidModalTarget.paidByTreasurerAt ?? now,
         accountingRequested: canManageAccounting && shouldRecordAccountingExpense,
@@ -941,7 +943,7 @@ export function ReimbursementsPage({
             <p className="muted">購入者: {toDemoFamilyName(data.users[detailTarget.buyer]?.displayName ?? detailTarget.buyer, detailTarget.buyer)}</p>
             <p className="muted">購入日: {toDateLabel(detailTarget.purchasedAt)}</p>
             <p className="muted">金額: {detailTarget.amount.toLocaleString()}円</p>
-            <p className="muted">会計連携状態: {detailTarget.accountingLinked ? "会計連携済み" : detailTarget.accountingRequested ? "会計連携準備あり" : "会計連携なし"}</p>
+            <p className="muted">会計連携状態: {detailTarget.accountingLinked || detailTarget.accountingEntryId ? "会計連携済み" : "会計連携なし"}</p>
             {normalizeReimbursementMemo(detailTarget.memo) && (
               <>
                 <p className="muted">メモ</p>
@@ -1003,7 +1005,7 @@ export function ReimbursementsPage({
                 checked={shouldRecordAccountingExpense}
                 onChange={(event) => setShouldRecordAccountingExpense(event.target.checked)}
               />
-              <span>会計連携の準備情報を残す</span>
+              <span>会計に支出を記録する</span>
             </label>
             {shouldRecordAccountingExpense && (
               <div className="field-stack">
@@ -1060,7 +1062,7 @@ export function ReimbursementsPage({
                 </label>
               </div>
             )}
-            <p className="muted">今回は会計への直接追加は行わず、後続実装で使う連携情報だけを保存します。</p>
+            <p className="muted">確定すると、その場で会計へ支出を記録します。</p>
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={closeMarkPaidModal} disabled={isSubmitting}>
                 キャンセル
@@ -1085,7 +1087,7 @@ export function ReimbursementsPage({
             <p className="muted">購入者: {toDemoFamilyName(data.users[confirmDialog.reimbursement.buyer]?.displayName ?? confirmDialog.reimbursement.buyer, confirmDialog.reimbursement.buyer)}</p>
             <p className="muted">購入日: {toDateLabel(confirmDialog.reimbursement.purchasedAt)}</p>
             {normalizeReimbursementMemo(confirmDialog.reimbursement.memo) && <p className="muted">メモ: {normalizeReimbursementMemo(confirmDialog.reimbursement.memo)}</p>}
-            <p className="muted">会計連携状態: {confirmDialog.reimbursement.accountingLinked ? "会計連携済み" : confirmDialog.reimbursement.accountingRequested ? "会計連携準備あり" : "会計連携なし"}</p>
+            <p className="muted">会計連携状態: {confirmDialog.reimbursement.accountingLinked || confirmDialog.reimbursement.accountingEntryId ? "会計連携済み" : "会計連携なし"}</p>
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={() => setConfirmDialog(null)} disabled={isSubmitting}>
                 キャンセル
