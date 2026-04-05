@@ -320,69 +320,88 @@ export function FeesPage({ currentUid, isAdmin }: FeesPageProps) {
             >
               ×
             </button>
-            <h2>{modalMember.name} の会費状態</h2>
-            <p className="muted">{fiscalYear}年度（9月〜翌8月）</p>
-
-            <div className="fees-month-list">
-              {monthRows.map((row) => {
-                const checked = selectedMonthKeys.includes(row.monthKey);
-                const selectable = row.selectable && !requestedRecord;
-                return (
-                  <label key={row.monthKey} className={`fees-month-row fees-month-row-${row.state}`}>
-                    <span className="fees-month-check">
-                      {row.selectable ? (
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={!selectable || isSubmitting}
-                          onChange={() => toggleMonthSelection(row.monthKey)}
-                        />
-                      ) : (
-                        <span className="fees-check-placeholder" aria-hidden="true" />
-                      )}
-                    </span>
-                    <span className="fees-month-label">{row.label}</span>
-                    <span className={`fees-status-icon fees-status-${row.state}`} aria-hidden="true">
-                      {stateIcon(row.state)}
-                    </span>
-                    <span className="fees-month-state">{stateLabel(row.state)}</span>
-                    <span className="fees-month-meta">
-                      {row.record ? formatMoney(row.record.amount) : ""}
-                    </span>
-                  </label>
-                );
-              })}
+            <div className="fees-modal-header">
+              <h2>{modalMember.name} の会費状態</h2>
+              <p className="muted">{fiscalYear}年度（9月〜翌8月）</p>
             </div>
 
-            {requestedRecord ? (
-              <div className="fees-action-card">
-                <strong>請求中の会費</strong>
-                <p>{requestedRecord.title}</p>
-                <p className="muted">
-                  金額: {formatMoney(requestedRecord.amount)} / 月謝袋配布日: {toDateLabel(requestedRecord.requestedOn)}
-                </p>
-                <label className="field-label" htmlFor="fees-account-select">
-                  入金先口座
-                </label>
-                <select
-                  id="fees-account-select"
-                  className="field-input"
-                  value={receiptAccountId}
-                  onChange={(event) => setReceiptAccountId(event.target.value)}
-                  disabled={isSubmitting}
-                >
-                  <option value="">選択してください</option>
-                  {availableAccounts.map((account) => (
-                    <option key={account.accountId} value={account.accountId}>
-                      {account.label}
-                    </option>
-                  ))}
-                </select>
-                {receiptAccountError && <p className="field-error">{receiptAccountError}</p>}
-                {!currentPeriod && (
-                  <p className="field-error">現在の会計期がないため、領収済みにできません。先に会計期を開始してください。</p>
-                )}
-                <div className="modal-actions">
+            <div className="fees-modal-body">
+              <div className="fees-month-list" role="list">
+                {monthRows.map((row) => {
+                  const checked = selectedMonthKeys.includes(row.monthKey);
+                  const selectable = row.selectable && !requestedRecord;
+                  return (
+                    <label key={row.monthKey} className={`fees-month-row fees-month-row-${row.state}`} role="listitem">
+                      <span className="fees-month-check">
+                        {row.selectable ? (
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={!selectable || isSubmitting}
+                            onChange={() => toggleMonthSelection(row.monthKey)}
+                          />
+                        ) : (
+                          <span className="fees-check-placeholder" aria-hidden="true" />
+                        )}
+                      </span>
+                      <span className="fees-month-label">{row.label}</span>
+                      <span className={`fees-status-icon fees-status-${row.state}`} aria-hidden="true">
+                        {stateIcon(row.state)}
+                      </span>
+                      <span className="fees-month-state">{stateLabel(row.state)}</span>
+                      <span className="fees-month-meta">
+                        {row.record ? formatMoney(row.record.amount) : ""}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              {requestedRecord ? (
+                <div className="fees-action-card">
+                  <strong>請求中の会費</strong>
+                  <p>{requestedRecord.title}</p>
+                  <p className="muted">
+                    金額: {formatMoney(requestedRecord.amount)} / 月謝袋配布日: {toDateLabel(requestedRecord.requestedOn)}
+                  </p>
+                  <label className="field-label" htmlFor="fees-account-select">
+                    入金先口座
+                  </label>
+                  <select
+                    id="fees-account-select"
+                    className="field-input"
+                    value={receiptAccountId}
+                    onChange={(event) => setReceiptAccountId(event.target.value)}
+                    disabled={isSubmitting}
+                  >
+                    <option value="">選択してください</option>
+                    {availableAccounts.map((account) => (
+                      <option key={account.accountId} value={account.accountId}>
+                        {account.label}
+                      </option>
+                    ))}
+                  </select>
+                  {receiptAccountError && <p className="field-error">{receiptAccountError}</p>}
+                  {!currentPeriod && (
+                    <p className="field-error">現在の会計期がないため、領収済みにできません。先に会計期を開始してください。</p>
+                  )}
+                </div>
+              ) : monthRows.some((row) => row.selectable) ? (
+                <div className="fees-action-card">
+                  <strong>未請求月を選んで月謝袋を渡す</strong>
+                  <p className="muted">選択した月をまとめて請求中にします。</p>
+                </div>
+              ) : (
+                <div className="fees-action-card">
+                  <strong>この年度の会費はすべて領収済みです。</strong>
+                </div>
+              )}
+            </div>
+
+            <div className="fees-modal-footer">
+              {modalError && <p className="field-error">{modalError}</p>}
+              <div className="modal-actions">
+                {requestedRecord ? (
                   <button
                     type="button"
                     className="button"
@@ -391,13 +410,7 @@ export function FeesPage({ currentUid, isAdmin }: FeesPageProps) {
                   >
                     {isSubmitting ? "保存中..." : "領収済みにする"}
                   </button>
-                </div>
-              </div>
-            ) : monthRows.some((row) => row.selectable) ? (
-              <div className="fees-action-card">
-                <strong>未請求月を選んで月謝袋を渡す</strong>
-                <p className="muted">選択した月をまとめて請求中にします。</p>
-                <div className="modal-actions">
+                ) : monthRows.some((row) => row.selectable) ? (
                   <button
                     type="button"
                     className="button"
@@ -406,15 +419,12 @@ export function FeesPage({ currentUid, isAdmin }: FeesPageProps) {
                   >
                     {isSubmitting ? "保存中..." : "月謝袋を渡す"}
                   </button>
-                </div>
+                ) : null}
+                <button type="button" className="button button-secondary" onClick={closeMemberModal} disabled={isSubmitting}>
+                  閉じる
+                </button>
               </div>
-            ) : (
-              <div className="fees-action-card">
-                <strong>この年度の会費はすべて領収済みです。</strong>
-              </div>
-            )}
-
-            {modalError && <p className="field-error">{modalError}</p>}
+            </div>
           </section>
         </div>
       )}

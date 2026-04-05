@@ -7546,22 +7546,52 @@ textarea {
 
 .fees-modal-panel {
   max-width: 720px;
+  max-height: min(88vh, 860px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.fees-modal-header {
+  display: grid;
+  gap: 4px;
+  padding-right: 24px;
+}
+
+.fees-modal-body {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding-right: 4px;
+  overflow-y: auto;
+}
+
+.fees-modal-footer {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+  background: #fff;
 }
 
 .fees-month-list {
   display: grid;
-  gap: 8px;
-  margin-top: 16px;
+  gap: 4px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
 }
 
 .fees-month-row {
   display: grid;
-  grid-template-columns: 28px 72px 32px 1fr auto;
+  grid-template-columns: 28px 64px 28px 1fr auto;
   align-items: center;
-  gap: 12px;
-  min-height: 48px;
-  padding: 10px 12px;
-  border-radius: 12px;
+  gap: 10px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #eef2f7;
   background: #f8fafc;
 }
 
@@ -7573,9 +7603,14 @@ textarea {
   background: #f0fdf4;
 }
 
+.fees-month-row:last-child {
+  border-bottom: none;
+}
+
 .fees-month-check {
   display: inline-flex;
   justify-content: center;
+  align-items: center;
 }
 
 .fees-check-placeholder {
@@ -7593,15 +7628,15 @@ textarea {
 
 .fees-month-meta {
   color: #6b7280;
-  font-size: 13px;
+  font-size: 12px;
   text-align: right;
+  white-space: nowrap;
 }
 
 .fees-action-card {
   display: grid;
   gap: 8px;
-  margin-top: 16px;
-  padding: 16px;
+  padding: 12px 14px;
   border-radius: 12px;
   background: #f8fafc;
 }
@@ -7613,11 +7648,14 @@ textarea {
   }
 
   .fees-month-row {
-    grid-template-columns: 28px 60px 28px 1fr;
+    grid-template-columns: 28px 56px 24px 1fr;
+    gap: 8px;
+    padding: 8px 10px;
   }
 
   .fees-month-meta {
     grid-column: 2 / -1;
     text-align: left;
+    white-space: normal;
   }
 }
