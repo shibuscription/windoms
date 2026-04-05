@@ -59,7 +59,8 @@ export type ReportCategoryGroup = {
 export const sortTransactions = (transactions: AccountingTransaction[]): AccountingTransaction[] =>
   [...transactions].sort((a, b) => {
     if (a.date !== b.date) return a.date.localeCompare(b.date);
-    return a.createdAt.localeCompare(b.createdAt);
+    if (a.createdAt !== b.createdAt) return a.createdAt.localeCompare(b.createdAt);
+    return a.id.localeCompare(b.id);
   });
 
 const kindLabel = (type: TransactionType, accountDelta: number): string => {
