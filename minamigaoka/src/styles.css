@@ -7545,6 +7545,7 @@ textarea {
 }
 
 .fees-modal-panel {
+  width: min(720px, calc(100vw - 24px));
   max-width: 720px;
   max-height: min(88vh, 860px);
   display: flex;
@@ -7553,12 +7554,15 @@ textarea {
 }
 
 .fees-modal-header {
+  flex: 0 0 auto;
   display: grid;
   gap: 4px;
   padding-right: 24px;
 }
 
 .fees-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
   display: grid;
   gap: 12px;
   margin-top: 12px;
@@ -7567,6 +7571,7 @@ textarea {
 }
 
 .fees-modal-footer {
+  flex: 0 0 auto;
   display: grid;
   gap: 8px;
   margin-top: 16px;
