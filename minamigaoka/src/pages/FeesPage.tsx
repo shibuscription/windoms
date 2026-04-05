@@ -41,6 +41,13 @@ const stateLabel = (state: MemberMonthState): string => {
 };
 
 const toDateLabel = (value?: string): string => value || "-";
+const formatFeeBreakdown = (record: MembershipFeeRecord): string => {
+  const monthCount = record.monthKeys.length;
+  if (monthCount <= 1) {
+    return formatMoney(record.amount);
+  }
+  return `${formatMoney(record.amount)}（${formatMoney(record.monthlyAmount)} × ${monthCount}か月）`;
+};
 
 export function FeesPage({ currentUid, isAdmin }: FeesPageProps) {
   const { currentPeriod } = useAccountingStore();
@@ -122,6 +129,7 @@ export function FeesPage({ currentUid, isAdmin }: FeesPageProps) {
     [fiscalYear, modalMember, records],
   );
   const requestedRecord = modalRecords.find((record) => record.status === "requested") ?? null;
+  const monthlyFeeAmount = useMemo(() => membershipFeeMonthlyAmount(), []);
 
   useEffect(() => {
     if (!modalMember) return;
@@ -169,9 +177,10 @@ export function FeesPage({ currentUid, isAdmin }: FeesPageProps) {
           state,
           record,
           selectable: state === "unrequested",
+          monthlyAmount: record?.monthlyAmount || monthlyFeeAmount,
         };
       }),
-    [monthEntries, recordByMonthKey],
+    [monthEntries, monthlyFeeAmount, recordByMonthKey],
   );
 
   const toggleMonthSelection = (monthKey: string) => {
@@ -350,7 +359,7 @@ export function FeesPage({ currentUid, isAdmin }: FeesPageProps) {
                       </span>
                       <span className="fees-month-state">{stateLabel(row.state)}</span>
                       <span className="fees-month-meta">
-                        {row.record ? formatMoney(row.record.amount) : ""}
+                        {formatMoney(row.monthlyAmount)}
                       </span>
                     </label>
                   );
@@ -362,7 +371,7 @@ export function FeesPage({ currentUid, isAdmin }: FeesPageProps) {
                   <strong>請求中の会費</strong>
                   <p>{requestedRecord.title}</p>
                   <p className="muted">
-                    金額: {formatMoney(requestedRecord.amount)} / 月謝袋配布日: {toDateLabel(requestedRecord.requestedOn)}
+                    金額: {formatFeeBreakdown(requestedRecord)} / 月謝袋配布日: {toDateLabel(requestedRecord.requestedOn)}
                   </p>
                   <label className="field-label" htmlFor="fees-account-select">
                     入金先口座
