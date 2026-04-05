@@ -72,8 +72,7 @@ export const menuModuleDefinitions: MenuModuleDefinition[] = [
     label: "会計",
     icon: "💰",
     sectionId: "accounting",
-    defaultAudienceRoles: ["admin"],
-    lockedToAdmin: true,
+    defaultAudienceRoles: ["parent", "admin"],
   },
   { id: "instruments", label: "楽器", icon: "🎷", sectionId: "assets", defaultAudienceRoles: ["child", "parent", "admin"] },
   { id: "scores", label: "楽譜", icon: "🎼", sectionId: "assets", defaultAudienceRoles: ["child", "parent", "admin"] },
@@ -149,12 +148,22 @@ export const sanitizeModuleVisibilitySettings = (value: unknown): ModuleVisibili
     const rawRule = source[definition.id];
     if (rawRule && typeof rawRule === "object") {
       const rule = rawRule as Record<string, unknown>;
-      result[definition.id] = {
+      const normalizedRule = {
         isPublic: typeof rule.isPublic === "boolean" ? rule.isPublic : true,
         memberTypes: normalizeMemberTypes(rule.memberTypes),
         adminRoles: normalizeAdminRoles(rule.adminRoles),
         staffPermissions: normalizeStaffPermissions(rule.staffPermissions),
       };
+      const isLegacyAccountingAdminOnly =
+        definition.id === "accounting" &&
+        normalizedRule.isPublic &&
+        normalizedRule.memberTypes.length === 0 &&
+        normalizedRule.adminRoles.length === 1 &&
+        normalizedRule.adminRoles[0] === "admin" &&
+        normalizedRule.staffPermissions.length === 0;
+      result[definition.id] = isLegacyAccountingAdminOnly
+        ? defaultModuleVisibilitySettings[definition.id]
+        : normalizedRule;
     } else {
       result[definition.id] = defaultModuleVisibilitySettings[definition.id];
     }
