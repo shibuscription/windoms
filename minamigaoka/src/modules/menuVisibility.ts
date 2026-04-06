@@ -60,8 +60,7 @@ export const menuModuleDefinitions: MenuModuleDefinition[] = [
     label: "シフト作成",
     icon: "🧭",
     sectionId: "activity",
-    defaultAudienceRoles: ["admin"],
-    lockedToAdmin: true,
+    defaultAudienceRoles: ["parent", "admin"],
   },
   { id: "purchase-request", label: "購入依頼", icon: "🛒", sectionId: "accounting", defaultAudienceRoles: ["parent", "admin"] },
   { id: "reimbursement", label: "立替", icon: "💴", sectionId: "accounting", defaultAudienceRoles: ["parent", "admin"] },
@@ -161,7 +160,14 @@ export const sanitizeModuleVisibilitySettings = (value: unknown): ModuleVisibili
         normalizedRule.adminRoles.length === 1 &&
         normalizedRule.adminRoles[0] === "admin" &&
         normalizedRule.staffPermissions.length === 0;
-      result[definition.id] = isLegacyAccountingAdminOnly
+      const isLegacyShiftCreateAdminOnly =
+        definition.id === "shift-create" &&
+        normalizedRule.isPublic &&
+        normalizedRule.memberTypes.length === 0 &&
+        normalizedRule.adminRoles.length === 1 &&
+        normalizedRule.adminRoles[0] === "admin" &&
+        normalizedRule.staffPermissions.length === 0;
+      result[definition.id] = isLegacyAccountingAdminOnly || isLegacyShiftCreateAdminOnly
         ? defaultModuleVisibilitySettings[definition.id]
         : normalizedRule;
     } else {
