@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { sortMembersForDisplay } from "../members/permissions";
 import { subscribeMembers } from "../members/service";
 import type { MemberRecord } from "../members/types";
 import {
@@ -20,7 +21,6 @@ const TEXT = {
   description:
     "管理者がタイトル・本文・送信対象を指定して、通知センターへ手動通知を送信します。",
   targetLabel: "送信対象",
-  targetPlaceholder: "送信対象を選択",
   titleLabel: "タイトル",
   bodyLabel: "本文",
   recipientsLabel: "対象ユーザー",
@@ -42,12 +42,37 @@ const audienceOptions: Array<{ value: NotificationAudienceScope; label: string }
 
 const roleLabel = (member: MemberRecord): string => {
   if (member.role === "admin" || member.adminRole === "admin") return "管理者";
-  if (member.memberTypes.includes("child") || member.role === "child") return "子ども";
+  if (member.memberTypes.includes("child") || member.role === "child") return "部員";
   if (member.memberTypes.includes("parent") || member.role === "parent" || member.role === "officer") {
     return "保護者";
   }
   if (member.memberTypes.includes("teacher") || member.role === "teacher") return "先生";
   return member.role;
+};
+
+const formatHistoryDateTime = (value: unknown): string => {
+  if (!value) return "-";
+  if (typeof value === "object" && value !== null && "toDate" in value) {
+    const date = (value as { toDate?: () => Date }).toDate?.();
+    if (date instanceof Date && !Number.isNaN(date.getTime())) {
+      return date.toLocaleString("ja-JP", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+  }
+  const date = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 
 type FieldErrors = {
@@ -79,7 +104,11 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
         setIsLoadingMembers(false);
       });
     } catch (error) {
-      setPageError(error instanceof Error ? error.message : "通知対象ユーザーの読み込みに失敗しました。");
+      setPageError(
+        error instanceof Error
+          ? error.message
+          : "通知対象ユーザーの読み込みに失敗しました。",
+      );
       setIsLoadingMembers(false);
       return undefined;
     }
@@ -98,7 +127,11 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
         },
       );
     } catch (error) {
-      setHistoryError(error instanceof Error ? error.message : "通知送信履歴の読み込みに失敗しました。");
+      setHistoryError(
+        error instanceof Error
+          ? error.message
+          : "通知送信履歴の読み込みに失敗しました。",
+      );
       setIsLoadingHistory(false);
       return undefined;
     }
@@ -111,20 +144,23 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
   }, [successMessage]);
 
   const recipientOptions = useMemo(() => {
-    const map = new Map<string, { uid: string; label: string; sortLabel: string }>();
-    members
-      .filter((member) => member.memberStatus === "active" && member.authUid.trim())
-      .sort((left, right) => left.displayName.localeCompare(right.displayName, "ja"))
-      .forEach((member) => {
-        const uid = member.authUid.trim();
-        if (map.has(uid)) return;
-        map.set(uid, {
+    const ordered = sortMembersForDisplay(
+      members.filter((member) => member.memberStatus === "active" && member.authUid.trim()),
+      "all",
+    );
+    const unique = new Set<string>();
+    return ordered.flatMap((member) => {
+      const uid = member.authUid.trim();
+      if (!uid || unique.has(uid)) return [];
+      unique.add(uid);
+      return [
+        {
           uid,
-          label: `${member.displayName} (${roleLabel(member)})`,
-          sortLabel: member.displayName,
-        });
-      });
-    return Array.from(map.values()).sort((left, right) => left.sortLabel.localeCompare(right.sortLabel, "ja"));
+          label: member.displayName,
+          meta: roleLabel(member),
+        },
+      ];
+    });
   }, [members]);
 
   const toggleRecipient = (uid: string, checked: boolean) => {
@@ -166,7 +202,9 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
       setAudienceUserUids([]);
       setSuccessMessage(TEXT.sent);
     } catch (error) {
-      setPageError(error instanceof Error ? error.message : "通知送信に失敗しました。");
+      setPageError(
+        error instanceof Error ? error.message : "通知送信に失敗しました。",
+      );
     } finally {
       setIsSending(false);
     }
@@ -193,7 +231,11 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
               onChange={(event) => {
                 const nextValue = event.target.value as NotificationAudienceScope;
                 setAudienceScope(nextValue);
-                setFieldErrors((current) => ({ ...current, audienceScope: "", audienceUserUids: "" }));
+                setFieldErrors((current) => ({
+                  ...current,
+                  audienceScope: undefined,
+                  audienceUserUids: undefined,
+                }));
               }}
             >
               {audienceOptions.map((option) => (
@@ -211,7 +253,7 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
               value={title}
               onChange={(event) => {
                 setTitle(event.target.value);
-                setFieldErrors((current) => ({ ...current, title: "" }));
+                setFieldErrors((current) => ({ ...current, title: undefined }));
               }}
               placeholder="タイトルを入力"
             />
@@ -224,7 +266,7 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
               value={body}
               onChange={(event) => {
                 setBody(event.target.value);
-                setFieldErrors((current) => ({ ...current, body: "" }));
+                setFieldErrors((current) => ({ ...current, body: undefined }));
               }}
               placeholder="本文を入力"
             />
@@ -238,7 +280,7 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
               ) : recipientOptions.length === 0 ? (
                 <p className="field-error">{TEXT.noRecipients}</p>
               ) : (
-                <div className="system-notification-recipient-list">
+                <div className="system-notification-recipient-list" role="group" aria-label={TEXT.recipientsLabel}>
                   {recipientOptions.map((option) => (
                     <label key={option.uid} className="system-notification-recipient-item">
                       <input
@@ -246,10 +288,11 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
                         checked={audienceUserUids.includes(option.uid)}
                         onChange={(event) => {
                           toggleRecipient(option.uid, event.target.checked);
-                          setFieldErrors((current) => ({ ...current, audienceUserUids: "" }));
+                          setFieldErrors((current) => ({ ...current, audienceUserUids: undefined }));
                         }}
                       />
-                      <span>{option.label}</span>
+                      <span className="system-notification-recipient-name">{option.label}</span>
+                      <span className="system-notification-recipient-meta">{option.meta}</span>
                     </label>
                   ))}
                 </div>
@@ -285,6 +328,7 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
                   <span className="muted">{item.recipientCount}人</span>
                 </div>
                 {item.body && <p>{item.body}</p>}
+                <p className="muted">{formatHistoryDateTime(item.createdAt)}</p>
               </article>
             ))}
           </div>

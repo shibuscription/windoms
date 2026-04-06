@@ -152,6 +152,31 @@ const formatShortDateWithWeekday = (dateKey: string): string => {
   return `${month}/${String(day).padStart(2, "0")}(${weekday})`;
 };
 
+const formatNotificationDateTime = (value: unknown): string => {
+  if (!value) return "-";
+  if (typeof value === "object" && value !== null && "toDate" in value) {
+    const date = (value as { toDate?: () => Date }).toDate?.();
+    if (date instanceof Date && !Number.isNaN(date.getTime())) {
+      return date.toLocaleString("ja-JP", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+  }
+  const date = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 const isParentHeaderTarget = (
   member: MemberRecord | null,
   authRole?: AuthenticatedUser["role"],
@@ -444,6 +469,7 @@ export function App() {
   const [activeStatusPanel, setActiveStatusPanel] = useState<"notice" | "todo" | null>(
     null,
   );
+  const [selectedNotificationId, setSelectedNotificationId] = useState<string | null>(null);
   const [selectedInboxTodoId, setSelectedInboxTodoId] = useState<string | null>(null);
   const [noticeTab, setNoticeTab] = useState<"active" | "resolved">("active");
   const [notifications, setNotifications] = useState<UserNotificationRecord[]>([]);
@@ -952,6 +978,13 @@ export function App() {
     [data.todos, currentUid],
   );
   const inboxTodoCount = sharedInboxTodos.length + privateInboxTodos.length;
+  const selectedNotification = useMemo(
+    () =>
+      selectedNotificationId
+        ? notifications.find((item) => item.id === selectedNotificationId) ?? null
+        : null,
+    [notifications, selectedNotificationId],
+  );
   const selectedInboxTodo = useMemo(
     () => (selectedInboxTodoId ? data.todos.find((todo) => todo.id === selectedInboxTodoId) ?? null : null),
     [data.todos, selectedInboxTodoId],
@@ -1012,6 +1045,7 @@ export function App() {
     location.pathname === "/settings/modules" || location.pathname === "/accounting/ledger";
   const handleNotificationClick = useCallback(
     async (notification: UserNotificationRecord) => {
+      setSelectedNotificationId(notification.id);
       if (!currentNotificationUid || notification.isRead) return;
       try {
         await markNotificationAsRead(currentNotificationUid, notification.id);
@@ -1713,20 +1747,11 @@ export function App() {
                             {item.title}
                             {!item.isRead && <span className="status-new-tag">NEW</span>}
                           </span>
-                          {item.body && <p className="status-notice-body">{item.body}</p>}
+                          <p className="status-notice-meta">
+                            {formatNotificationDateTime(item.createdAt)}
+                            {item.senderName ? ` / ${item.senderName}` : ""}
+                          </p>
                         </div>
-                        {item.status === "active" && (
-                          <button
-                            type="button"
-                            className="button button-small"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void handleResolveNotification(item);
-                            }}
-                          >
-                            対応済にする
-                          </button>
-                        )}
                       </li>
                     ))}
                   {!isNotificationsLoading &&
@@ -1859,6 +1884,60 @@ export function App() {
                 )}
               </>
             )}
+          </section>
+        </div>
+      )}
+      {selectedNotification && (
+        <div className="modal-backdrop modal-backdrop-front" onClick={() => setSelectedNotificationId(null)}>
+          <section className="modal-panel todos-related-modal" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close"
+              aria-label="閉じる"
+              onClick={() => setSelectedNotificationId(null)}
+            >
+              ×
+            </button>
+            <h3>通知詳細</h3>
+            <p className="modal-context">{selectedNotification.title}</p>
+            <p className="modal-summary">作成日時: {formatNotificationDateTime(selectedNotification.createdAt)}</p>
+            {selectedNotification.senderName && (
+              <p className="modal-summary">送信者: {selectedNotification.senderName}</p>
+            )}
+            <p className="modal-summary">
+              状態: {selectedNotification.status === "resolved" ? "対応済" : "未対応"}
+            </p>
+            {selectedNotification.body?.trim() ? (
+              <>
+                <p className="modal-summary">本文</p>
+                <p className="todo-memo-full">
+                  <LinkifiedText
+                    text={selectedNotification.body}
+                    className="todo-linkified-text"
+                  />
+                </p>
+              </>
+            ) : (
+              <p className="muted">本文はありません。</p>
+            )}
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => setSelectedNotificationId(null)}
+              >
+                閉じる
+              </button>
+              {selectedNotification.status === "active" && (
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => void handleResolveNotification(selectedNotification)}
+                >
+                  対応済にする
+                </button>
+              )}
+            </div>
           </section>
         </div>
       )}
