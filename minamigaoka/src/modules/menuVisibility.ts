@@ -23,6 +23,7 @@ export type ModuleMenuId =
   | "members"
   | "links"
   | "settings"
+  | "system-notifications"
   | "members-management"
   | "module-management";
 
@@ -79,6 +80,14 @@ export const menuModuleDefinitions: MenuModuleDefinition[] = [
   { id: "members", label: "メンバー", icon: "👥", sectionId: "assets", defaultAudienceRoles: ["child", "parent", "admin"] },
   { id: "links", label: "リンク集", icon: "🔗", sectionId: "assets", defaultAudienceRoles: ["child", "parent", "admin"] },
   { id: "settings", label: "設定", icon: "⚙️", sectionId: "settings", defaultAudienceRoles: ["child", "parent", "admin"] },
+  {
+    id: "system-notifications",
+    label: "システム通知",
+    icon: "🔔",
+    sectionId: "settings",
+    defaultAudienceRoles: ["admin"],
+    lockedToAdmin: true,
+  },
   {
     id: "members-management",
     label: "メンバー管理",

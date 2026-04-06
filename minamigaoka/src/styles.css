@@ -232,7 +232,7 @@ body {
 
 .status-notice-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
   padding: 8px 10px;
@@ -244,6 +244,21 @@ body {
 
 .status-notice-row:hover {
   background: rgba(30, 41, 59, 0.65);
+}
+
+.status-notice-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.status-notice-body {
+  margin: 0;
+  font-size: 0.84rem;
+  color: #cbd5e1;
+  line-height: 1.45;
+  white-space: pre-wrap;
 }
 
 .status-unread {
@@ -6437,9 +6452,60 @@ textarea {
   gap: 12px;
 }
 
+.field-block {
+  display: grid;
+  gap: 6px;
+}
+
 .settings-actions {
   display: flex;
   justify-content: flex-end;
+}
+
+.system-notification-textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.system-notification-recipient-list {
+  display: grid;
+  gap: 8px;
+  max-height: min(40vh, 320px);
+  overflow-y: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--line, #d7e0e8);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.system-notification-recipient-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.system-notification-history {
+  display: grid;
+  gap: 12px;
+}
+
+.system-notification-history-card {
+  padding: 14px 16px;
+  border: 1px solid var(--line, #d7e0e8);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.system-notification-history-card p {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+}
+
+.system-notification-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .module-settings-table-wrap {

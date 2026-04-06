@@ -27,6 +27,7 @@ import { AccountingHome } from "./pages/Accounting/AccountingHome";
 import { AccountingPeriods } from "./pages/Accounting/AccountingPeriods";
 import { AccountingReport } from "./pages/Accounting/AccountingReport";
 import { AccountLedger } from "./pages/Accounting/AccountLedger";
+import { SystemNotificationsPage } from "./pages/SystemNotificationsPage";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import type {
   DayLog,
@@ -105,6 +106,12 @@ import {
   subscribePurchaseRequests,
   subscribeReimbursements,
 } from "./operations/service";
+import {
+  markNotificationAsRead,
+  resolveNotification,
+  subscribeUserNotifications,
+} from "./notifications/service";
+import type { UserNotificationRecord } from "./notifications/types";
 
 type MenuItem = {
   id: ModuleMenuId;
@@ -119,14 +126,6 @@ type MenuSection = {
   id: string;
   heading: string;
   items: MenuItem[];
-};
-
-type DemoNotification = {
-  id: string;
-  title: string;
-  type: "actionable" | "info";
-  read: boolean;
-  resolved: boolean;
 };
 
 const toMenuRole = (role: MemberRole | "parent" | "admin"): DemoMenuRole => {
@@ -191,6 +190,7 @@ const resolvePageLabel = (pathname: string, search: string): string | null => {
   if (pathname === "/members") return "メンバー";
   if (pathname === "/settings/members") return "メンバー管理";
   if (pathname === "/settings/modules") return "モジュール管理";
+  if (pathname === "/settings/system-notifications") return "システム通知";
   if (pathname === "/links") return "リンク集";
   return null;
 };
@@ -379,6 +379,13 @@ const menuSections = (
           to: "/settings/modules",
           isActive: (location) => location.pathname === "/settings/modules",
         },
+        {
+          id: "system-notifications",
+          label: "システム通知",
+          icon: "🔔",
+          to: "/settings/system-notifications",
+          isActive: (location) => location.pathname === "/settings/system-notifications",
+        },
       ],
     },
   ];
@@ -438,17 +445,16 @@ export function App() {
     null,
   );
   const [selectedInboxTodoId, setSelectedInboxTodoId] = useState<string | null>(null);
-  const [noticeTab, setNoticeTab] = useState<"pending" | "history">("pending");
-  const [notifications, setNotifications] = useState<DemoNotification[]>([
-    { id: "n1", title: "当番可否アンケートの回答期限が近づいています", type: "actionable", read: false, resolved: false },
-    { id: "n2", title: "3月の活動予定が通知されました", type: "info", read: false, resolved: true },
-    { id: "n3", title: "見守り当番の調整が未完了です", type: "actionable", read: true, resolved: false },
-  ]);
+  const [noticeTab, setNoticeTab] = useState<"active" | "resolved">("active");
+  const [notifications, setNotifications] = useState<UserNotificationRecord[]>([]);
+  const [isNotificationsLoading, setIsNotificationsLoading] = useState(hasFirebaseAppConfig);
+  const [notificationsLoadError, setNotificationsLoadError] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
   const today = todayDateKey();
   const activityPlanMonthKey = getActivityPlanTargetMonthKey(today);
   const currentUid = authUser?.appUid ?? "";
+  const currentNotificationUid = authUser?.user.uid ?? "";
   const currentRole = linkedMember ? toMenuRole(linkedMember.role) : authUser?.role ?? "parent";
   const currentOperatorRole: "admin" | "parent" = currentRole === "admin" ? "admin" : "parent";
   const isAdmin = linkedMember?.role === "admin" || (!linkedMember && authUser?.role === "admin");
@@ -476,6 +482,28 @@ export function App() {
     typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   useEffect(() => subscribeModuleVisibilitySettings(setModuleVisibilitySettings), []);
+
+  useEffect(() => {
+    if (!hasFirebaseAppConfig || !currentNotificationUid) {
+      setNotifications([]);
+      setNotificationsLoadError("");
+      setIsNotificationsLoading(false);
+      return undefined;
+    }
+    setIsNotificationsLoading(true);
+    setNotificationsLoadError("");
+    return subscribeUserNotifications(
+      currentNotificationUid,
+      (rows) => {
+        setNotifications(rows);
+        setIsNotificationsLoading(false);
+      },
+      (message) => {
+        setNotificationsLoadError(message);
+        setIsNotificationsLoading(false);
+      },
+    );
+  }, [currentNotificationUid]);
 
   useEffect(() => {
     if (!menuHeaderToast) return undefined;
@@ -888,7 +916,7 @@ export function App() {
     return () => window.removeEventListener("hashchange", updateDocumentTitle);
   }, [location.pathname, location.search]);
 
-  const unreadNotificationCount = notifications.filter((item) => !item.read).length;
+  const activeNotificationCount = notifications.filter((item) => item.status === "active").length;
   const selfTodoKeys = useMemo(
     () =>
       new Set(
@@ -929,15 +957,11 @@ export function App() {
     [data.todos, selectedInboxTodoId],
   );
   const statusButtons: Array<{ id: "notice" | "todo"; icon: string; label: string; badge: number }> = [
-    { id: "notice", icon: "🔔", label: "Notices", badge: unreadNotificationCount },
+    { id: "notice", icon: "🔔", label: "Notices", badge: activeNotificationCount },
     { id: "todo", icon: "✅", label: "My TODO", badge: inboxTodoCount + (hasShiftSurveyTodo ? 1 : 0) },
   ];
-  const pendingNotifications = notifications.filter(
-    (item) => item.type === "actionable" && !item.resolved,
-  );
-  const historyNotifications = notifications.filter(
-    (item) => item.read || item.type === "info",
-  );
+  const activeNotifications = notifications.filter((item) => item.status === "active");
+  const resolvedNotifications = notifications.filter((item) => item.status === "resolved");
   const showNextDuty = isParentHeaderTarget(linkedMember, authUser?.role);
   const nextDutySession = useMemo(() => {
     if (!showNextDuty) return null;
@@ -986,6 +1010,32 @@ export function App() {
   const lunchPath = "/lunch";
   const usesWidePageLayout =
     location.pathname === "/settings/modules" || location.pathname === "/accounting/ledger";
+  const handleNotificationClick = useCallback(
+    async (notification: UserNotificationRecord) => {
+      if (!currentNotificationUid || notification.isRead) return;
+      try {
+        await markNotificationAsRead(currentNotificationUid, notification.id);
+      } catch (error) {
+        setMenuHeaderToast(
+          error instanceof Error ? error.message : "通知の既読化に失敗しました",
+        );
+      }
+    },
+    [currentNotificationUid],
+  );
+  const handleResolveNotification = useCallback(
+    async (notification: UserNotificationRecord) => {
+      if (!currentNotificationUid || notification.status === "resolved") return;
+      try {
+        await resolveNotification(currentNotificationUid, notification.id, !notification.isRead);
+      } catch (error) {
+        setMenuHeaderToast(
+          error instanceof Error ? error.message : "通知の更新に失敗しました",
+        );
+      }
+    },
+    [currentNotificationUid],
+  );
 
   const updateDayLog = useCallback((date: string, updater: (prev: DayLog) => DayLog) => {
     setData((prev) => {
@@ -1233,7 +1283,7 @@ export function App() {
                 className={`status-icon-button ${isActive ? "active" : ""}`}
                 aria-label={item.label}
                 onClick={() => {
-                  if (item.id === "notice") setNoticeTab("pending");
+                  if (item.id === "notice") setNoticeTab("active");
                   setActiveStatusPanel((prev) => (prev === item.id ? null : item.id));
                 }}
               >
@@ -1444,6 +1494,19 @@ export function App() {
             path="/settings/modules"
             element={isAdmin ? <ModuleSettingsPage /> : <Navigate to="/today" replace />}
           />
+          <Route
+            path="/settings/system-notifications"
+            element={
+              isAdmin ? (
+                <SystemNotificationsPage
+                  currentMember={linkedMember}
+                  currentLoginId={authUser?.loginId ?? ""}
+                />
+              ) : (
+                <Navigate to="/today" replace />
+              )
+            }
+          />
           <Route path="/accounting" element={<AccountingHome isAdmin={isAdmin} />} />
           <Route
             path="/accounting/ledger"
@@ -1619,56 +1682,61 @@ export function App() {
                 <div className="status-panel-tabs">
                   <button
                     type="button"
-                    className={`status-panel-tab ${noticeTab === "pending" ? "active" : ""}`}
-                    onClick={() => setNoticeTab("pending")}
+                    className={`status-panel-tab ${noticeTab === "active" ? "active" : ""}`}
+                    onClick={() => setNoticeTab("active")}
                   >
-                    未処理
+                    未対応
                   </button>
                   <button
                     type="button"
-                    className={`status-panel-tab ${noticeTab === "history" ? "active" : ""}`}
-                    onClick={() => setNoticeTab("history")}
+                    className={`status-panel-tab ${noticeTab === "resolved" ? "active" : ""}`}
+                    onClick={() => setNoticeTab("resolved")}
                   >
-                    履歴
+                    対応済
                   </button>
                 </div>
                 <ul className="status-panel-list">
-                  {(noticeTab === "pending" ? pendingNotifications : historyNotifications).map((item) => (
-                    <li
-                      key={item.id}
-                      className="status-notice-row"
-                      onClick={() =>
-                        setNotifications((prev) =>
-                          prev.map((notice) =>
-                            notice.id === item.id ? { ...notice, read: true } : notice,
-                          ),
-                        )
-                      }
-                    >
-                      <span className={item.read ? "" : "status-unread"}>
-                        {item.title}
-                        {!item.read && <span className="status-new-tag">NEW</span>}
-                      </span>
-                      {item.type === "actionable" && !item.resolved && (
-                        <button
-                          type="button"
-                          className="button button-small"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setNotifications((prev) =>
-                              prev.map((notice) =>
-                                notice.id === item.id ? { ...notice, resolved: true, read: true } : notice,
-                              ),
-                            );
-                          }}
-                        >
-                          解消
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                  {noticeTab === "pending" && pendingNotifications.length === 0 && <li>未処理通知はありません</li>}
-                  {noticeTab === "history" && historyNotifications.length === 0 && <li>履歴はありません</li>}
+                  {isNotificationsLoading && <li>通知を読み込み中...</li>}
+                  {!isNotificationsLoading && notificationsLoadError && (
+                    <li className="field-error">{notificationsLoadError}</li>
+                  )}
+                  {!isNotificationsLoading &&
+                    !notificationsLoadError &&
+                    (noticeTab === "active" ? activeNotifications : resolvedNotifications).map((item) => (
+                      <li
+                        key={item.id}
+                        className="status-notice-row"
+                        onClick={() => void handleNotificationClick(item)}
+                      >
+                        <div className="status-notice-main">
+                          <span className={item.isRead ? "" : "status-unread"}>
+                            {item.title}
+                            {!item.isRead && <span className="status-new-tag">NEW</span>}
+                          </span>
+                          {item.body && <p className="status-notice-body">{item.body}</p>}
+                        </div>
+                        {item.status === "active" && (
+                          <button
+                            type="button"
+                            className="button button-small"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              void handleResolveNotification(item);
+                            }}
+                          >
+                            対応済にする
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  {!isNotificationsLoading &&
+                    !notificationsLoadError &&
+                    noticeTab === "active" &&
+                    activeNotifications.length === 0 && <li>未対応の通知はありません</li>}
+                  {!isNotificationsLoading &&
+                    !notificationsLoadError &&
+                    noticeTab === "resolved" &&
+                    resolvedNotifications.length === 0 && <li>対応済の通知はありません</li>}
                 </ul>
               </>
             )}
