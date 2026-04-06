@@ -432,6 +432,10 @@ export function App() {
   const [isLunchRecordsLoading, setIsLunchRecordsLoading] = useState(hasFirebaseAppConfig);
   const [lunchRecordsLoadError, setLunchRecordsLoadError] = useState("");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [menuHeaderToast, setMenuHeaderToast] = useState("");
+  const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() =>
+    typeof window !== "undefined" ? window.matchMedia("(max-width: 767px)").matches : false,
+  );
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [activeStatusPanel, setActiveStatusPanel] = useState<"notice" | "todo" | null>(
     null,
@@ -470,8 +474,35 @@ export function App() {
     () => menuSections(activityPlanBadgeText, linkedMember, moduleVisibilitySettings),
     [activityPlanBadgeText, linkedMember, moduleVisibilitySettings],
   );
+  const currentPageLabel = resolvePageLabel(location.pathname, location.search) ?? siteConfig.productName;
+  const canUseNativeShare =
+    isMobileViewport &&
+    typeof navigator !== "undefined" &&
+    typeof navigator.share === "function";
 
   useEffect(() => subscribeModuleVisibilitySettings(setModuleVisibilitySettings), []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+    const updateViewport = (event: MediaQueryListEvent | MediaQueryList) => {
+      setIsMobileViewport(event.matches);
+    };
+
+    updateViewport(mediaQuery);
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", updateViewport);
+      return () => mediaQuery.removeEventListener("change", updateViewport);
+    }
+    mediaQuery.addListener(updateViewport);
+    return () => mediaQuery.removeListener(updateViewport);
+  }, []);
+
+  useEffect(() => {
+    if (!menuHeaderToast) return undefined;
+    const timer = window.setTimeout(() => setMenuHeaderToast(""), 2200);
+    return () => window.clearTimeout(timer);
+  }, [menuHeaderToast]);
 
   useEffect(() => {
     let active = true;
@@ -1126,6 +1157,33 @@ export function App() {
     }));
   };
 
+  const copyCurrentPageUrl = useCallback(async () => {
+    try {
+      if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
+        throw new Error("clipboard unavailable");
+      }
+      await navigator.clipboard.writeText(window.location.href);
+      setMenuHeaderToast("リンクをコピーしました");
+    } catch {
+      setMenuHeaderToast("リンクのコピーに失敗しました");
+    }
+  }, []);
+
+  const shareCurrentPageUrl = useCallback(async () => {
+    if (!canUseNativeShare) return;
+    try {
+      await navigator.share({
+        title: `${siteConfig.productName} - ${currentPageLabel}`,
+        url: window.location.href,
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        return;
+      }
+      setMenuHeaderToast("共有に失敗しました");
+    }
+  }, [canUseNativeShare, currentPageLabel]);
+
   if (!isAuthReady) {
     return (
       <div className="auth-screen">
@@ -1441,25 +1499,50 @@ export function App() {
         <div className="menu-overlay" onClick={() => setIsMenuOpen(false)}>
           <div className="menu-panel">
             <div className="menu-content">
-              <button
-                type="button"
-                className="menu-close"
-                aria-label="閉じる" title="閉じる"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                ×
-              </button>
-              <button
-                type="button"
-                className="menu-today-header"
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  navigate("/today");
-                }}
-              >
-                <span className="menu-today-date">{formatDateYmd(today)}</span>
-                <span className={`menu-today-weekday ${weekdayTone(today)}`}>（{formatWeekdayJa(today)}）</span>
-              </button>
+              {menuHeaderToast && <div className="inline-toast menu-inline-toast">{menuHeaderToast}</div>}
+              <div className="menu-topbar">
+                <div className="menu-share-actions">
+                  <button
+                    type="button"
+                    className="menu-header-icon-button"
+                    aria-label="現在のページのリンクをコピー"
+                    title="リンクをコピー"
+                    onClick={() => void copyCurrentPageUrl()}
+                  >
+                    🔗
+                  </button>
+                  {canUseNativeShare && (
+                    <button
+                      type="button"
+                      className="menu-header-icon-button"
+                      aria-label="現在のページを共有"
+                      title="共有"
+                      onClick={() => void shareCurrentPageUrl()}
+                    >
+                      ⤴
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="menu-today-header"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    navigate("/today");
+                  }}
+                >
+                  <span className="menu-today-date">{formatDateYmd(today)}</span>
+                  <span className={`menu-today-weekday ${weekdayTone(today)}`}>（{formatWeekdayJa(today)}）</span>
+                </button>
+                <button
+                  type="button"
+                  className="menu-close"
+                  aria-label="閉じる" title="閉じる"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
               <div className="menu-sections">
                 {visibleMenuSections.map((section) => (
                   <section key={section.id} className="menu-section">

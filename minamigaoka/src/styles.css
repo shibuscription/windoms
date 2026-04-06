@@ -328,14 +328,55 @@ body {
   min-height: calc(100vh - 48px);
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+.menu-topbar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 12px;
+}
+
+.menu-share-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.menu-header-icon-button {
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(2, 6, 23, 0.82);
+  color: #f8fafc;
+  border-radius: 999px;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.menu-header-icon-button:hover,
+.menu-header-icon-button:focus-visible {
+  background: rgba(30, 41, 59, 0.92);
+}
+
+.menu-inline-toast {
+  top: 4px;
 }
 
 .menu-close {
   position: sticky;
   top: 10px;
-  right: 10px;
-  margin-left: auto;
-  display: block;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   background: rgba(2, 6, 23, 0.82);
   color: #f8fafc;
@@ -5675,6 +5716,28 @@ textarea {
 
   .menu-content {
     padding: 12px 0 2px;
+  }
+
+  .menu-topbar {
+    grid-template-columns: auto 1fr auto;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .menu-share-actions {
+    gap: 6px;
+  }
+
+  .menu-header-icon-button,
+  .menu-close {
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+  }
+
+  .menu-inline-toast {
+    right: 12px;
+    max-width: calc(100% - 24px);
   }
 
   .menu-account-panel {
