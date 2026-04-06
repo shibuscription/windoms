@@ -333,7 +333,7 @@ body {
 
 .menu-topbar {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: start;
   gap: 12px;
 }
@@ -392,6 +392,7 @@ body {
 
 .menu-today-header {
   width: 100%;
+  min-width: 0;
   border: 0;
   background: transparent;
   text-align: center;
@@ -399,6 +400,7 @@ body {
   cursor: pointer;
   padding: 8px 28px 16px;
   margin: 0;
+  overflow: hidden;
 }
 
 .menu-today-date {
@@ -406,6 +408,7 @@ body {
   font-size: clamp(1.6rem, 3.4vw, 2.2rem);
   font-weight: 800;
   color: #fff;
+  white-space: nowrap;
 }
 
 .menu-today-weekday {
@@ -5723,7 +5726,7 @@ textarea {
   }
 
   .menu-topbar {
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 8px;
     align-items: center;
   }
@@ -5741,6 +5744,19 @@ textarea {
     width: 34px;
     min-width: 34px;
     height: 34px;
+  }
+
+  .menu-today-header {
+    padding: 6px 8px 10px;
+  }
+
+  .menu-today-date {
+    font-size: clamp(1.15rem, 4.8vw, 1.45rem);
+  }
+
+  .menu-today-weekday {
+    margin-left: 2px;
+    font-size: clamp(0.78rem, 3vw, 0.92rem);
   }
 
   .menu-inline-toast {
