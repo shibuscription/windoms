@@ -433,9 +433,6 @@ export function App() {
   const [lunchRecordsLoadError, setLunchRecordsLoadError] = useState("");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [menuHeaderToast, setMenuHeaderToast] = useState("");
-  const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() =>
-    typeof window !== "undefined" ? window.matchMedia("(max-width: 767px)").matches : false,
-  );
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [activeStatusPanel, setActiveStatusPanel] = useState<"notice" | "todo" | null>(
     null,
@@ -476,27 +473,9 @@ export function App() {
   );
   const currentPageLabel = resolvePageLabel(location.pathname, location.search) ?? siteConfig.productName;
   const canUseNativeShare =
-    isMobileViewport &&
-    typeof navigator !== "undefined" &&
-    typeof navigator.share === "function";
+    typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   useEffect(() => subscribeModuleVisibilitySettings(setModuleVisibilitySettings), []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return undefined;
-    const mediaQuery = window.matchMedia("(max-width: 767px)");
-    const updateViewport = (event: MediaQueryListEvent | MediaQueryList) => {
-      setIsMobileViewport(event.matches);
-    };
-
-    updateViewport(mediaQuery);
-    if (typeof mediaQuery.addEventListener === "function") {
-      mediaQuery.addEventListener("change", updateViewport);
-      return () => mediaQuery.removeEventListener("change", updateViewport);
-    }
-    mediaQuery.addListener(updateViewport);
-    return () => mediaQuery.removeListener(updateViewport);
-  }, []);
 
   useEffect(() => {
     if (!menuHeaderToast) return undefined;
@@ -1497,7 +1476,7 @@ export function App() {
       </main>
       {isMenuOpen && (
         <div className="menu-overlay" onClick={() => setIsMenuOpen(false)}>
-          <div className="menu-panel">
+          <div className="menu-panel" onClick={(event) => event.stopPropagation()}>
             <div className="menu-content">
               {menuHeaderToast && <div className="inline-toast menu-inline-toast">{menuHeaderToast}</div>}
               <div className="menu-topbar">
@@ -1514,7 +1493,7 @@ export function App() {
                   {canUseNativeShare && (
                     <button
                       type="button"
-                      className="menu-header-icon-button"
+                      className="menu-header-icon-button menu-header-share-button"
                       aria-label="現在のページを共有"
                       title="共有"
                       onClick={() => void shareCurrentPageUrl()}

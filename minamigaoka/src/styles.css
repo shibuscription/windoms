@@ -361,6 +361,10 @@ body {
   cursor: pointer;
 }
 
+.menu-header-share-button {
+  display: none;
+}
+
 .menu-header-icon-button:hover,
 .menu-header-icon-button:focus-visible {
   background: rgba(30, 41, 59, 0.92);
@@ -5726,6 +5730,10 @@ textarea {
 
   .menu-share-actions {
     gap: 6px;
+  }
+
+  .menu-header-share-button {
+    display: inline-flex;
   }
 
   .menu-header-icon-button,
