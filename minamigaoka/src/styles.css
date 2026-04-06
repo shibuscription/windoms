@@ -6476,9 +6476,11 @@ textarea {
 
 .system-notification-recipient-list {
   display: grid;
-  gap: 8px;
+  gap: 0;
   max-height: min(40vh, 320px);
   overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
   padding: 10px 12px;
   border: 1px solid var(--line, #d7e0e8);
   border-radius: 12px;
@@ -6486,10 +6488,12 @@ textarea {
 }
 
 .system-notification-recipient-item {
-  display: flex;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
-  padding: 8px 0;
+  column-gap: 12px;
+  min-height: 44px;
+  padding: 6px 0;
   border-bottom: 1px solid rgba(148, 163, 184, 0.18);
 }
 
@@ -6497,15 +6501,46 @@ textarea {
   border-bottom: none;
 }
 
+.system-notification-recipient-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  justify-self: center;
+  align-self: center;
+}
+
 .system-notification-recipient-name {
-  flex: 1;
   min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: keep-all;
+  overflow-wrap: normal;
+  writing-mode: horizontal-tb;
+  line-height: 1.4;
 }
 
 .system-notification-recipient-meta {
   flex: 0 0 auto;
+  min-width: 3.5rem;
+  white-space: nowrap;
+  text-align: right;
   color: #64748b;
   font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 640px) {
+  .system-notification-recipient-item {
+    grid-template-columns: 20px minmax(0, 1fr) auto;
+    column-gap: 10px;
+    min-height: 42px;
+  }
+
+  .system-notification-recipient-meta {
+    min-width: 3rem;
+    font-size: 0.78rem;
+  }
 }
 
 .system-notification-history {
