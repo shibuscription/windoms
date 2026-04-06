@@ -108,6 +108,7 @@ import {
 } from "./operations/service";
 import {
   markNotificationAsRead,
+  reopenNotification,
   resolveNotification,
   subscribeUserNotifications,
 } from "./notifications/service";
@@ -1070,6 +1071,19 @@ export function App() {
     },
     [currentNotificationUid],
   );
+  const handleReopenNotification = useCallback(
+    async (notification: UserNotificationRecord) => {
+      if (!currentNotificationUid || notification.status !== "resolved") return;
+      try {
+        await reopenNotification(currentNotificationUid, notification.id);
+      } catch (error) {
+        setMenuHeaderToast(
+          error instanceof Error ? error.message : "通知の更新に失敗しました",
+        );
+      }
+    },
+    [currentNotificationUid],
+  );
 
   const updateDayLog = useCallback((date: string, updater: (prev: DayLog) => DayLog) => {
     setData((prev) => {
@@ -1935,6 +1949,15 @@ export function App() {
                   onClick={() => void handleResolveNotification(selectedNotification)}
                 >
                   対応済にする
+                </button>
+              )}
+              {selectedNotification.status === "resolved" && (
+                <button
+                  type="button"
+                  className="button"
+                  onClick={() => void handleReopenNotification(selectedNotification)}
+                >
+                  未対応に戻す
                 </button>
               )}
             </div>

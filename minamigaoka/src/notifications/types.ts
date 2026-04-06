@@ -9,6 +9,8 @@ export type NotificationAudienceScope =
   | "children"
   | "individual";
 
+export type NotificationHistoryKind = "manual" | "auto";
+
 export type UserNotificationRecord = {
   id: string;
   type: string;
@@ -26,6 +28,27 @@ export type UserNotificationRecord = {
   linkUrl: string;
   senderUid: string;
   senderName: string;
+};
+
+export type NotificationHistoryRecord = {
+  id: string;
+  kind: NotificationHistoryKind;
+  sourceModule: string;
+  sourceEvent: string;
+  title: string;
+  body: string;
+  targetType: NotificationAudienceScope | "unknown";
+  targetSummary: string;
+  targetUserIds: string[];
+  recipientCount: number;
+  createdAt: unknown;
+  createdByUid: string;
+  createdByName: string;
+  isCancelable: boolean;
+  sourceRecordId: string;
+  canceledAt: unknown;
+  canceledByUid: string;
+  canceledByName: string;
 };
 
 export type SystemNotificationRecord = {

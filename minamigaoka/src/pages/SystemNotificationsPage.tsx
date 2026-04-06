@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
+import { ConfirmationDialog } from "../components/ConfirmationDialog";
 import { sortMembersForDisplay } from "../members/permissions";
 import { subscribeMembers } from "../members/service";
 import type { MemberRecord } from "../members/types";
 import {
+  cancelManualNotificationHistory,
   sendSystemNotification,
-  subscribeSystemNotifications,
+  subscribeNotificationHistory,
 } from "../notifications/service";
 import type {
   NotificationAudienceScope,
-  SystemNotificationRecord,
+  NotificationHistoryKind,
+  NotificationHistoryRecord,
 } from "../notifications/types";
 
 type Props = {
@@ -16,10 +19,17 @@ type Props = {
   currentLoginId: string;
 };
 
+type FieldErrors = {
+  title?: string;
+  body?: string;
+  audienceScope?: string;
+  audienceUserUids?: string;
+};
+
 const TEXT = {
   title: "システム通知",
   description:
-    "管理者がタイトル・本文・送信対象を指定して、通知センターへ手動通知を送信します。",
+    "管理者がタイトルと本文を指定して、対象ユーザーへ手動通知を送信します。送信後は通知履歴にも記録されます。",
   targetLabel: "送信対象",
   titleLabel: "タイトル",
   bodyLabel: "本文",
@@ -27,9 +37,18 @@ const TEXT = {
   send: "通知を送信する",
   sending: "送信中...",
   sent: "通知を送信しました。",
-  recentTitle: "送信履歴",
-  noHistory: "まだ通知送信履歴はありません。",
+  historyTitle: "通知履歴",
+  noHistory: "この条件の通知履歴はありません。",
   noRecipients: "送信対象ユーザーが見つかりません。",
+  filterAll: "すべて",
+  filterManual: "手動",
+  filterAuto: "自動",
+  previousMonth: "前月",
+  nextMonth: "翌月",
+  detailTitle: "通知履歴詳細",
+  cancelHistory: "通知を取り消す",
+  canceling: "取消中...",
+  canceled: "通知を取り消しました。",
 } as const;
 
 const audienceOptions: Array<{ value: NotificationAudienceScope; label: string }> = [
@@ -39,6 +58,45 @@ const audienceOptions: Array<{ value: NotificationAudienceScope; label: string }
   { value: "children", label: "子どものみ" },
   { value: "individual", label: "個別ユーザー選択" },
 ];
+
+const monthLabel = (value: Date): string =>
+  `${value.getFullYear()}年${String(value.getMonth() + 1).padStart(2, "0")}月`;
+
+const monthKey = (value: Date): string =>
+  `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}`;
+
+const shiftMonth = (value: Date, delta: number): Date =>
+  new Date(value.getFullYear(), value.getMonth() + delta, 1);
+
+const toDate = (value: unknown): Date | null => {
+  if (!value) return null;
+  if (typeof value === "object" && value !== null && "toDate" in value) {
+    const date = (value as { toDate?: () => Date }).toDate?.();
+    return date instanceof Date && !Number.isNaN(date.getTime()) ? date : null;
+  }
+  const date = value instanceof Date ? value : new Date(String(value));
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const formatDateTime = (value: unknown): string => {
+  const date = toDate(value);
+  if (!date) return "-";
+  return date.toLocaleString("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const formatHistoryKind = (value: NotificationHistoryKind): string =>
+  value === "manual" ? "手動" : "自動";
+
+const summarizeBody = (value: string): string => {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  return normalized || "本文はありません。";
+};
 
 const roleLabel = (member: MemberRecord): string => {
   if (member.role === "admin" || member.adminRole === "admin") return "管理者";
@@ -50,41 +108,9 @@ const roleLabel = (member: MemberRecord): string => {
   return member.role;
 };
 
-const formatHistoryDateTime = (value: unknown): string => {
-  if (!value) return "-";
-  if (typeof value === "object" && value !== null && "toDate" in value) {
-    const date = (value as { toDate?: () => Date }).toDate?.();
-    if (date instanceof Date && !Number.isNaN(date.getTime())) {
-      return date.toLocaleString("ja-JP", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-    }
-  }
-  const date = value instanceof Date ? value : new Date(String(value));
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleString("ja-JP", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
-
-type FieldErrors = {
-  title?: string;
-  body?: string;
-  audienceScope?: string;
-  audienceUserUids?: string;
-};
-
 export function SystemNotificationsPage({ currentMember, currentLoginId }: Props) {
   const [members, setMembers] = useState<MemberRecord[]>([]);
-  const [history, setHistory] = useState<SystemNotificationRecord[]>([]);
+  const [history, setHistory] = useState<NotificationHistoryRecord[]>([]);
   const [historyError, setHistoryError] = useState("");
   const [pageError, setPageError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -94,8 +120,13 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
   const [audienceScope, setAudienceScope] = useState<NotificationAudienceScope>("all");
   const [audienceUserUids, setAudienceUserUids] = useState<string[]>([]);
   const [isSending, setIsSending] = useState(false);
+  const [isCanceling, setIsCanceling] = useState(false);
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
+  const [pendingCancelHistoryId, setPendingCancelHistoryId] = useState<string | null>(null);
+  const [historyMonth, setHistoryMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [historyKindFilter, setHistoryKindFilter] = useState<"all" | NotificationHistoryKind>("all");
 
   useEffect(() => {
     try {
@@ -105,9 +136,7 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
       });
     } catch (error) {
       setPageError(
-        error instanceof Error
-          ? error.message
-          : "通知対象ユーザーの読み込みに失敗しました。",
+        error instanceof Error ? error.message : "通知対象ユーザーの読み込みに失敗しました。",
       );
       setIsLoadingMembers(false);
       return undefined;
@@ -116,7 +145,7 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
 
   useEffect(() => {
     try {
-      return subscribeSystemNotifications(
+      return subscribeNotificationHistory(
         (rows) => {
           setHistory(rows);
           setIsLoadingHistory(false);
@@ -128,9 +157,7 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
       );
     } catch (error) {
       setHistoryError(
-        error instanceof Error
-          ? error.message
-          : "通知送信履歴の読み込みに失敗しました。",
+        error instanceof Error ? error.message : "通知履歴の読み込みに失敗しました。",
       );
       setIsLoadingHistory(false);
       return undefined;
@@ -162,6 +189,21 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
       ];
     });
   }, [members]);
+
+  const selectedHistory = useMemo(
+    () => (selectedHistoryId ? history.find((item) => item.id === selectedHistoryId) ?? null : null),
+    [history, selectedHistoryId],
+  );
+
+  const visibleHistory = useMemo(() => {
+    const currentMonthKey = monthKey(historyMonth);
+    return history.filter((item) => {
+      const created = toDate(item.createdAt);
+      if (!created || monthKey(created) !== currentMonthKey) return false;
+      if (historyKindFilter === "all") return true;
+      return item.kind === historyKindFilter;
+    });
+  }, [history, historyKindFilter, historyMonth]);
 
   const toggleRecipient = (uid: string, checked: boolean) => {
     setAudienceUserUids((current) =>
@@ -202,11 +244,27 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
       setAudienceUserUids([]);
       setSuccessMessage(TEXT.sent);
     } catch (error) {
-      setPageError(
-        error instanceof Error ? error.message : "通知送信に失敗しました。",
-      );
+      setPageError(error instanceof Error ? error.message : "通知送信に失敗しました。");
     } finally {
       setIsSending(false);
+    }
+  };
+
+  const handleCancelHistory = async () => {
+    if (!pendingCancelHistoryId) return;
+    setIsCanceling(true);
+    setPageError("");
+    try {
+      await cancelManualNotificationHistory(pendingCancelHistoryId);
+      if (selectedHistoryId === pendingCancelHistoryId) {
+        setSelectedHistoryId(null);
+      }
+      setPendingCancelHistoryId(null);
+      setSuccessMessage(TEXT.canceled);
+    } catch (error) {
+      setPageError(error instanceof Error ? error.message : "通知取消に失敗しました。");
+    } finally {
+      setIsCanceling(false);
     }
   };
 
@@ -229,8 +287,7 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
             <select
               value={audienceScope}
               onChange={(event) => {
-                const nextValue = event.target.value as NotificationAudienceScope;
-                setAudienceScope(nextValue);
+                setAudienceScope(event.target.value as NotificationAudienceScope);
                 setFieldErrors((current) => ({
                   ...current,
                   audienceScope: undefined,
@@ -312,28 +369,132 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
 
       <section className="settings-section">
         <div className="settings-section-head">
-          <h2>{TEXT.recentTitle}</h2>
+          <h2>{TEXT.historyTitle}</h2>
+        </div>
+        <div className="system-notification-history-toolbar">
+          <div className="system-notification-history-month-nav">
+            <button
+              type="button"
+              className="button button-small button-secondary"
+              onClick={() => setHistoryMonth((current) => shiftMonth(current, -1))}
+            >
+              {TEXT.previousMonth}
+            </button>
+            <strong>{monthLabel(historyMonth)}</strong>
+            <button
+              type="button"
+              className="button button-small button-secondary"
+              onClick={() => setHistoryMonth((current) => shiftMonth(current, 1))}
+            >
+              {TEXT.nextMonth}
+            </button>
+          </div>
+          <div className="system-notification-history-filters">
+            {[
+              { value: "all" as const, label: TEXT.filterAll },
+              { value: "manual" as const, label: TEXT.filterManual },
+              { value: "auto" as const, label: TEXT.filterAuto },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`status-panel-tab ${historyKindFilter === option.value ? "active" : ""}`}
+                onClick={() => setHistoryKindFilter(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
         {historyError && <p className="field-error">{historyError}</p>}
         {isLoadingHistory ? (
-          <p className="muted">送信履歴を読み込み中...</p>
-        ) : history.length === 0 ? (
+          <p className="muted">通知履歴を読み込み中...</p>
+        ) : visibleHistory.length === 0 ? (
           <p className="muted">{TEXT.noHistory}</p>
         ) : (
           <div className="system-notification-history">
-            {history.slice(0, 10).map((item) => (
-              <article key={item.id} className="system-notification-history-card">
+            {visibleHistory.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="system-notification-history-card"
+                onClick={() => setSelectedHistoryId(item.id)}
+              >
                 <div className="system-notification-history-head">
                   <strong>{item.title}</strong>
                   <span className="muted">{item.recipientCount}人</span>
                 </div>
-                {item.body && <p>{item.body}</p>}
-                <p className="muted">{formatHistoryDateTime(item.createdAt)}</p>
-              </article>
+                <p className="system-notification-history-body">{summarizeBody(item.body)}</p>
+                <p className="muted">{formatDateTime(item.createdAt)}</p>
+              </button>
             ))}
           </div>
         )}
       </section>
+
+      {selectedHistory && (
+        <div className="modal-backdrop modal-backdrop-front" onClick={() => setSelectedHistoryId(null)}>
+          <section className="modal-panel todos-related-modal" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close"
+              aria-label="閉じる"
+              onClick={() => setSelectedHistoryId(null)}
+            >
+              ×
+            </button>
+            <h3>{TEXT.detailTitle}</h3>
+            <p className="modal-context">{selectedHistory.title}</p>
+            <p className="modal-summary">送信日時: {formatDateTime(selectedHistory.createdAt)}</p>
+            <p className="modal-summary">種別: {formatHistoryKind(selectedHistory.kind)}</p>
+            <p className="modal-summary">由来モジュール: {selectedHistory.sourceModule || "-"}</p>
+            <p className="modal-summary">対象範囲: {selectedHistory.targetSummary || "-"}</p>
+            <p className="modal-summary">人数: {selectedHistory.recipientCount}人</p>
+            {selectedHistory.createdByName && (
+              <p className="modal-summary">送信者: {selectedHistory.createdByName}</p>
+            )}
+            {selectedHistory.body?.trim() ? (
+              <>
+                <p className="modal-summary">本文</p>
+                <p className="todo-memo-full">{selectedHistory.body}</p>
+              </>
+            ) : (
+              <p className="muted">本文はありません。</p>
+            )}
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => setSelectedHistoryId(null)}
+              >
+                閉じる
+              </button>
+              {selectedHistory.kind === "manual" && selectedHistory.isCancelable && (
+                <button
+                  type="button"
+                  className="button events-danger-button"
+                  onClick={() => setPendingCancelHistoryId(selectedHistory.id)}
+                >
+                  {TEXT.cancelHistory}
+                </button>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {pendingCancelHistoryId && (
+        <ConfirmationDialog
+          title="通知を取り消しますか？"
+          message="この通知を取り消すと、配布済みの全ユーザー通知も削除されます。"
+          summary="手動通知のみ取り消せます。すでに対応済の通知も対象です。"
+          confirmLabel={isCanceling ? TEXT.canceling : TEXT.cancelHistory}
+          danger
+          busy={isCanceling}
+          onClose={() => setPendingCancelHistoryId(null)}
+          onConfirm={handleCancelHistory}
+        />
+      )}
     </section>
   );
 }
