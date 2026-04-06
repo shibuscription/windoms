@@ -2341,63 +2341,103 @@ TODO：
 
 この三軸が交差することで、Windomsはクラブ運営の全体像を表現する。
 
-## 29. Instruments Module (DEMO v0)
+## 29. 楽器モジュール v1
 
-### 29.1 Scope
-- DEMO-only implementation.
-- Source of truth is `demo/src/data/mockData.ts` `instruments`.
-- No DB/Firestore persistence.
-- Screens: List, Detail, Create, Edit, Delete (with confirmation dialog).
+### 29.1 位置づけ
+- 楽器モジュール v1 は Firestore を使った `一覧表示 / 新規追加 / 編集 / 削除` を対象とする。
+- 一般ユーザーは閲覧のみとし、管理者のみ追加・編集・削除を行える。
+- 貸出返却の業務フロー、修理履歴、画像、通知連携、検索高度化などは後続フェーズで検討する。
 
-### 29.2 Data Model
-- `id: string`
-- `code: string`
-- `name: string`
-- `category: string` (`Woodwind` / `Brass` / `Drums` / `Percussion` / `Keyboard Percussion`)
-- `status: string` (`良好` / `要調整` / `修理中` / `貸出中`)
-- `location: string`
-- `assignees: string[]`
-- `note: string`
+### 29.2 Firestore コレクション
+- 楽器データは `instruments` コレクションで管理する。
+- ドキュメント ID は `managementCode` そのものではなく Firestore の自動 ID を使う。
+- `managementCode` はドキュメント本文に保持する。
+- 理由は、管理番号の表記修正が必要になった場合でもドキュメント ID の付け替えを避け、壊れにくくするためである。
 
-### 29.3 Assignee Rules
-- Woodwind/Brass are managed with assignees.
-- Max assignee count is 1 per instrument record (one physical instrument).
-- Drums/Percussion/Keyboard Percussion have empty assignees and UI displays `—`.
-- Fixed DEMO assignees:
-  - Flute: 瀬古 / 大滝
-  - Clarinet: 中村
-  - Alto Sax: 今井 / 青木
-  - Tenor Sax: 水野
-  - Trumpet: 渋谷
-  - Trombone: 熊澤
-- For multiple copies of the same instrument, assign only as many records as designated people, and leave extra records unassigned (`—`).
-- Kato (percussion) is not included in DEMO data.
+### 29.3 v1 データ項目
+- `managementCode`
+- `name`
+- `category`
+- `categorySortOrder`
+- `status`
+- `storageLocation`
+- `assigneeMemberId`
+- `assigneeName`
+- `notes`
+- `sortOrder`
+- `isActive`
+- `createdAt`
+- `updatedAt`
+- `assigneeMemberId` は Member 参照用とする。
+- `assigneeName` は一覧表示安定化のため保持してよい。
+- 将来的に Member 名変更との同期は再検討してよい。
+- `isActive` は項目として持つが、v1 では原則 `true` 運用とする。
 
-### 29.4 DEMO Inventory Policy
-- Include many instruments, including currently unused ones.
-- Drums are managed as 2 set records (`DR-01`, `DR-02`).
-- Small percussion and keyboard percussion are managed as individual records.
-- Distribute `status` and `location` values to keep realistic variance.
-
-### 29.5 UI Rules
-- List shows grouped sections in this fixed order:
+### 29.4 カテゴリ候補
+- v1 のカテゴリ候補は固定値でよい。
+- 採用するカテゴリは以下とする。
   - `木管楽器`
   - `金管楽器`
   - `ドラム`
   - `小物打楽器`
   - `鍵盤打楽器`
-- Group-internal row sort is `管理番号(code)` ascending.
-- List columns are: `管理番号 / 楽器名 / 状態 / 保管場所 / 担当` (no category column).
-- Category is kept as internal data for grouping only; category labels are not shown in row cells.
-- Empty assignee displays `—`.
-- Required fields in Create/Edit: `管理番号 / 楽器名 / カテゴリ / 状態 / 保管場所`.
-- Required validation errors are displayed directly under each field on submit.
-- Button labels:
-  - List: `＋追加`
-  - Detail: `編集` / `削除` / `閉じる`
-  - Form: `保存` / `キャンセル`
-  - Delete confirm: `削除` / `キャンセル`
-- `×` close buttons must have `aria-label="閉じる"` and `title="閉じる"`.
+- v1 ではカテゴリマスタ化は行わない。
+- 一覧はカテゴリごとの見出し付き表示を維持する。
+
+### 29.5 状態候補
+- v1 の状態候補は固定値でよい。
+- 採用する状態は以下とする。
+  - `良好`
+  - `要調整`
+  - `修理中`
+  - `貸出中`
+- v1 では状態マスタ化は行わない。
+
+### 29.6 担当者
+- 担当は Member のうち `部員` から選択する。
+- 表示は苗字だけでなくフルネームとする。
+- 一覧表示もフルネームで行う。
+- 未設定を許可する。
+- v1 では複数担当は扱わない。
+
+### 29.7 一覧表示
+- 一覧はカテゴリ見出しごとにまとまって表示する。
+- 表示列は `管理番号 / 楽器名 / 状態 / 保管場所 / 担当` とする。
+- 並び順は `カテゴリ順 + 各カテゴリ内の sortOrder + 管理番号` で安定表示する。
+- 管理者向けには `編集 / 削除` 導線を自然に追加してよい。
+- 一般ユーザー向けには閲覧専用表示とする。
+- 0 件時表示は自然に整える。
+
+### 29.8 追加・編集・削除
+- 追加・編集・削除は管理者のみ実行可能とする。
+- 追加と編集は同じ項目構成でよい。
+- 入力項目は少なくとも `管理番号 / 楽器名 / カテゴリ / 状態 / 保管場所 / 担当 / 備考` とする。
+- 必須入力エラーはフィールド単位で表示する。
+- 削除は確認ダイアログを必須とする。
+- v1 の削除方式は `物理削除` とする。
+- 運用開始前の簡潔さを優先し、v1 では論理削除 UI は持たない。
+
+### 29.9 権限
+- 一般ユーザーは一覧閲覧のみとする。
+- 管理者のみ追加・編集・削除可能とする。
+- UI 上でも制御し、一般ユーザーには追加ボタンや編集削除操作を見せない。
+
+### 29.10 UI 方針
+- 今の一覧レイアウトを大きく壊さない。
+- 一覧はカテゴリ見出し付き表示を維持する。
+- モーダルの見た目は既存の Windoms モーダルと統一感を持たせる。
+- エラーは該当箇所に出し、無反応に見える状態を作らない。
+- スマホでも大きく破綻しないようにする。
+
+### 29.11 v1 で扱わないもの
+- 貸出 / 返却のワークフロー
+- 修理履歴
+- 楽器写真
+- 通知連携
+- 検索 / 詳細フィルタ / 並び替え UI
+- 一括登録 / 一括編集
+- カテゴリや状態のマスタ管理
+- 部員以外を担当に設定する運用
 
 ## 30. minamigaoka 本番仮運用フェーズ
 

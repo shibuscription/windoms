@@ -276,13 +276,23 @@ export type InstrumentStatus = "良好" | "要調整" | "修理中" | "貸出中
 
 export type Instrument = {
   id: string;
-  code: string;
+  managementCode?: string;
+  code?: string;
   name: string;
   category: string;
+  categorySortOrder?: number | null;
   status: InstrumentStatus;
-  location: string;
-  assignees: string[];
-  note: string;
+  storageLocation?: string;
+  location?: string;
+  assigneeMemberId?: string;
+  assigneeName?: string;
+  assignees?: string[];
+  notes?: string;
+  note?: string;
+  sortOrder?: number | null;
+  isActive?: boolean;
+  createdAt?: unknown;
+  updatedAt?: unknown;
 };
 
 export type DocCategory =

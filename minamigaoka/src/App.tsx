@@ -34,7 +34,6 @@ import type {
   DemoData,
   DemoRsvp,
   EventRecord,
-  Instrument,
   Score,
   Todo,
 } from "./types";
@@ -84,6 +83,12 @@ import {
 import type { SaveAttendanceEntry } from "./attendance/service";
 import { subscribeScheduleDays } from "./schedule/service";
 import { saveScore as saveFirestoreScore, subscribeScores } from "./scores/service";
+import {
+  createInstrument as createFirestoreInstrument,
+  deleteInstrument as deleteFirestoreInstrument,
+  saveInstrument as saveFirestoreInstrument,
+  subscribeInstruments,
+} from "./instruments/service";
 import {
   createTodo as createFirestoreTodo,
   deleteTodo as deleteFirestoreTodo,
@@ -447,6 +452,7 @@ export function App() {
       purchaseRequests: [],
       reimbursements: [],
       lunchRecords: [],
+      instruments: hasFirebaseAppConfig ? [] : initialData.instruments,
     };
   });
   const [authUser, setAuthUser] = useState<AuthenticatedUser | null>(null);
@@ -458,6 +464,8 @@ export function App() {
   );
   const [isScoresLoading, setIsScoresLoading] = useState(true);
   const [scoresLoadError, setScoresLoadError] = useState("");
+  const [isInstrumentsLoading, setIsInstrumentsLoading] = useState(hasFirebaseAppConfig);
+  const [instrumentsLoadError, setInstrumentsLoadError] = useState("");
   const [isPurchaseRequestsLoading, setIsPurchaseRequestsLoading] = useState(hasFirebaseAppConfig);
   const [purchaseRequestsLoadError, setPurchaseRequestsLoadError] = useState("");
   const [isReimbursementsLoading, setIsReimbursementsLoading] = useState(hasFirebaseAppConfig);
@@ -763,6 +771,50 @@ export function App() {
       }));
       setIsScoresLoading(false);
       setScoresLoadError("楽譜データの読み込みに失敗しました。");
+      return undefined;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hasFirebaseAppConfig) {
+      setData((prev) => ({
+        ...prev,
+        instruments: [],
+      }));
+      setIsInstrumentsLoading(false);
+      setInstrumentsLoadError("Firebase 設定が未完了のため、楽器データを読み込めません。");
+      return undefined;
+    }
+
+    setIsInstrumentsLoading(true);
+    setInstrumentsLoadError("");
+
+    try {
+      return subscribeInstruments(
+        (instruments) => {
+          setData((prev) => ({
+            ...prev,
+            instruments,
+          }));
+          setIsInstrumentsLoading(false);
+          setInstrumentsLoadError("");
+        },
+        () => {
+          setData((prev) => ({
+            ...prev,
+            instruments: [],
+          }));
+          setIsInstrumentsLoading(false);
+          setInstrumentsLoadError("楽器データの読み込みに失敗しました。");
+        },
+      );
+    } catch {
+      setData((prev) => ({
+        ...prev,
+        instruments: [],
+      }));
+      setIsInstrumentsLoading(false);
+      setInstrumentsLoadError("楽器データの読み込みに失敗しました。");
       return undefined;
     }
   }, []);
@@ -1227,13 +1279,6 @@ export function App() {
     }));
   };
 
-  const updateInstruments = (updater: (prev: Instrument[]) => Instrument[]) => {
-    setData((prev) => ({
-      ...prev,
-      instruments: updater(prev.instruments),
-    }));
-  };
-
   const copyCurrentPageUrl = useCallback(async () => {
     try {
       if (!navigator.clipboard || typeof navigator.clipboard.writeText !== "function") {
@@ -1516,7 +1561,17 @@ export function App() {
           />
           <Route
             path="/instruments"
-            element={<InstrumentsPage data={data} updateInstruments={updateInstruments} />}
+            element={
+              <InstrumentsPage
+                data={data}
+                isAdmin={isAdmin}
+                isLoading={isInstrumentsLoading}
+                loadError={instrumentsLoadError}
+                createInstrument={createFirestoreInstrument}
+                saveInstrument={saveFirestoreInstrument}
+                deleteInstrument={deleteFirestoreInstrument}
+              />
+            }
           />
           <Route
             path="/scores"

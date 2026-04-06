@@ -1,93 +1,91 @@
 import { useEffect, useMemo, useState } from "react";
+import { ConfirmationDialog } from "../components/ConfirmationDialog";
+import {
+  instrumentCategoryLabel,
+  instrumentCategoryOptions,
+  instrumentStatusOptions,
+  normalizeInstrumentCategory,
+  type InstrumentCategoryKey,
+} from "../instruments/catalog";
+import type { SaveInstrumentInput } from "../instruments/service";
+import { subscribeMembers } from "../members/service";
+import { sortMembersForDisplay } from "../members/permissions";
+import type { MemberRecord } from "../members/types";
 import type { DemoData, Instrument, InstrumentStatus } from "../types";
 
 type InstrumentsPageProps = {
   data: DemoData;
-  updateInstruments: (updater: (prev: Instrument[]) => Instrument[]) => void;
+  isAdmin: boolean;
+  isLoading: boolean;
+  loadError: string;
+  createInstrument: (input: SaveInstrumentInput) => Promise<void>;
+  saveInstrument: (instrumentId: string, input: SaveInstrumentInput) => Promise<void>;
+  deleteInstrument: (instrumentId: string) => Promise<void>;
 };
 
 type FormMode = "new" | "edit";
-type CategoryKey = "woodwind" | "brass" | "drums" | "percussion" | "keyboardPercussion";
 
 type InstrumentDraft = {
-  code: string;
+  managementCode: string;
   name: string;
-  category: CategoryKey;
+  category: InstrumentCategoryKey;
   status: InstrumentStatus;
-  location: string;
-  assignee: string;
-  note: string;
+  storageLocation: string;
+  assigneeMemberId: string;
+  notes: string;
 };
 
 type InstrumentFormErrors = {
-  code?: string;
+  managementCode?: string;
   name?: string;
   category?: string;
   status?: string;
-  location?: string;
+  storageLocation?: string;
 };
 
-const assigneeOptions = ["-", "瀬古", "中村", "今井", "水野", "渋谷", "熊澤", "青木", "大滝", "加藤"] as const;
-
-const categoryOptions: Array<{ value: CategoryKey; label: string }> = [
-  { value: "woodwind", label: "木管楽器" },
-  { value: "brass", label: "金管楽器" },
-  { value: "drums", label: "ドラム" },
-  { value: "percussion", label: "小物打楽器" },
-  { value: "keyboardPercussion", label: "鍵盤打楽器" },
-];
-
-const groupOrder: Array<{ key: CategoryKey; label: string }> = [
-  { key: "woodwind", label: "木管楽器" },
-  { key: "brass", label: "金管楽器" },
-  { key: "drums", label: "ドラム" },
-  { key: "percussion", label: "小物打楽器" },
-  { key: "keyboardPercussion", label: "鍵盤打楽器" },
-];
-
-const statusOptions: InstrumentStatus[] = ["良好", "要調整", "修理中", "貸出中"];
-
 const emptyDraft = (): InstrumentDraft => ({
-  code: "",
+  managementCode: "",
   name: "",
   category: "woodwind",
   status: "良好",
-  location: "",
-  assignee: "-",
-  note: "",
+  storageLocation: "",
+  assigneeMemberId: "",
+  notes: "",
 });
 
-const normalizeCategory = (category: string): CategoryKey => {
-  const normalized = category.replace(/\s+/g, "").toLowerCase();
-  if (normalized === "woodwind") return "woodwind";
-  if (normalized === "brass") return "brass";
-  if (normalized === "drums" || normalized === "drum") return "drums";
-  if (normalized === "keyboardpercussion") return "keyboardPercussion";
-  if (normalized === "percussion") return "percussion";
-  return "percussion";
-};
+const instrumentManagementCode = (instrument: Instrument): string =>
+  instrument.managementCode?.trim() || instrument.code?.trim() || "";
 
-const categoryLabel = (category: string): string => {
-  const key = normalizeCategory(category);
-  return groupOrder.find((item) => item.key === key)?.label ?? "小物打楽器";
-};
+const instrumentStorageLocation = (instrument: Instrument): string =>
+  instrument.storageLocation?.trim() || instrument.location?.trim() || "";
 
-const toAssignees = (assignee: string): string[] => (assignee === "-" ? [] : [assignee]);
+const instrumentAssigneeName = (instrument: Instrument): string =>
+  instrument.assigneeName?.trim() ||
+  instrument.assignees?.find((item) => item.trim().length > 0)?.trim() ||
+  "—";
 
-const assigneesLabel = (assignees: string[]): string =>
-  assignees.length > 0 ? assignees[0] : "—";
+const instrumentNotes = (instrument: Instrument): string =>
+  instrument.notes?.trim() || instrument.note?.trim() || "";
 
 const draftFromInstrument = (instrument: Instrument): InstrumentDraft => ({
-  code: instrument.code,
+  managementCode: instrumentManagementCode(instrument),
   name: instrument.name,
-  category: normalizeCategory(instrument.category),
+  category: normalizeInstrumentCategory(instrument.category),
   status: instrument.status,
-  location: instrument.location,
-  assignee: instrument.assignees[0] ?? "-",
-  note: instrument.note,
+  storageLocation: instrumentStorageLocation(instrument),
+  assigneeMemberId: instrument.assigneeMemberId?.trim() || "",
+  notes: instrumentNotes(instrument),
 });
 
-export function InstrumentsPage({ data, updateInstruments }: InstrumentsPageProps) {
+export function InstrumentsPage({
+  data,
+  isAdmin,
+  isLoading,
+  loadError,
+  createInstrument,
+  saveInstrument,
+  deleteInstrument,
+}: InstrumentsPageProps) {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<FormMode | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -95,6 +93,11 @@ export function InstrumentsPage({ data, updateInstruments }: InstrumentsPageProp
   const [errors, setErrors] = useState<InstrumentFormErrors>({});
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(() => window.matchMedia("(max-width: 759px)").matches);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [members, setMembers] = useState<MemberRecord[]>([]);
+  const [membersError, setMembersError] = useState("");
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 759px)");
@@ -104,11 +107,45 @@ export function InstrumentsPage({ data, updateInstruments }: InstrumentsPageProp
     return () => mq.removeEventListener("change", sync);
   }, []);
 
+  useEffect(() => {
+    try {
+      return subscribeMembers((rows) => {
+        setMembers(rows);
+        setMembersError("");
+      });
+    } catch (error) {
+      setMembersError(error instanceof Error ? error.message : "部員一覧の読み込みに失敗しました。");
+      return undefined;
+    }
+  }, []);
+
+  const assigneeOptions = useMemo(
+    () =>
+      sortMembersForDisplay(
+        members.filter(
+          (member) =>
+            member.memberStatus === "active" &&
+            (member.memberTypes.includes("child") || member.role === "child"),
+        ),
+        "child",
+      ).map((member) => ({
+        id: member.id,
+        label: member.displayName,
+      })),
+    [members],
+  );
+
   const groupedInstruments = useMemo(() => {
-    const base = [...(data.instruments ?? [])].sort((a, b) => a.code.localeCompare(b.code, "ja"));
-    return groupOrder.map((group) => ({
+    const sorted = [...(data.instruments ?? [])].sort((left, right) => {
+      const categoryCompare = (left.categorySortOrder ?? 999) - (right.categorySortOrder ?? 999);
+      if (categoryCompare !== 0) return categoryCompare;
+      const sortCompare = (left.sortOrder ?? 0) - (right.sortOrder ?? 0);
+      if (sortCompare !== 0) return sortCompare;
+      return instrumentManagementCode(left).localeCompare(instrumentManagementCode(right), "ja");
+    });
+    return instrumentCategoryOptions.map((group) => ({
       ...group,
-      rows: base.filter((item) => normalizeCategory(item.category) === group.key),
+      rows: sorted.filter((item) => normalizeInstrumentCategory(item.category) === group.value),
     }));
   }, [data.instruments]);
 
@@ -117,88 +154,117 @@ export function InstrumentsPage({ data, updateInstruments }: InstrumentsPageProp
     ? data.instruments.find((item) => item.id === deleteTargetId) ?? null
     : null;
 
+  const totalCount = groupedInstruments.reduce((sum, group) => sum + group.rows.length, 0);
+
   const closeForm = () => {
+    if (isSaving) return;
     setFormMode(null);
     setEditingId(null);
     setErrors({});
+    setSubmitError("");
   };
 
   const openNewForm = () => {
+    if (!isAdmin) return;
     setDraft(emptyDraft());
     setErrors({});
+    setSubmitError("");
     setEditingId(null);
     setFormMode("new");
   };
 
   const openEditForm = (instrument: Instrument) => {
+    if (!isAdmin) return;
     setDraft(draftFromInstrument(instrument));
     setErrors({});
+    setSubmitError("");
     setEditingId(instrument.id);
     setFormMode("edit");
   };
 
   const validate = (): InstrumentFormErrors => {
     const nextErrors: InstrumentFormErrors = {};
-    if (!draft.code.trim()) nextErrors.code = "管理番号は必須です";
-    if (!draft.name.trim()) nextErrors.name = "楽器名は必須です";
-    if (!draft.category.trim()) nextErrors.category = "カテゴリは必須です";
-    if (!draft.status.trim()) nextErrors.status = "状態は必須です";
-    if (!draft.location.trim()) nextErrors.location = "保管場所は必須です";
+    if (!draft.managementCode.trim()) nextErrors.managementCode = "管理番号を入力してください。";
+    if (!draft.name.trim()) nextErrors.name = "楽器名を入力してください。";
+    if (!draft.category.trim()) nextErrors.category = "カテゴリを選択してください。";
+    if (!draft.status.trim()) nextErrors.status = "状態を選択してください。";
+    if (!draft.storageLocation.trim()) nextErrors.storageLocation = "保管場所を入力してください。";
 
-    const normalizedCode = draft.code.trim().toUpperCase();
+    const normalizedCode = draft.managementCode.trim().toUpperCase();
     const duplicatedCode = data.instruments.some(
-      (item) => item.code.trim().toUpperCase() === normalizedCode && item.id !== editingId,
+      (item) =>
+        instrumentManagementCode(item).trim().toUpperCase() === normalizedCode &&
+        item.id !== editingId,
     );
-    if (!nextErrors.code && duplicatedCode) nextErrors.code = "同じ管理番号が既にあります";
+    if (!nextErrors.managementCode && duplicatedCode) {
+      nextErrors.managementCode = "同じ管理番号の楽器がすでにあります。";
+    }
 
     return nextErrors;
   };
 
-  const saveForm = () => {
+  const submit = async () => {
     const nextErrors = validate();
     setErrors(nextErrors);
+    setSubmitError("");
     if (Object.keys(nextErrors).length > 0) return;
 
-    const payload: Omit<Instrument, "id"> = {
-      code: draft.code.trim(),
+    const assignee = assigneeOptions.find((item) => item.id === draft.assigneeMemberId);
+    const payload: SaveInstrumentInput = {
+      managementCode: draft.managementCode.trim(),
       name: draft.name.trim(),
       category: draft.category,
       status: draft.status,
-      location: draft.location.trim(),
-      assignees: toAssignees(draft.assignee),
-      note: draft.note.trim(),
+      storageLocation: draft.storageLocation.trim(),
+      assigneeMemberId: draft.assigneeMemberId || undefined,
+      assigneeName: assignee?.label || undefined,
+      notes: draft.notes.trim(),
+      sortOrder: 0,
     };
 
-    if (formMode === "edit" && editingId) {
-      updateInstruments((prev) =>
-        prev.map((item) => (item.id === editingId ? { ...item, ...payload } : item)),
-      );
-      setDetailId(editingId);
-    } else {
-      const id = `inst-${Date.now()}`;
-      updateInstruments((prev) => [{ id, ...payload }, ...prev]);
-      setDetailId(id);
+    setIsSaving(true);
+    try {
+      if (formMode === "edit" && editingId) {
+        await saveInstrument(editingId, payload);
+        setDetailId(editingId);
+      } else {
+        await createInstrument(payload);
+      }
+      closeForm();
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "楽器の保存に失敗しました。");
+    } finally {
+      setIsSaving(false);
     }
-    closeForm();
   };
 
-  const confirmDelete = () => {
+  const handleDelete = async () => {
     if (!deleteTarget) return;
-    updateInstruments((prev) => prev.filter((item) => item.id !== deleteTarget.id));
-    if (detailId === deleteTarget.id) setDetailId(null);
-    setDeleteTargetId(null);
+    setIsDeleting(true);
+    try {
+      await deleteInstrument(deleteTarget.id);
+      if (detailId === deleteTarget.id) setDetailId(null);
+      setDeleteTargetId(null);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "楽器の削除に失敗しました。");
+    } finally {
+      setIsDeleting(false);
+    }
   };
-
-  const totalCount = groupedInstruments.reduce((sum, group) => sum + group.rows.length, 0);
 
   return (
     <section className="card instruments-page">
       <div className="instruments-header">
         <h1>楽器</h1>
-        <button type="button" className="button button-small" onClick={openNewForm}>
-          ＋追加
-        </button>
+        {isAdmin && (
+          <button type="button" className="button button-small" onClick={openNewForm}>
+            ＋追加
+          </button>
+        )}
       </div>
+
+      {loadError && <p className="field-error">{loadError}</p>}
+      {membersError && isAdmin && <p className="field-error">{membersError}</p>}
 
       {!isMobile && (
         <div className="instruments-table-wrap">
@@ -213,7 +279,7 @@ export function InstrumentsPage({ data, updateInstruments }: InstrumentsPageProp
               </tr>
             </thead>
             {groupedInstruments.map((group) => (
-              <tbody key={group.key}>
+              <tbody key={group.value}>
                 <tr className="instruments-group-row">
                   <th colSpan={5}>{group.label}</th>
                 </tr>
@@ -223,11 +289,11 @@ export function InstrumentsPage({ data, updateInstruments }: InstrumentsPageProp
                     className="instruments-row"
                     onClick={() => setDetailId(instrument.id)}
                   >
-                    <td>{instrument.code}</td>
+                    <td>{instrumentManagementCode(instrument)}</td>
                     <td>{instrument.name}</td>
                     <td>{instrument.status}</td>
-                    <td>{instrument.location}</td>
-                    <td>{assigneesLabel(instrument.assignees)}</td>
+                    <td>{instrumentStorageLocation(instrument)}</td>
+                    <td>{instrumentAssigneeName(instrument)}</td>
                   </tr>
                 ))}
                 {group.rows.length === 0 && (
@@ -244,7 +310,7 @@ export function InstrumentsPage({ data, updateInstruments }: InstrumentsPageProp
       {isMobile && (
         <div className="instruments-mobile-list">
           {groupedInstruments.map((group) => (
-            <section key={group.key} className="instruments-mobile-group">
+            <section key={group.value} className="instruments-mobile-group">
               <h2 className="instruments-mobile-group-title">{group.label}</h2>
               <div className="instruments-mobile-cards">
                 {group.rows.map((instrument) => (
@@ -257,7 +323,7 @@ export function InstrumentsPage({ data, updateInstruments }: InstrumentsPageProp
                     <strong className="instrument-mobile-title">{instrument.name}</strong>
                     <div className="instrument-mobile-row">
                       <span className="instrument-mobile-label">管理番号</span>
-                      <span>{instrument.code}</span>
+                      <span>{instrumentManagementCode(instrument)}</span>
                     </div>
                     <div className="instrument-mobile-row">
                       <span className="instrument-mobile-label">状態</span>
@@ -265,11 +331,11 @@ export function InstrumentsPage({ data, updateInstruments }: InstrumentsPageProp
                     </div>
                     <div className="instrument-mobile-row">
                       <span className="instrument-mobile-label">保管場所</span>
-                      <span className="instrument-mobile-location">{instrument.location}</span>
+                      <span className="instrument-mobile-location">{instrumentStorageLocation(instrument)}</span>
                     </div>
                     <div className="instrument-mobile-row">
                       <span className="instrument-mobile-label">担当</span>
-                      <span>{assigneesLabel(instrument.assignees)}</span>
+                      <span>{instrumentAssigneeName(instrument)}</span>
                     </div>
                   </button>
                 ))}
@@ -280,7 +346,8 @@ export function InstrumentsPage({ data, updateInstruments }: InstrumentsPageProp
         </div>
       )}
 
-      {totalCount === 0 && <p className="muted">楽器データはありません。</p>}
+      {isLoading && <p className="muted">楽器データを読み込み中...</p>}
+      {!isLoading && totalCount === 0 && <p className="muted">楽器データはありません。</p>}
 
       {detail && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setDetailId(null)}>
@@ -290,21 +357,25 @@ export function InstrumentsPage({ data, updateInstruments }: InstrumentsPageProp
             </button>
             <h3>楽器詳細</h3>
             <dl className="instruments-detail-list">
-              <div><dt>管理番号</dt><dd>{detail.code}</dd></div>
+              <div><dt>管理番号</dt><dd>{instrumentManagementCode(detail)}</dd></div>
               <div><dt>楽器名</dt><dd>{detail.name}</dd></div>
-              <div><dt>カテゴリ</dt><dd>{categoryLabel(detail.category)}</dd></div>
+              <div><dt>カテゴリ</dt><dd>{instrumentCategoryLabel(detail.category)}</dd></div>
               <div><dt>状態</dt><dd>{detail.status}</dd></div>
-              <div><dt>保管場所</dt><dd>{detail.location}</dd></div>
-              <div><dt>担当</dt><dd>{assigneesLabel(detail.assignees)}</dd></div>
-              <div><dt>備考</dt><dd>{detail.note || "—"}</dd></div>
+              <div><dt>保管場所</dt><dd>{instrumentStorageLocation(detail)}</dd></div>
+              <div><dt>担当</dt><dd>{instrumentAssigneeName(detail)}</dd></div>
+              <div><dt>備考</dt><dd>{instrumentNotes(detail) || "—"}</dd></div>
             </dl>
             <div className="modal-actions">
-              <button type="button" className="button button-secondary" onClick={() => openEditForm(detail)}>
-                編集
-              </button>
-              <button type="button" className="button events-danger-button" onClick={() => setDeleteTargetId(detail.id)}>
-                削除
-              </button>
+              {isAdmin && (
+                <>
+                  <button type="button" className="button button-secondary" onClick={() => openEditForm(detail)}>
+                    編集
+                  </button>
+                  <button type="button" className="button events-danger-button" onClick={() => setDeleteTargetId(detail.id)}>
+                    削除
+                  </button>
+                </>
+              )}
               <button type="button" className="button button-secondary" onClick={() => setDetailId(null)}>
                 閉じる
               </button>
@@ -319,23 +390,30 @@ export function InstrumentsPage({ data, updateInstruments }: InstrumentsPageProp
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeForm}>
               ×
             </button>
-            <h3>{formMode === "new" ? "楽器を新規作成" : "楽器を編集"}</h3>
+            <h3>{formMode === "new" ? "楽器を新規追加" : "楽器を編集"}</h3>
+            {submitError && <p className="field-error">{submitError}</p>}
 
             <label>
               管理番号
               <input
-                value={draft.code}
-                onChange={(event) => setDraft((prev) => ({ ...prev, code: event.target.value }))}
+                value={draft.managementCode}
+                onChange={(event) => {
+                  setDraft((prev) => ({ ...prev, managementCode: event.target.value }));
+                  setErrors((prev) => ({ ...prev, managementCode: undefined }));
+                }}
                 placeholder="例: FL-01"
               />
-              {errors.code && <span className="field-error">{errors.code}</span>}
+              {errors.managementCode && <span className="field-error">{errors.managementCode}</span>}
             </label>
 
             <label>
               楽器名
               <input
                 value={draft.name}
-                onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}
+                onChange={(event) => {
+                  setDraft((prev) => ({ ...prev, name: event.target.value }));
+                  setErrors((prev) => ({ ...prev, name: undefined }));
+                }}
               />
               {errors.name && <span className="field-error">{errors.name}</span>}
             </label>
@@ -345,11 +423,12 @@ export function InstrumentsPage({ data, updateInstruments }: InstrumentsPageProp
                 カテゴリ
                 <select
                   value={draft.category}
-                  onChange={(event) =>
-                    setDraft((prev) => ({ ...prev, category: event.target.value as CategoryKey }))
-                  }
+                  onChange={(event) => {
+                    setDraft((prev) => ({ ...prev, category: event.target.value as InstrumentCategoryKey }));
+                    setErrors((prev) => ({ ...prev, category: undefined }));
+                  }}
                 >
-                  {categoryOptions.map((option) => (
+                  {instrumentCategoryOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
@@ -362,11 +441,12 @@ export function InstrumentsPage({ data, updateInstruments }: InstrumentsPageProp
                 状態
                 <select
                   value={draft.status}
-                  onChange={(event) =>
-                    setDraft((prev) => ({ ...prev, status: event.target.value as InstrumentStatus }))
-                  }
+                  onChange={(event) => {
+                    setDraft((prev) => ({ ...prev, status: event.target.value as InstrumentStatus }));
+                    setErrors((prev) => ({ ...prev, status: undefined }));
+                  }}
                 >
-                  {statusOptions.map((option) => (
+                  {instrumentStatusOptions.map((option) => (
                     <option key={option} value={option}>
                       {option}
                     </option>
@@ -379,21 +459,25 @@ export function InstrumentsPage({ data, updateInstruments }: InstrumentsPageProp
             <label>
               保管場所
               <input
-                value={draft.location}
-                onChange={(event) => setDraft((prev) => ({ ...prev, location: event.target.value }))}
+                value={draft.storageLocation}
+                onChange={(event) => {
+                  setDraft((prev) => ({ ...prev, storageLocation: event.target.value }));
+                  setErrors((prev) => ({ ...prev, storageLocation: undefined }));
+                }}
               />
-              {errors.location && <span className="field-error">{errors.location}</span>}
+              {errors.storageLocation && <span className="field-error">{errors.storageLocation}</span>}
             </label>
 
             <label>
               担当
               <select
-                value={draft.assignee}
-                onChange={(event) => setDraft((prev) => ({ ...prev, assignee: event.target.value }))}
+                value={draft.assigneeMemberId}
+                onChange={(event) => setDraft((prev) => ({ ...prev, assigneeMemberId: event.target.value }))}
               >
+                <option value="">未設定</option>
                 {assigneeOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
+                  <option key={option.id} value={option.id}>
+                    {option.label}
                   </option>
                 ))}
               </select>
@@ -402,17 +486,17 @@ export function InstrumentsPage({ data, updateInstruments }: InstrumentsPageProp
             <label>
               備考
               <textarea
-                value={draft.note}
-                onChange={(event) => setDraft((prev) => ({ ...prev, note: event.target.value }))}
+                value={draft.notes}
+                onChange={(event) => setDraft((prev) => ({ ...prev, notes: event.target.value }))}
               />
             </label>
 
             <div className="modal-actions">
-              <button type="button" className="button button-secondary" onClick={closeForm}>
+              <button type="button" className="button button-secondary" onClick={closeForm} disabled={isSaving}>
                 キャンセル
               </button>
-              <button type="button" className="button" onClick={saveForm}>
-                保存
+              <button type="button" className="button" onClick={() => void submit()} disabled={isSaving}>
+                {isSaving ? "保存中..." : "保存"}
               </button>
             </div>
           </section>
@@ -420,23 +504,15 @@ export function InstrumentsPage({ data, updateInstruments }: InstrumentsPageProp
       )}
 
       {deleteTarget && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true">
-          <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setDeleteTargetId(null)}>
-              ×
-            </button>
-            <h3>楽器を削除しますか？</h3>
-            <p className="modal-summary">{deleteTarget.code} / {deleteTarget.name}</p>
-            <div className="modal-actions">
-              <button type="button" className="button button-secondary" onClick={() => setDeleteTargetId(null)}>
-                キャンセル
-              </button>
-              <button type="button" className="button events-danger-button" onClick={confirmDelete}>
-                削除
-              </button>
-            </div>
-          </section>
-        </div>
+        <ConfirmationDialog
+          title="楽器を削除しますか？"
+          summary={`${instrumentManagementCode(deleteTarget)} / ${deleteTarget.name}`}
+          confirmLabel={isDeleting ? "削除中..." : "削除"}
+          danger
+          busy={isDeleting}
+          onClose={() => setDeleteTargetId(null)}
+          onConfirm={handleDelete}
+        />
       )}
     </section>
   );
