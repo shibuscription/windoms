@@ -29,6 +29,10 @@ type DeleteCalendarSessionResponse = {
   sessionId: string;
 };
 
+type CalendarIcsSubscriptionResponse = {
+  url: string;
+};
+
 const scheduleDaysCollection = db ? collection(db, "scheduleDays") : null;
 
 const ensureDb = () => {
@@ -210,4 +214,14 @@ export const deleteCalendarSession = async (date: string, sessionId: string): Pr
   );
   const result = await callable({ date, sessionId });
   return result.data;
+};
+
+export const getCalendarIcsSubscriptionUrl = async (): Promise<string> => {
+  ensureFunctions();
+  const callable = httpsCallable<undefined, CalendarIcsSubscriptionResponse>(
+    functions!,
+    "getCalendarIcsSubscription",
+  );
+  const result = await callable();
+  return typeof result.data?.url === "string" ? result.data.url : "";
 };

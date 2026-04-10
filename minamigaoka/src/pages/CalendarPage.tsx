@@ -7,6 +7,7 @@ import { sortFamiliesByDisplayOrder } from "../members/familyOrder";
 import {
   createCalendarSession,
   deleteCalendarSession,
+  getCalendarIcsSubscriptionUrl,
   updateCalendarSession,
   type SaveCalendarSessionInput,
 } from "../schedule/service";
@@ -320,6 +321,11 @@ export function CalendarPage({
   const [sessionErrors, setSessionErrors] = useState<FieldErrors>({});
   const [sessionSubmitError, setSessionSubmitError] = useState("");
   const [isSubmittingSession, setIsSubmittingSession] = useState(false);
+  const [isIcsModalOpen, setIsIcsModalOpen] = useState(false);
+  const [icsUrl, setIcsUrl] = useState("");
+  const [icsError, setIcsError] = useState("");
+  const [isIcsLoading, setIsIcsLoading] = useState(false);
+  const [icsToast, setIcsToast] = useState("");
   const eventIdBySessionId = useMemo(() => {
     const map = new Map<string, string>();
     data.events.forEach((event) => {
@@ -429,6 +435,12 @@ export function CalendarPage({
       document.body.style.overflow = previous;
     };
   }, [selectedDay]);
+
+  useEffect(() => {
+    if (!icsToast) return;
+    const timer = window.setTimeout(() => setIcsToast(""), 2200);
+    return () => window.clearTimeout(timer);
+  }, [icsToast]);
 
   useEffect(() => {
     if (!selectedDay) return;
@@ -582,6 +594,40 @@ export function CalendarPage({
     setIsSessionModalOpen(false);
   };
 
+  const openIcsModal = async () => {
+    if (authRole !== "admin") return;
+    setIsIcsModalOpen(true);
+    setIsIcsLoading(true);
+    setIcsUrl("");
+    setIcsError("");
+    try {
+      const nextUrl = await getCalendarIcsSubscriptionUrl();
+      if (!nextUrl) {
+        throw new Error("ICS 購読 URL を取得できませんでした。");
+      }
+      setIcsUrl(nextUrl);
+    } catch (error) {
+      setIcsError(error instanceof Error ? error.message : "ICS 購読 URL の取得に失敗しました。");
+    } finally {
+      setIsIcsLoading(false);
+    }
+  };
+
+  const closeIcsModal = () => {
+    if (isIcsLoading) return;
+    setIsIcsModalOpen(false);
+  };
+
+  const copyIcsUrl = async () => {
+    if (!icsUrl) return;
+    try {
+      await navigator.clipboard.writeText(icsUrl);
+      setIcsToast("ICS 購読 URL をコピーしました。");
+    } catch {
+      setIcsToast("URL のコピーに失敗しました。");
+    }
+  };
+
   const handleSessionFieldChange = <K extends keyof SessionFormState>(
     key: K,
     value: SessionFormState[K],
@@ -731,7 +777,19 @@ export function CalendarPage({
             </div>
           )}
         </div>
+        <div className="month-calendar-header-right">
+          {authRole === "admin" && (
+            <button
+              type="button"
+              className="button button-small button-secondary"
+              onClick={() => void openIcsModal()}
+            >
+              ICS
+            </button>
+          )}
+        </div>
       </div>
+      {icsToast && <p className="inline-toast">{icsToast}</p>}
       <div className="calendar-mobile-bleed">
         <div className="month-calendar-weekdays">
           {weekdayLabels.map((label) => (
@@ -1132,6 +1190,54 @@ export function CalendarPage({
                 disabled={isSubmittingSession}
               >
                 {isSubmittingSession ? "保存中..." : "保存"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {isIcsModalOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={closeIcsModal}>
+          <section className="modal-panel calendar-ics-panel" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close"
+              aria-label="閉じる"
+              title="閉じる"
+              onClick={closeIcsModal}
+            >
+              ×
+            </button>
+            <h3>ICS 購読 URL</h3>
+            <p className="modal-summary">
+              Google カレンダー等で URL 購読できます。秘密 URL のため、知っている人だけが参照できます。
+            </p>
+            {icsError && <p className="field-error">{icsError}</p>}
+            <label className="calendar-ics-field">
+              購読用 URL
+              <input
+                type="text"
+                value={icsUrl}
+                readOnly
+                placeholder={isIcsLoading ? "読み込み中..." : ""}
+              />
+            </label>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={closeIcsModal}
+                disabled={isIcsLoading}
+              >
+                閉じる
+              </button>
+              <button
+                type="button"
+                className="button"
+                onClick={() => void copyIcsUrl()}
+                disabled={!icsUrl || isIcsLoading}
+              >
+                コピー
               </button>
             </div>
           </section>

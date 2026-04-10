@@ -3655,6 +3655,13 @@ body {
     width: 100%;
   }
 
+  .month-calendar-header-right {
+    order: 3;
+    grid-column: 1;
+    justify-content: flex-end;
+    width: 100%;
+  }
+
   .month-calendar-nav {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto auto;
@@ -3676,6 +3683,19 @@ body {
   .month-picker-popover {
     width: min(320px, calc(100vw - 32px));
   }
+}
+
+.calendar-ics-panel {
+  width: min(560px, calc(100vw - 24px));
+}
+
+.calendar-ics-field {
+  display: grid;
+  gap: 6px;
+}
+
+.calendar-ics-field input {
+  width: 100%;
 }
 
 .month-calendar-weekdays {

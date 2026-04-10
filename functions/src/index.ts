@@ -1,10 +1,10 @@
 import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
-import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import { setGlobalOptions } from "firebase-functions/v2";
 import * as logger from "firebase-functions/logger";
-import { randomInt } from "crypto";
+import { randomBytes, randomInt } from "crypto";
 
 const functionsRegion = "asia-northeast1";
 const adminApp = initializeApp({
@@ -15,6 +15,7 @@ setGlobalOptions({ region: functionsRegion, maxInstances: 10 });
 const firestore = getFirestore();
 const adminAuth = getAuth();
 const internalEmailDomain = "minamigaoka.windoms.club";
+const calendarIcsConfigRef = firestore.collection("appSettings").doc("calendarIcs");
 const serverProjectId =
   adminApp.options.projectId ??
   process.env.GCLOUD_PROJECT ??
@@ -52,6 +53,151 @@ const generateTemporaryPassword = (): string => {
 
 const normalizeOptionalString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
+
+const escapeIcsText = (value: string): string =>
+  value
+    .replace(/\\/g, "\\\\")
+    .replace(/\r?\n/g, "\\n")
+    .replace(/,/g, "\\,")
+    .replace(/;/g, "\\;");
+
+const toIcsUtcDateTime = (dateKey: string, time: string): string => {
+  const date = new Date(`${dateKey}T${time}:00+09:00`);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`invalid calendar datetime: ${dateKey} ${time}`);
+  }
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const hours = String(date.getUTCHours()).padStart(2, "0");
+  const minutes = String(date.getUTCMinutes()).padStart(2, "0");
+  const seconds = String(date.getUTCSeconds()).padStart(2, "0");
+  return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;
+};
+
+const toIcsDateStamp = (value: Date): string => {
+  const year = value.getUTCFullYear();
+  const month = String(value.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(value.getUTCDate()).padStart(2, "0");
+  const hours = String(value.getUTCHours()).padStart(2, "0");
+  const minutes = String(value.getUTCMinutes()).padStart(2, "0");
+  const seconds = String(value.getUTCSeconds()).padStart(2, "0");
+  return `${year}${month}${day}T${hours}${minutes}${seconds}Z`;
+};
+
+const getCalendarIcsFeedUrl = (token: string): string => {
+  const projectId = serverProjectId || process.env.GCLOUD_PROJECT || "";
+  return `https://${functionsRegion}-${projectId}.cloudfunctions.net/calendarIcsFeed?token=${token}`;
+};
+
+const getOrCreateCalendarIcsToken = async (): Promise<string> => {
+  const snapshot = await calendarIcsConfigRef.get();
+  const existingToken =
+    snapshot.exists && typeof snapshot.get("token") === "string"
+      ? String(snapshot.get("token")).trim()
+      : "";
+  if (existingToken) return existingToken;
+
+  const token = randomBytes(32).toString("hex");
+  await calendarIcsConfigRef.set(
+    {
+      token,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+    { merge: true },
+  );
+  return token;
+};
+
+const getCalendarSessionTitle = (session: Record<string, unknown>): string => {
+  const type = session.type === "self" || session.type === "event" ? session.type : "normal";
+  const assigneeName =
+    typeof session.assigneeNameSnapshot === "string" ? session.assigneeNameSnapshot.trim() : "";
+  const eventName = typeof session.eventName === "string" ? session.eventName.trim() : "";
+
+  if (type === "self") {
+    return assigneeName ? `【吹奏楽】 自主練 ${assigneeName}` : "【吹奏楽】 自主練";
+  }
+  if (type === "event") {
+    return assigneeName ? `【吹奏楽】 ${eventName} ${assigneeName}` : `【吹奏楽】 ${eventName}`;
+  }
+  return assigneeName ? `【吹奏楽】 ${assigneeName}` : "【吹奏楽】 通常練習";
+};
+
+const loadCalendarIcsEvents = async (): Promise<
+  Array<{
+    uid: string;
+    summary: string;
+    description: string;
+    location: string;
+    dtStart: string;
+    dtEnd: string;
+    updatedAt: Date | null;
+  }>
+> => {
+  const scheduleDaysSnapshot = await firestore.collection("scheduleDays").get();
+  const rows = await Promise.all(
+    scheduleDaysSnapshot.docs.map(async (dayDoc) => {
+      const dateKey = dayDoc.id;
+      if (!isValidDateKey(dateKey)) return [] as Array<{
+        uid: string;
+        summary: string;
+        description: string;
+        location: string;
+        dtStart: string;
+        dtEnd: string;
+        updatedAt: Date | null;
+      }>;
+
+      const sessionsSnapshot = await dayDoc.ref.collection("sessions").get();
+      return sessionsSnapshot.docs
+        .map((sessionDoc) => {
+          const value = sessionDoc.data();
+          const startTime = typeof value.startTime === "string" ? value.startTime : "";
+          const endTime = typeof value.endTime === "string" ? value.endTime : "";
+          if (!timePattern.test(startTime) || !timePattern.test(endTime) || startTime >= endTime) {
+            return null;
+          }
+          const updatedAtRaw = value.updatedAt;
+          const updatedAt =
+            updatedAtRaw && typeof updatedAtRaw === "object" && "toDate" in updatedAtRaw
+              ? (updatedAtRaw as { toDate: () => Date }).toDate()
+              : null;
+          return {
+            uid: `${dateKey}-${sessionDoc.id}@windoms-minamigaoka`,
+            summary: getCalendarSessionTitle(value),
+            description: typeof value.note === "string" ? value.note.trim() : "",
+            location: typeof value.location === "string" ? value.location.trim() : "",
+            dtStart: toIcsUtcDateTime(dateKey, startTime),
+            dtEnd: toIcsUtcDateTime(dateKey, endTime),
+            updatedAt: updatedAt instanceof Date && !Number.isNaN(updatedAt.getTime()) ? updatedAt : null,
+          };
+        })
+        .filter(
+          (
+            item,
+          ): item is {
+            uid: string;
+            summary: string;
+            description: string;
+            location: string;
+            dtStart: string;
+            dtEnd: string;
+            updatedAt: Date | null;
+          } => Boolean(item),
+        );
+    }),
+  );
+
+  return rows
+    .flat()
+    .sort((left, right) => {
+      if (left.dtStart !== right.dtStart) return left.dtStart.localeCompare(right.dtStart);
+      if (left.dtEnd !== right.dtEnd) return left.dtEnd.localeCompare(right.dtEnd);
+      return left.uid.localeCompare(right.uid);
+    });
+};
 
 const normalizeOptionalBoolean = (value: unknown): boolean | null => {
   if (value === true) return true;
@@ -643,6 +789,82 @@ export const bulkRegisterMembers = onCall(async (request) => {
     projectId: serverProjectId,
     functionsRegion,
   };
+});
+
+export const getCalendarIcsSubscription = onCall(async (request) => {
+  await assertAdmin(request.auth);
+  const token = await getOrCreateCalendarIcsToken();
+  return {
+    url: getCalendarIcsFeedUrl(token),
+  };
+});
+
+export const calendarIcsFeed = onRequest(async (request, response) => {
+  try {
+    const token = typeof request.query.token === "string" ? request.query.token.trim() : "";
+    if (!token) {
+      response.status(400).type("text/plain; charset=utf-8").send("token is required");
+      return;
+    }
+
+    const snapshot = await calendarIcsConfigRef.get();
+    const expectedToken =
+      snapshot.exists && typeof snapshot.get("token") === "string"
+        ? String(snapshot.get("token")).trim()
+        : "";
+
+    if (!expectedToken || token !== expectedToken) {
+      response.status(404).type("text/plain; charset=utf-8").send("not found");
+      return;
+    }
+
+    const events = await loadCalendarIcsEvents();
+    const dtStamp = toIcsDateStamp(new Date());
+    const lines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Windoms//Calendar ICS//JA",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "X-WR-CALNAME:南ヶ丘中学校吹奏楽クラブ",
+      "X-WR-TIMEZONE:Asia/Tokyo",
+    ];
+
+    events.forEach((event) => {
+      lines.push("BEGIN:VEVENT");
+      lines.push(`UID:${escapeIcsText(event.uid)}`);
+      lines.push(`DTSTAMP:${dtStamp}`);
+      lines.push(`DTSTART:${event.dtStart}`);
+      lines.push(`DTEND:${event.dtEnd}`);
+      lines.push(`SUMMARY:${escapeIcsText(event.summary)}`);
+      if (event.description) {
+        lines.push(`DESCRIPTION:${escapeIcsText(event.description)}`);
+      }
+      if (event.location) {
+        lines.push(`LOCATION:${escapeIcsText(event.location)}`);
+      }
+      if (event.updatedAt) {
+        lines.push(`LAST-MODIFIED:${toIcsDateStamp(event.updatedAt)}`);
+      }
+      lines.push("END:VEVENT");
+    });
+
+    lines.push("END:VCALENDAR");
+
+    response
+      .status(200)
+      .set("Content-Type", "text/calendar; charset=utf-8")
+      .set("Content-Disposition", 'inline; filename="windoms-calendar.ics"')
+      .set("Cache-Control", "private, max-age=300")
+      .send(`${lines.join("\r\n")}\r\n`);
+  } catch (error) {
+    logger.error("calendarIcsFeed failed", {
+      projectId: serverProjectId || "(unknown)",
+      functionsRegion,
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+    response.status(500).type("text/plain; charset=utf-8").send("internal error");
+  }
 });
 
 export const createCalendarSession = onCall(async (request) => {
