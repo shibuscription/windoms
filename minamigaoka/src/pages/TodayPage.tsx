@@ -468,11 +468,12 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
   }
 
   return (
-    <section className="card">
+      <section className="card">
       <div className="today-header today-date-view">
-        <button type="button" className="date-nav-button today-prev-day-button" onClick={() => moveDate(-1)}>
-            ← 前日
-        </button>
+        <div className="today-top-row">
+          <button type="button" className="date-nav-button today-prev-day-button" onClick={() => moveDate(-1)}>
+              ← 前日
+          </button>
           <div className="today-date-center" ref={calendarWrapRef}>
             <button
               type="button"
@@ -537,28 +538,27 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
               </div>
             )}
           </div>
-        <div className="today-actions">
-          <div className="today-secondary-actions">
-            {birthdayCelebrants.length > 0 && (
-              <button
-                type="button"
-                className="today-birthday-trigger"
-                onClick={() => setBirthdayModalDate(date)}
-                aria-label="誕生日のお祝いを見る"
-                title="誕生日のお祝いを見る"
-              >
-                🎂
-              </button>
-            )}
-            {hasSessions && (
-              <button type="button" className="button button-small" onClick={() => void openDayLog()}>
-                日誌へ
-              </button>
-            )}
-          </div>
           <button type="button" className="date-nav-button today-next-day-button" onClick={() => moveDate(1)}>
             翌日 →
           </button>
+        </div>
+        <div className="today-secondary-actions">
+          {birthdayCelebrants.length > 0 && (
+            <button
+              type="button"
+              className="today-birthday-trigger"
+              onClick={() => setBirthdayModalDate(date)}
+              aria-label="誕生日のお祝いを見る"
+              title="誕生日のお祝いを見る"
+            >
+              🎂
+            </button>
+          )}
+          {hasSessions && (
+            <button type="button" className="button button-small" onClick={() => void openDayLog()}>
+              日誌へ
+            </button>
+          )}
         </div>
       </div>
 
