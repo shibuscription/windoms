@@ -58,7 +58,13 @@ import { LinkifiedText } from "./components/LinkifiedText";
 import { loadInitialData } from "./data/runtimeData";
 import { getMemberByAuthUid } from "./members/service";
 import type { MemberRecord, MemberRole } from "./members/types";
-import { canManageCalendarSessions as canManageCalendarSessionsByMember } from "./members/permissions";
+import {
+  adminRoleLabel,
+  canManageCalendarSessions as canManageCalendarSessionsByMember,
+  memberTypeDisplayOrder,
+  memberTypeLabel,
+  staffPermissionLabel,
+} from "./members/permissions";
 import {
   canAccessModuleBySettings,
   menuModuleDefinitions,
@@ -499,7 +505,20 @@ export function App() {
     isAdmin || canManageCalendarSessionsByMember(linkedMember);
   const accountPrimaryName = linkedMember?.name?.trim() || authUser?.loginId || "ログイン中ユーザー";
   const accountLoginId = authUser?.loginId ?? "-";
-  const accountRoleLabel = linkedMember?.role ?? authUser?.role ?? "-";
+  const accountMemberTypesLabel = linkedMember
+    ? memberTypeDisplayOrder
+        .filter((type) => linkedMember.memberTypes.includes(type))
+        .map((type) => memberTypeLabel[type])
+        .join(" / ") || "-"
+    : authUser?.role === "admin"
+      ? "管理者"
+      : "保護者";
+  const accountAdminRoleLabel = linkedMember?.adminRole && linkedMember.adminRole !== "none"
+    ? adminRoleLabel[linkedMember.adminRole]
+    : "";
+  const accountStaffPermissionsLabel = linkedMember?.staffPermissions?.length
+    ? linkedMember.staffPermissions.map((permission) => staffPermissionLabel[permission]).join(" / ")
+    : "";
   const activityPlanStatus = readActivityPlanStatus(activityPlanMonthKey);
   const unansweredCount = readDemoUnansweredCount(activityPlanMonthKey);
   const activityPlanBadgeText =
@@ -1717,8 +1736,14 @@ export function App() {
               <section className="menu-account-panel">
                 <div className="menu-account-meta">
                   <strong className="menu-account-name">{accountPrimaryName}</strong>
-                  <span className="menu-account-sub">loginId: {accountLoginId}</span>
-                  <span className="menu-account-sub">role: {accountRoleLabel}</span>
+                  <span className="menu-account-sub">ログインID: {accountLoginId}</span>
+                  <span className="menu-account-sub">利用者区分: {accountMemberTypesLabel}</span>
+                  {accountAdminRoleLabel && (
+                    <span className="menu-account-sub">管理権限: {accountAdminRoleLabel}</span>
+                  )}
+                  {accountStaffPermissionsLabel && (
+                    <span className="menu-account-sub">担当業務: {accountStaffPermissionsLabel}</span>
+                  )}
                 </div>
                 <div className="menu-account-actions">
                   <button
