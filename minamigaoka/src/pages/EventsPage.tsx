@@ -5,7 +5,7 @@ import { buildFamilyMap, buildMemberIndexes, resolveFamilyNameFromIdentifier } f
 import { subscribeFamilies, subscribeMembers } from "../members/service";
 import type { FamilyRecord, MemberRecord } from "../members/types";
 import type { DemoData, EventCarpoolVehicle, EventKind, EventRecord, SessionDoc, Todo } from "../types";
-import { canViewTodoByScope, sortTodosOpenFirst } from "../utils/todoUtils";
+import { canViewTodoByScope, getTodoTakeoverLabel, sortTodosOpenFirst } from "../utils/todoUtils";
 import { todayDateKey } from "../utils/date";
 
 type DemoMenuRole = "child" | "parent" | "admin";
@@ -301,10 +301,7 @@ export function EventsPage({
   };
 
   const takeoverLabel = (todo: Todo): string | null => {
-    if (todo.completed) return null;
-    if (todo.assigneeUid === null) return "引き取る";
-    if (todo.assigneeUid !== currentUid) return "引き継ぐ";
-    return null;
+    return getTodoTakeoverLabel(todo, currentUid);
   };
 
   const openCreateModal = () => {

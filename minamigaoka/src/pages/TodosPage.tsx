@@ -10,6 +10,7 @@ import {
   canMemberBeAssignedToSharedScope,
   canViewSharedTodo,
   formatTodoDueDisplay,
+  getTodoTakeoverLabel,
   getCreatableSharedScopesForRole,
   getTodoKindOptionsForRole,
   parseSessionRelatedId,
@@ -406,10 +407,7 @@ export function TodosPage({
   };
 
   const assigneeActionLabel = (todo: Todo): string | null => {
-    if (todo.kind !== "shared") return null;
-    if (todo.assigneeUid === null) return "引き取る";
-    if (!selfMemberKeys.has(todo.assigneeUid)) return "引き継ぐ";
-    return null;
+    return getTodoTakeoverLabel(todo, currentUid, Array.from(selfMemberKeys));
   };
 
   const runAssigneeAction = async (todo: Todo) => {

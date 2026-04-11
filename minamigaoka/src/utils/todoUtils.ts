@@ -233,3 +233,13 @@ export const canMemberBeAssignedToSharedScope = (
   if (scope === "parent") return isParent || isOfficer || isAdmin;
   return isOfficer || isAdmin;
 };
+
+export const getTodoTakeoverLabel = (
+  todo: Todo,
+  currentUid: string,
+  selfKeys: string[] = [currentUid],
+): string | null => {
+  if (todo.kind !== "shared" || todo.completed) return null;
+  if (todo.assigneeUid === null) return "引き取る";
+  return selfKeys.includes(todo.assigneeUid) ? null : "引き継ぐ";
+};

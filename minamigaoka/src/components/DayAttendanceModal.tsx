@@ -10,7 +10,7 @@ import type {
   Todo,
 } from "../types";
 import { formatDateYmd, formatTimeNoLeadingZero, formatWeekdayJa } from "../utils/date";
-import { canViewTodoByScope, makeSessionRelatedId, sortTodosOpenFirst } from "../utils/todoUtils";
+import { canViewTodoByScope, getTodoTakeoverLabel, makeSessionRelatedId, sortTodosOpenFirst } from "../utils/todoUtils";
 import { resolveEditableAttendanceMemberIds } from "../attendance/utils";
 
 type AttendanceRow = {
@@ -209,10 +209,7 @@ export function DayAttendanceModal({
   };
 
   const takeoverLabel = (todo: Todo): string | null => {
-    if (todo.completed) return null;
-    if (todo.assigneeUid === null) return "引き取る";
-    if (todo.assigneeUid !== currentUid) return "引き継ぐ";
-    return null;
+    return getTodoTakeoverLabel(todo, currentUid);
   };
 
   const openAttendanceMemberModal = (member: MemberRecord) => {
