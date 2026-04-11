@@ -337,6 +337,7 @@ export function CalendarPage({
   const [members, setMembers] = useState<MemberRecord[]>([]);
   const [relations, setRelations] = useState<MemberRelationRecord[]>([]);
   const monthPickerRef = useRef<HTMLDivElement | null>(null);
+  const monthWheelLastHandledAtRef = useRef(0);
   const navigate = useNavigate();
   const today = todayDateKey();
   const queryDate = searchParams.get("date") ?? "";
@@ -349,6 +350,13 @@ export function CalendarPage({
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const [monthPickerYear, setMonthPickerYear] = useState<number>(() => Number(monthKey.slice(0, 4)));
   const calendarCells = useMemo(() => buildMonthCells(monthKey), [monthKey]);
+  const isModalOpen =
+    Boolean(selectedDay) ||
+    Boolean(dialog) ||
+    isAttendanceModalOpen ||
+    Boolean(birthdayModalDate) ||
+    isSessionModalOpen ||
+    isIcsModalOpen;
 
   const familyOptions = useMemo(
     () =>
@@ -507,6 +515,28 @@ export function CalendarPage({
 
   const goToday = () => {
     syncSearchParams(toMonthKey(today), today);
+  };
+
+  const handleMonthCalendarWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    if (window.matchMedia("(max-width: 767px)").matches) return;
+    if (isModalOpen) return;
+    if (Math.abs(event.deltaY) < 8) return;
+
+    const now = Date.now();
+    if (now - monthWheelLastHandledAtRef.current < 420) {
+      event.preventDefault();
+      return;
+    }
+
+    monthWheelLastHandledAtRef.current = now;
+    event.preventDefault();
+
+    if (event.deltaY < 0) {
+      goPrevMonth();
+      return;
+    }
+
+    goNextMonth();
   };
 
   const toggleMonthPicker = () => {
@@ -768,8 +798,8 @@ export function CalendarPage({
         </div>
       </div>
       {icsToast && <p className="inline-toast">{icsToast}</p>}
-      <div className="calendar-mobile-bleed">
-        <div className="month-calendar-weekdays">
+        <div className="calendar-mobile-bleed" onWheel={handleMonthCalendarWheel}>
+          <div className="month-calendar-weekdays">
           {weekdayLabels.map((label) => (
             <span key={`calendar-weekday-${label}`}>{label}</span>
           ))}
