@@ -3,12 +3,19 @@ import type { DemoData, Reimbursement, ReimbursementStatus } from "../types";
 import { LinkifiedText } from "../components/LinkifiedText";
 import { ReceiptImagePicker } from "../components/ReceiptImagePicker";
 import { useReceiptPreviews } from "../hooks/useReceiptPreviews";
-import { toDemoFamilyName } from "../utils/demoName";
 import { ReceiptOcrCanceledError, readReceiptSuggestion } from "../utils/receiptOcr";
 import { appRuntimeConfig } from "../config/runtime";
 import { useAccountingStore } from "../accounting/useAccountingStore";
 import { groupedAccountingSubjects } from "../accounting/fixedSubjects";
 import { comparePeriodAccounts } from "../accounting/sort";
+import { subscribeFamilies, subscribeMembers } from "../members/service";
+import type { FamilyRecord, MemberRecord } from "../members/types";
+import {
+  buildFamilyMap,
+  buildMemberIndexes,
+  resolveFamilyNameFromIdentifier,
+  resolveMemberByIdentifier,
+} from "../members/familyNameResolver";
 
 type ReimbursementsPageProps = {
   data: DemoData;
@@ -125,6 +132,8 @@ export function ReimbursementsPage({
   deleteReimbursement,
 }: ReimbursementsPageProps) {
   const { currentPeriod } = useAccountingStore();
+  const [members, setMembers] = useState<MemberRecord[]>([]);
+  const [families, setFamilies] = useState<FamilyRecord[]>([]);
   const [activeTab, setActiveTab] = useState<ReimbursementTab>("unfinished");
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [detailTarget, setDetailTarget] = useState<Reimbursement | null>(null);
@@ -172,11 +181,47 @@ export function ReimbursementsPage({
       isAdmin ? account.label === "現金（会長手元金）" : account.label === "現金（会計手元金）",
     )?.accountId ?? "";
   const accountingSubjectGroups = useMemo(() => groupedAccountingSubjects("expense"), []);
+  const memberIndexes = useMemo(() => buildMemberIndexes(members), [members]);
+  const familiesById = useMemo(() => buildFamilyMap(families), [families]);
+  const currentUserMember = useMemo(
+    () => resolveMemberByIdentifier(currentUid, memberIndexes),
+    [currentUid, memberIndexes],
+  );
+  useEffect(() => {
+    const unsubscribeMembers = subscribeMembers(setMembers);
+    const unsubscribeFamilies = subscribeFamilies(setFamilies);
+    return () => {
+      unsubscribeMembers();
+      unsubscribeFamilies();
+    };
+  }, []);
+
+  const resolveBuyerFamilyName = (buyer?: string): string =>
+    resolveFamilyNameFromIdentifier({
+      identifier: buyer,
+      memberIndexes,
+      familiesById,
+      fallback: buyer || "未設定",
+    });
+
+  const matchesCurrentUser = (identifier?: string): boolean => {
+    if (!identifier) return false;
+    if (identifier === currentUid) return true;
+    const resolved = resolveMemberByIdentifier(identifier, memberIndexes);
+    if (!resolved || !currentUserMember) return false;
+    return (
+      resolved.id === currentUserMember.id ||
+      resolved.authUid === currentUserMember.authUid ||
+      resolved.loginId === currentUserMember.loginId
+    );
+  };
+
   const visibleByRole = useMemo(
     () =>
-      data.reimbursements.filter((item) => (isAdmin ? true : item.buyer === currentUid)),
-    [currentUid, data.reimbursements, isAdmin],
+      data.reimbursements.filter((item) => (isAdmin ? true : matchesCurrentUser(item.buyer))),
+    [currentUid, currentUserMember, data.reimbursements, isAdmin, memberIndexes],
   );
+
   const rows = useMemo(() => {
     return [...visibleByRole]
       .map((item) => ({ item, uiStatus: resolveUiStatus(item) }))
@@ -612,7 +657,7 @@ export function ReimbursementsPage({
       </div>
       <div className="reimbursements-list">
         {rows.map(({ item, uiStatus }) => {
-          const isBuyer = item.buyer === currentUid;
+          const isBuyer = matchesCurrentUser(item.buyer);
           const canMarkPaid = uiStatus === "unpaid" && isAdmin;
           const canMarkReceived = uiStatus === "paid" && isBuyer;
           const canEdit = isAdmin || (uiStatus === "unpaid" && isBuyer);
@@ -642,7 +687,7 @@ export function ReimbursementsPage({
                 </span>
               </div>
               <p className="reimbursement-meta">
-                <span>購入者: {toDemoFamilyName(data.users[item.buyer]?.displayName ?? item.buyer, item.buyer)}</span>
+                <span>購入者: {resolveBuyerFamilyName(item.buyer)}</span>
                 <span>購入日: {toDateLabel(item.purchasedAt)}</span>
                 <span>金額: {item.amount.toLocaleString()}円</span>
               </p>
@@ -942,7 +987,7 @@ export function ReimbursementsPage({
               ×
             </button>
             <h3>{detailTarget.source === "lunch" ? "🍱 " : ""}{detailTarget.title}</h3>
-            <p className="muted">購入者: {toDemoFamilyName(data.users[detailTarget.buyer]?.displayName ?? detailTarget.buyer, detailTarget.buyer)}</p>
+            <p className="muted">購入者: {resolveBuyerFamilyName(detailTarget.buyer)}</p>
             <p className="muted">購入日: {toDateLabel(detailTarget.purchasedAt)}</p>
             <p className="muted">金額: {detailTarget.amount.toLocaleString()}円</p>
             <p className="muted">会計連携状態: {detailTarget.accountingLinked || detailTarget.accountingEntryId ? "会計連携済み" : "会計連携なし"}</p>
@@ -964,7 +1009,7 @@ export function ReimbursementsPage({
               </div>
             )}
             <div className="modal-actions">
-              {(isAdmin || (resolveUiStatus(detailTarget) === "unpaid" && detailTarget.buyer === currentUid)) && (
+              {(isAdmin || (resolveUiStatus(detailTarget) === "unpaid" && matchesCurrentUser(detailTarget.buyer))) && (
                 <button type="button" className="button button-secondary" onClick={() => openCreateModal(detailTarget)}>
                   編集
                 </button>
@@ -974,12 +1019,12 @@ export function ReimbursementsPage({
                   支払済にする
                 </button>
               )}
-              {resolveUiStatus(detailTarget) === "paid" && detailTarget.buyer === currentUid && (
+              {resolveUiStatus(detailTarget) === "paid" && matchesCurrentUser(detailTarget.buyer) && (
                 <button type="button" className="button" onClick={() => setConfirmDialog({ mode: "markReceived", reimbursement: detailTarget })}>
                   領収済にする
                 </button>
               )}
-              {(isAdmin || (resolveUiStatus(detailTarget) === "unpaid" && detailTarget.buyer === currentUid)) && (
+              {(isAdmin || (resolveUiStatus(detailTarget) === "unpaid" && matchesCurrentUser(detailTarget.buyer))) && (
                 <button type="button" className="button events-danger-button" onClick={() => setConfirmDialog({ mode: "delete", reimbursement: detailTarget })}>
                   削除
                 </button>
@@ -998,7 +1043,7 @@ export function ReimbursementsPage({
             <h3>支払済にしますか？</h3>
             <p className="modal-summary">{paidModalTarget.title}</p>
             <p className="muted">金額: {paidModalTarget.amount.toLocaleString()}円</p>
-            <p className="muted">購入者: {toDemoFamilyName(data.users[paidModalTarget.buyer]?.displayName ?? paidModalTarget.buyer, paidModalTarget.buyer)}</p>
+            <p className="muted">購入者: {resolveBuyerFamilyName(paidModalTarget.buyer)}</p>
             <p className="muted">購入日: {toDateLabel(paidModalTarget.purchasedAt)}</p>
             {normalizeReimbursementMemo(paidModalTarget.memo) && <p className="muted">メモ: {normalizeReimbursementMemo(paidModalTarget.memo)}</p>}
             <label className="purchase-option-check">
@@ -1086,7 +1131,7 @@ export function ReimbursementsPage({
             <h3>{confirmDialogTitle}</h3>
             <p className="modal-summary">{confirmDialog.reimbursement.title}</p>
             <p className="muted">金額: {confirmDialog.reimbursement.amount.toLocaleString()}円</p>
-            <p className="muted">購入者: {toDemoFamilyName(data.users[confirmDialog.reimbursement.buyer]?.displayName ?? confirmDialog.reimbursement.buyer, confirmDialog.reimbursement.buyer)}</p>
+            <p className="muted">購入者: {resolveBuyerFamilyName(confirmDialog.reimbursement.buyer)}</p>
             <p className="muted">購入日: {toDateLabel(confirmDialog.reimbursement.purchasedAt)}</p>
             {normalizeReimbursementMemo(confirmDialog.reimbursement.memo) && <p className="muted">メモ: {normalizeReimbursementMemo(confirmDialog.reimbursement.memo)}</p>}
             <p className="muted">会計連携状態: {confirmDialog.reimbursement.accountingLinked || confirmDialog.reimbursement.accountingEntryId ? "会計連携済み" : "会計連携なし"}</p>

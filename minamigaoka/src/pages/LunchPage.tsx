@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { LinkifiedText } from "../components/LinkifiedText";
 import { ReceiptImagePicker } from "../components/ReceiptImagePicker";
@@ -9,6 +9,15 @@ import { isValidDateKey, todayDateKey, weekdayTone } from "../utils/date";
 import { useAccountingStore } from "../accounting/useAccountingStore";
 import { groupedAccountingSubjects } from "../accounting/fixedSubjects";
 import { comparePeriodAccounts } from "../accounting/sort";
+import { subscribeFamilies, subscribeMembers } from "../members/service";
+import type { FamilyRecord, MemberRecord } from "../members/types";
+import {
+  buildFamilyMap,
+  buildMemberIndexes,
+  resolveFamilyNameFromIdentifier,
+  resolveMemberByIdentifier,
+  trimFamilySuffix as trimFamilySuffixFromMembers,
+} from "../members/familyNameResolver";
 import { toDemoFamilyName } from "../utils/demoName";
 
 type LunchPageProps = {
@@ -131,6 +140,11 @@ const resolveDutyName = (data: DemoData, record: LunchRecord): string => {
 const resolveBuyerName = (data: DemoData, record: LunchRecord): string =>
   resolveDisplayName(data, record.buyer, record.buyer);
 
+void resolveDisplayName;
+void resolveSessionDutyFamilyName;
+void resolveDutyName;
+void resolveBuyerName;
+
 export function LunchPage({
   data,
   currentUid,
@@ -144,6 +158,8 @@ export function LunchPage({
 }: LunchPageProps) {
   const { currentPeriod } = useAccountingStore();
   const isAdmin = demoRole === "admin";
+  const [members, setMembers] = useState<MemberRecord[]>([]);
+  const [families, setFamilies] = useState<FamilyRecord[]>([]);
   const [searchParams] = useSearchParams();
   const fallbackDate = todayDateKey();
   const queryDate = searchParams.get("date") ?? "";
@@ -170,7 +186,79 @@ export function LunchPage({
       demoRole === "admin" ? account.label === "現金（会長手元金）" : account.label === "現金（会計手元金）",
     )?.accountId ?? "";
   const accountingSubjectGroups = useMemo(() => groupedAccountingSubjects("expense"), []);
-  const currentUserHouseholdId = data.users[currentUid]?.householdId;
+  const memberIndexes = useMemo(() => buildMemberIndexes(members), [members]);
+  const familiesById = useMemo(() => buildFamilyMap(families), [families]);
+  const currentUserMember = useMemo(() => resolveMemberByIdentifier(currentUid, memberIndexes), [currentUid, memberIndexes]);
+  const currentUserFamilyId = currentUserMember?.familyId || "";
+
+  useEffect(() => {
+    const unsubscribeMembers = subscribeMembers(setMembers);
+    const unsubscribeFamilies = subscribeFamilies(setFamilies);
+    return () => {
+      unsubscribeMembers();
+      unsubscribeFamilies();
+    };
+  }, []);
+
+  const resolveSessionDutyFamilyNameFromFirestore = (
+    session: DemoData["scheduleDays"][string]["sessions"][number],
+  ): string => {
+    const snapshotFamily = trimFamilySuffixFromMembers(session.assigneeNameSnapshot);
+    if (snapshotFamily) return snapshotFamily;
+    return resolveFamilyNameFromIdentifier({
+      identifier: session.assignees[0],
+      memberIndexes,
+      familiesById,
+      fallback: "未定",
+    });
+  };
+
+  const resolveDutyNameFromFirestore = (record: LunchRecord): string => {
+    if (record.dutyMemberId) {
+      const dutyMemberFamily = resolveFamilyNameFromIdentifier({
+        identifier: record.dutyMemberId,
+        memberIndexes,
+        familiesById,
+        fallback: "",
+      });
+      if (dutyMemberFamily) return dutyMemberFamily;
+    }
+    if (record.dutyHouseholdId) {
+      const dutyFamily = resolveFamilyNameFromIdentifier({
+        identifier: record.dutyHouseholdId,
+        memberIndexes,
+        familiesById,
+        fallback: "",
+      });
+      if (dutyFamily) return dutyFamily;
+    }
+    return resolveFamilyNameFromIdentifier({
+      identifier: record.buyer,
+      memberIndexes,
+      familiesById,
+      fallback: "未設定",
+    });
+  };
+
+  const resolveBuyerNameFromFirestore = (record: LunchRecord): string =>
+    resolveFamilyNameFromIdentifier({
+      identifier: record.buyer,
+      memberIndexes,
+      familiesById,
+      fallback: "未設定",
+    });
+
+  const matchesCurrentUser = (identifier?: string): boolean => {
+    if (!identifier) return false;
+    if (identifier === currentUid) return true;
+    const resolved = resolveMemberByIdentifier(identifier, memberIndexes);
+    if (!resolved || !currentUserMember) return false;
+    return (
+      resolved.id === currentUserMember.id ||
+      resolved.authUid === currentUserMember.authUid ||
+      resolved.loginId === currentUserMember.loginId
+    );
+  };
 
   const sortedRecords = useMemo(
     () =>
@@ -200,18 +288,18 @@ export function LunchPage({
           )
           .map((session) => ({
             dateKey,
-            dutyName: resolveSessionDutyFamilyName(data, session),
+            dutyName: resolveSessionDutyFamilyNameFromFirestore(session),
             isCurrentUserDuty:
               session.assignees.includes(currentUid) ||
               Boolean(
-                currentUserHouseholdId &&
-                  session.assignees.some((uid) => data.users[uid]?.householdId === currentUserHouseholdId),
+                currentUserFamilyId &&
+                  session.assignees.some((uid) => resolveMemberByIdentifier(uid, memberIndexes)?.familyId === currentUserFamilyId),
               ),
           })),
       )
       .sort((left, right) => left.dateKey.localeCompare(right.dateKey))
       .slice(0, 2);
-  }, [currentUid, currentUserHouseholdId, data, targetDate]);
+  }, [currentUid, currentUserFamilyId, data, memberIndexes, targetDate]);
 
   const amountNumber = Number(draft.amount || "0");
 
@@ -258,12 +346,14 @@ export function LunchPage({
         item.startTime >= "12:00" &&
         (weekdayTone(dateKey) === "sat" || weekdayTone(dateKey) === "sun"),
     );
-    const dutyMemberId = session?.assignees[0];
-    const dutyHouseholdId = dutyMemberId ? data.users[dutyMemberId]?.householdId : undefined;
+    const dutySourceId = session?.assignees[0];
+    const dutyMember = resolveMemberByIdentifier(dutySourceId, memberIndexes);
+    const dutyMemberId = dutyMember?.loginId || dutyMember?.id || dutySourceId;
+    const dutyHouseholdId = dutyMember?.familyId || currentUserFamilyId || undefined;
     return {
-      buyerUid: dutyMemberId ?? currentUid,
+      buyerUid: dutyMember?.authUid || currentUid,
       dutyMemberId: dutyMemberId ?? undefined,
-      dutyHouseholdId: dutyHouseholdId ?? currentUserHouseholdId,
+      dutyHouseholdId,
     };
   };
 
@@ -337,7 +427,7 @@ export function LunchPage({
     }
   };
 
-  const canEditRecord = (record: LunchRecord): boolean => isAdmin || record.buyer === currentUid;
+  const canEditRecord = (record: LunchRecord): boolean => isAdmin || matchesCurrentUser(record.buyer);
 
   const runDelete = async () => {
     if (!deleteTarget) return;
@@ -405,7 +495,7 @@ export function LunchPage({
                 <span className="lunch-tile-date">
                   {formatDateWithWeekday(record.date || toDateKeyFromIso(record.purchasedAt))}
                 </span>
-                <span className="lunch-tile-duty">当番: {resolveDutyName(data, record)}</span>
+                <span className="lunch-tile-duty">当番: {resolveDutyNameFromFirestore(record)}</span>
               </span>
             </button>
           );
@@ -585,7 +675,7 @@ export function LunchPage({
             </button>
             <h3>{detailTarget.title}</h3>
             <p className="muted">購入日: {formatDateWithWeekday(detailTarget.date || toDateKeyFromIso(detailTarget.purchasedAt))}</p>
-            <p className="muted">購入者: {resolveBuyerName(data, detailTarget)}</p>
+            <p className="muted">購入者: {resolveBuyerNameFromFirestore(detailTarget)}</p>
             <p className="muted">金額: {detailTarget.amount.toLocaleString()}円</p>
             <p className="muted">
               支払い方法: {detailTarget.paymentMethod === "direct_accounting" ? "直接会計払い" : "立替払い"}

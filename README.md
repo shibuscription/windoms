@@ -2655,6 +2655,13 @@ TODO：
 - 優先 2: TODO、イベント。
 - 優先 3: 購入依頼、立替、会計簡易版。
 
+### 30.7.1 仮運用モジュールの実データ参照方針
+- `minamigaoka` の仮運用対象モジュールでは、`シフト作成` モジュールを除き、`mock` / `DemoData` / demo fallback を正データ参照として残さない。
+- 表示用の名前解決も Firestore の `members` / `families` を正とする。
+- 解決できない場合に demo family 名へ寄せる fallback は、仮運用対象モジュールでは採用しない。
+- `お弁当` と `立替` の Family 名表示は、保存済みの `buyer` / `dutyMemberId` / `dutyHouseholdId` を Firestore の `members` / `families` から解決して表示する。
+- `シフト作成` モジュールは未着手のため、今回の仮運用実データ化の例外対象として扱う。
+
 ### 30.8 データ移行の考え方
 - Phase 1 の `minamigaoka` は、まだ全画面を Firestore 永続化しない。
 - ただし当番日誌は例外とし、`minamigaoka` では Firestore に正式保存する。
