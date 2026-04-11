@@ -780,7 +780,7 @@ export function ReimbursementsPage({
       </div>
 
       {isCreateModalOpen && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true">
+        <div className="modal-backdrop modal-backdrop-front" role="dialog" aria-modal="true">
           <section className="modal-panel purchases-complete-modal" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeCreateModal}>
               ×
@@ -963,7 +963,7 @@ export function ReimbursementsPage({
       )}
 
       {isCreateModalOpen && isReadingReceipt && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-backdrop modal-backdrop-front" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
           <section className="modal-panel ocr-progress-modal" onClick={(event) => event.stopPropagation()}>
             <h3>レシートから金額を読み取り中です</h3>
             <p className="muted">完了までしばらくお待ちください。中止して手入力に切り替えることもできます。</p>
@@ -1035,7 +1035,7 @@ export function ReimbursementsPage({
       )}
 
       {paidModalTarget && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true">
+        <div className="modal-backdrop modal-backdrop-front" role="dialog" aria-modal="true">
           <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeMarkPaidModal}>
               ×
@@ -1123,7 +1123,7 @@ export function ReimbursementsPage({
       )}
 
       {confirmDialog && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true">
+        <div className="modal-backdrop modal-backdrop-front" role="dialog" aria-modal="true">
           <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setConfirmDialog(null)}>
               ×
