@@ -10,16 +10,18 @@ import type {
 export const memberTypeOptions: Array<{ value: MemberType; label: string }> = [
   { value: "parent", label: "保護者" },
   { value: "child", label: "部員" },
+  { value: "supporter", label: "サポーター" },
   { value: "teacher", label: "先生" },
   { value: "obog", label: "先輩" },
 ];
 
-export type MemberTypeFilter = "all" | "child" | "parent" | "obog" | "teacher";
+export type MemberTypeFilter = "all" | "child" | "parent" | "supporter" | "obog" | "teacher";
 
 export const memberTypeFilterOptions: Array<{ value: MemberTypeFilter; label: string }> = [
   { value: "all", label: "すべて" },
   { value: "child", label: "部員" },
   { value: "parent", label: "保護者" },
+  { value: "supporter", label: "サポーター" },
   { value: "obog", label: "先輩" },
   { value: "teacher", label: "先生" },
 ];
@@ -27,11 +29,12 @@ export const memberTypeFilterOptions: Array<{ value: MemberTypeFilter; label: st
 export const memberTypeLabel: Record<MemberType, string> = {
   parent: "保護者",
   child: "部員",
+  supporter: "サポーター",
   teacher: "先生",
   obog: "先輩",
 };
 
-export const memberTypeDisplayOrder: MemberType[] = ["child", "parent", "obog", "teacher"];
+export const memberTypeDisplayOrder: MemberType[] = ["child", "parent", "supporter", "obog", "teacher"];
 
 export const adminRoleOptions: Array<{ value: AdminRole; label: string }> = [
   { value: "none", label: "なし" },
@@ -65,7 +68,7 @@ export const memberStatusLabel: Record<MemberStatus, string> = {
   inactive: "無効",
 };
 
-const allowedMemberTypes: MemberType[] = ["parent", "child", "teacher", "obog"];
+const allowedMemberTypes: MemberType[] = ["parent", "child", "supporter", "teacher", "obog"];
 const allowedAdminRoles: AdminRole[] = ["none", "officer", "admin"];
 const allowedStaffPermissions: StaffPermission[] = ["accounting", "shift_management"];
 const allowedMemberStatuses: MemberStatus[] = ["active", "inactive"];
@@ -226,6 +229,9 @@ export const getPrimaryMemberTypeLabel = (
   if (member.memberTypes.includes("parent")) {
     return memberTypeLabel.parent;
   }
+  if (member.memberTypes.includes("supporter")) {
+    return memberTypeLabel.supporter;
+  }
   if (member.memberTypes.includes("obog")) {
     return memberTypeLabel.obog;
   }
@@ -248,6 +254,9 @@ const getMemberDisplayType = (member: Pick<MemberRecord, "memberTypes" | "role">
   }
   if (member.memberTypes.includes("parent")) {
     return "parent";
+  }
+  if (member.memberTypes.includes("supporter")) {
+    return "supporter";
   }
   if (member.memberTypes.includes("obog")) {
     return "obog";

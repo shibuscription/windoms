@@ -137,7 +137,14 @@ export const defaultModuleVisibilitySettings = menuModuleDefinitions.reduce<Modu
 
 const normalizeMemberTypes = (value: unknown): MemberType[] =>
   Array.isArray(value)
-    ? value.filter((item): item is MemberType => item === "parent" || item === "child" || item === "teacher" || item === "obog")
+    ? value.filter(
+        (item): item is MemberType =>
+          item === "parent" ||
+          item === "child" ||
+          item === "supporter" ||
+          item === "teacher" ||
+          item === "obog",
+      )
     : [];
 
 const normalizeAdminRoles = (value: unknown): AdminRole[] =>

@@ -154,7 +154,11 @@ const toMemberRecord = (id: string, value: Record<string, unknown>): MemberRecor
             Partial<Record<MemberType, number>>
           >((result, [key, item]) => {
             if (
-              (key === "child" || key === "parent" || key === "obog" || key === "teacher") &&
+              (key === "child" ||
+                key === "parent" ||
+                key === "supporter" ||
+                key === "obog" ||
+                key === "teacher") &&
               typeof item === "number" &&
               Number.isFinite(item)
             ) {

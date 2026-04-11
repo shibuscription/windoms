@@ -1,6 +1,6 @@
 export type FamilyStatus = "active" | "inactive";
 export type MemberRole = "admin" | "officer" | "parent" | "child" | "teacher";
-export type MemberType = "parent" | "child" | "teacher" | "obog";
+export type MemberType = "parent" | "child" | "supporter" | "teacher" | "obog";
 export type AdminRole = "none" | "officer" | "admin";
 export type StaffPermission = "accounting" | "shift_management";
 export type MemberStatus = "active" | "inactive";

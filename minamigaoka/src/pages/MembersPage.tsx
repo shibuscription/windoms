@@ -2162,7 +2162,7 @@ export function MembersManagementPage() {
               <div className="permission-form-grid">
                 <PermissionSection
                   title="利用者区分"
-                  description="部員は他の利用者区分と同時に設定できません。先輩は保護者・先生と併用できます。"
+                  description="部員は他の利用者区分と同時に設定できません。サポーター・先輩は保護者や先生と併用できます。"
                   error={memberErrors.memberTypes}
                 >
                   {memberTypeOptions.map((option) => {

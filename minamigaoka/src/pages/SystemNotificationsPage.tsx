@@ -104,6 +104,8 @@ const roleLabel = (member: MemberRecord): string => {
   if (member.memberTypes.includes("parent") || member.role === "parent" || member.role === "officer") {
     return "保護者";
   }
+  if (member.memberTypes.includes("supporter")) return "サポーター";
+  if (member.memberTypes.includes("obog")) return "先輩";
   if (member.memberTypes.includes("teacher") || member.role === "teacher") return "先生";
   return member.role;
 };
