@@ -78,7 +78,7 @@ const demoViewTitle: Record<string, string> = {
 };
 
 const statusSymbol: Record<RsvpStatus, string> = {
-  yes: "○",
+  yes: "◯",
   maybe: "△",
   no: "×",
   unknown: "ー",
@@ -609,7 +609,7 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
                   <span className="kv-key">出欠:</span>
                   <span className="kv-val">
                     <button type="button" className="attendance-trigger" onClick={openAttendanceModal}>
-                      <span className="count-yes">○{counts.yes}</span>
+                      <span className="count-yes">◯{counts.yes}</span>
                       <span className="count-maybe">△{counts.maybe}</span>
                       <span className="count-no">×{counts.no}</span>
                       <span className="count-unknown">ー{counts.unknown}</span>
@@ -655,7 +655,7 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
                       </div>
                       <div className="today-attendance-session-summary-type">{typeLabel[session.type]}</div>
                       <div className="today-attendance-session-summary-counts">
-                        <span className="count-yes">○{counts.yes}</span>
+                        <span className="count-yes">◯{counts.yes}</span>
                         <span className="count-maybe">△{counts.maybe}</span>
                         <span className="count-no">×{counts.no}</span>
                         <span className="count-unknown">ー{counts.unknown}</span>
