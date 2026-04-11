@@ -656,12 +656,17 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
                 const counts = countAttendanceRows(attendanceRowsByOrder[session.order] ?? []);
                 const relatedTodos = sessionTodosByOrder[session.order] ?? [];
                 return (
-                  <div key={session.id ?? `${session.order}-${session.startTime}`} className="today-attendance-session-summary">
+                  <div
+                    key={session.id ?? `${session.order}-${session.startTime}`}
+                    className={`today-attendance-session-summary ${session.type}`}
+                  >
+                    <span className={`session-type-badge today-attendance-session-summary-badge ${session.type}`}>
+                      {typeLabel[session.type]}
+                    </span>
                     <div className="today-attendance-session-summary-main">
                       <div className="today-attendance-session-summary-time">
                         {formatTimeNoLeadingZero(session.startTime)} - {formatTimeNoLeadingZero(session.endTime)}
                       </div>
-                      <div className="today-attendance-session-summary-type">{typeLabel[session.type]}</div>
                       <div className="today-attendance-session-summary-counts">
                         <span className="count-yes">◯{counts.yes}</span>
                         <span className="count-maybe">△{counts.maybe}</span>

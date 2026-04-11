@@ -3430,6 +3430,7 @@ body {
 }
 
 .today-attendance-session-summary {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3440,12 +3441,28 @@ body {
   padding: 8px 10px;
 }
 
+.today-attendance-session-summary.normal {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.today-attendance-session-summary.self {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.today-attendance-session-summary.event {
+  border-color: #fbcfe8;
+  background: #fdf2f8;
+}
+
 .today-attendance-session-summary-main {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px 12px;
   min-width: 0;
+  padding-right: 72px;
 }
 
 .today-attendance-session-summary-time {
@@ -3454,16 +3471,18 @@ body {
   white-space: nowrap;
 }
 
-.today-attendance-session-summary-type {
-  color: #475569;
-  white-space: nowrap;
-}
-
 .today-attendance-session-summary-counts {
   display: inline-flex;
   flex-wrap: wrap;
   gap: 4px 8px;
   font-size: 0.85rem;
+}
+
+.today-attendance-session-summary-badge {
+  top: 8px;
+  right: 10px;
+  font-size: 0.68rem;
+  padding: 2px 7px;
 }
 
 .today-attendance-session-todo-trigger {
@@ -6199,6 +6218,7 @@ textarea {
 
   .today-attendance-session-summary-main {
     gap: 6px 10px;
+    padding-right: 46px;
   }
 
   .today-attendance-member-name-wrap {
