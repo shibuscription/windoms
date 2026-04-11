@@ -40,6 +40,7 @@ import type {
 import { formatDateYmd, formatTimeNoLeadingZero, formatWeekdayJa, todayDateKey, weekdayTone } from "./utils/date";
 import {
   canViewSharedTodo,
+  formatTodoDueDisplay,
   getVisibleSharedScopesForRole,
   resolveTodoAudienceRole,
   resolveTodoRelatedSummary,
@@ -1869,6 +1870,7 @@ export function App() {
                   <h3>個人TODO</h3>
                   <ul className="status-panel-list">
                     {privateInboxTodos.map((item) => {
+                      const dueDisplay = formatTodoDueDisplay(item.dueDate, item.completed);
                       return (
                         <li key={item.id} className="status-inbox-row">
                           <div className="status-inbox-main">
@@ -1878,7 +1880,7 @@ export function App() {
                               onClick={() => setSelectedInboxTodoId(item.id)}
                             >
                             <strong>{item.title}</strong>
-                            <span className="status-inbox-meta">期限: {item.dueDate ?? "—"}</span>
+                            <span className={`status-inbox-meta todo-due todo-due-${dueDisplay.tone}`}>期限: {dueDisplay.text}</span>
                             </button>
                           </div>
                           <button
@@ -1900,6 +1902,7 @@ export function App() {
                   <h3>共有TODO（自分担当）</h3>
                   <ul className="status-panel-list">
                     {sharedInboxTodos.map((item) => {
+                      const dueDisplay = formatTodoDueDisplay(item.dueDate, item.completed);
                       const related = resolveTodoRelatedSummary(data, item);
                       const relatedPath = related.to;
                       return (
@@ -1911,7 +1914,7 @@ export function App() {
                               onClick={() => setSelectedInboxTodoId(item.id)}
                             >
                             <strong>{item.title}</strong>
-                            <span className="status-inbox-meta">期限: {item.dueDate ?? "—"}</span>
+                            <span className={`status-inbox-meta todo-due todo-due-${dueDisplay.tone}`}>期限: {dueDisplay.text}</span>
                             </button>
                             <span className="status-inbox-meta">
                               {related.to ? (
@@ -2059,7 +2062,7 @@ export function App() {
             </button>
             <h3>TODO詳細</h3>
             <p className="modal-context">{selectedInboxTodo.title}</p>
-            <p className="modal-summary">期限: {selectedInboxTodo.dueDate ?? "—"}</p>
+            <p className={`modal-summary todo-due todo-due-${formatTodoDueDisplay(selectedInboxTodo.dueDate, selectedInboxTodo.completed).tone}`}>期限: {formatTodoDueDisplay(selectedInboxTodo.dueDate, selectedInboxTodo.completed).text}</p>
             <p className="modal-summary">
               種別: {selectedInboxTodo.kind === "shared" ? "共有TODO" : "個人TODO"}
             </p>

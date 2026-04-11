@@ -9,6 +9,7 @@ import {
   buildSessionChoices,
   canMemberBeAssignedToSharedScope,
   canViewSharedTodo,
+  formatTodoDueDisplay,
   getCreatableSharedScopesForRole,
   getTodoKindOptionsForRole,
   parseSessionRelatedId,
@@ -422,6 +423,7 @@ export function TodosPage({
     const related = resolveTodoRelatedSummary(data, todo);
     const relatedPath = related.to;
     const actionLabel = assigneeActionLabel(todo);
+    const dueDisplay = formatTodoDueDisplay(todo.dueDate, todo.completed);
     return (
       <article key={todo.id} className={`todo-row ${todo.completed ? "completed" : ""}`}>
         <label className="todo-check">
@@ -440,7 +442,7 @@ export function TodosPage({
           )}
           <p className="todo-meta">
             <span>{todo.kind === "shared" ? `担当: ${userNameByUid(todo.assigneeUid)}` : "種別: 個人TODO"}</span>
-            <span>期限: {todo.dueDate ?? "—"}</span>
+            <span className={`todo-due todo-due-${dueDisplay.tone}`}>期限: {dueDisplay.text}</span>
           </p>
           {todo.kind === "shared" && relatedPath ? (
             <button

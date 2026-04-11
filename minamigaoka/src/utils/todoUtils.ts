@@ -1,5 +1,6 @@
 import type { MemberRecord } from "../members/types";
 import type { DemoData, Todo, TodoKind, TodoSharedScope } from "../types";
+import { formatDateYmd, isValidDateKey, todayDateKey } from "./date";
 
 const SESSION_REF_PREFIX = "session:";
 
@@ -18,6 +19,40 @@ const toEpoch = (iso: string): number => {
 
 const normalizeDueDate = (dueDate?: string): string | null =>
   dueDate && /^\d{4}-\d{2}-\d{2}$/.test(dueDate) ? dueDate : null;
+
+const toDaySerial = (dateKey: string): number => {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
+};
+
+export type TodoDueTone = "normal" | "soon" | "urgent";
+
+export const formatTodoDueDisplay = (
+  dueDate?: string,
+  completed = false,
+): { text: string; tone: TodoDueTone } => {
+  const normalized = normalizeDueDate(dueDate);
+  if (!normalized || !isValidDateKey(normalized)) {
+    return { text: "—", tone: "normal" };
+  }
+
+  const base = formatDateYmd(normalized);
+  if (completed) {
+    return { text: base, tone: "normal" };
+  }
+
+  const diffDays = toDaySerial(normalized) - toDaySerial(todayDateKey());
+  if (diffDays < 0) {
+    return { text: `${base}（期限切れ${Math.abs(diffDays)}日）`, tone: "urgent" };
+  }
+  if (diffDays === 0) {
+    return { text: `${base}（今日まで）`, tone: "urgent" };
+  }
+  if (diffDays <= 3) {
+    return { text: `${base}（あと${diffDays}日）`, tone: "soon" };
+  }
+  return { text: `${base}（あと${diffDays}日）`, tone: "normal" };
+};
 
 export const makeSessionRelatedId = (dateKey: string, order: number): string =>
   `${SESSION_REF_PREFIX}${dateKey}:${order}`;

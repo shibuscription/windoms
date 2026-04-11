@@ -2465,6 +2465,18 @@ body {
   font-size: 0.82rem;
 }
 
+.todo-due {
+  font-weight: 500;
+}
+
+.todo-due-urgent {
+  color: #dc2626;
+}
+
+.todo-due-soon {
+  color: #ea580c;
+}
+
 .todo-related-link,
 .todo-related-text {
   margin: 0;
@@ -2660,6 +2672,16 @@ body {
 .status-inbox-meta {
   font-size: 0.8rem;
   color: #cbd5e1;
+}
+
+.status-inbox-meta.todo-due-urgent,
+.modal-summary.todo-due-urgent {
+  color: #fca5a5;
+}
+
+.status-inbox-meta.todo-due-soon,
+.modal-summary.todo-due-soon {
+  color: #fdba74;
 }
 
 .status-inline-link {
