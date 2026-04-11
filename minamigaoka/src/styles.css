@@ -6199,8 +6199,14 @@ textarea {
 
   .today-attendance-member-button,
   .today-attendance-member-label {
-    font-size: 0.68rem;
-    line-height: 1.1;
+    font-size: 0.74rem;
+    line-height: 1.2;
+  }
+
+  .today-attendance-member-head,
+  .today-attendance-member-cell {
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
   }
 
   .today-attendance-status-cell {
