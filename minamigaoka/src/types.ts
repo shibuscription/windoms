@@ -59,11 +59,19 @@ export type SessionDoc = {
   demoRsvps?: DemoRsvp[];
 };
 
+export type AttendanceTransportMethod = "car" | "walk";
+
+export type AttendanceTransportRecord = {
+  to?: AttendanceTransportMethod;
+  from?: AttendanceTransportMethod;
+};
+
 export type ScheduleDayDoc = {
   defaultLocation?: string;
   notice?: string;
   plannedInstructors?: string[];
   plannedSeniors?: string[];
+  attendanceTransport?: Record<string, AttendanceTransportRecord>;
   sessions: SessionDoc[];
 };
 

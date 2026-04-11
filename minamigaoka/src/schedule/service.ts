@@ -1,7 +1,14 @@
 import { collection, getDocs, onSnapshot } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, firebaseFunctionsRegion, firebaseProjectId, functions, hasFirebaseAppConfig } from "../config/firebase";
-import type { DemoRsvp, RsvpStatus, ScheduleDayDoc, SessionDoc } from "../types";
+import type {
+  AttendanceTransportMethod,
+  AttendanceTransportRecord,
+  DemoRsvp,
+  RsvpStatus,
+  ScheduleDayDoc,
+  SessionDoc,
+} from "../types";
 
 type EditableSessionType = "normal" | "self" | "event";
 
@@ -124,6 +131,25 @@ const compareSessions = (left: SessionDoc, right: SessionDoc): number => {
   return (left.id ?? "").localeCompare(right.id ?? "");
 };
 
+const normalizeTransportMethod = (value: unknown): AttendanceTransportMethod | undefined =>
+  value === "walk" ? "walk" : value === "car" ? "car" : undefined;
+
+const toAttendanceTransport = (value: unknown): Record<string, AttendanceTransportRecord> => {
+  if (!value || typeof value !== "object") return {};
+  return Object.entries(value as Record<string, unknown>).reduce<Record<string, AttendanceTransportRecord>>(
+    (result, [memberId, current]) => {
+      if (!current || typeof current !== "object") return result;
+      const source = current as Record<string, unknown>;
+      result[memberId] = {
+        to: normalizeTransportMethod(source.to),
+        from: normalizeTransportMethod(source.from),
+      };
+      return result;
+    },
+    {},
+  );
+};
+
 export const subscribeScheduleDays = (
   callback: (days: Record<string, ScheduleDayDoc>) => void,
   onError?: (error: Error) => void,
@@ -161,6 +187,7 @@ export const subscribeScheduleDays = (
               plannedSeniors: Array.isArray(dayValue.plannedSeniors)
                 ? dayValue.plannedSeniors.filter((item): item is string => typeof item === "string")
                 : [],
+              attendanceTransport: toAttendanceTransport(dayValue.attendanceTransport),
               sessions,
             };
             return [dayDoc.id, day] as const;

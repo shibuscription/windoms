@@ -1,11 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { resolveEditableAttendanceMemberIds } from "../attendance/utils";
 import { BirthdayCelebrationModal } from "../components/BirthdayCelebrationModal";
+import { saveDayAttendanceTransport, saveSessionRsvps } from "../journal/service";
 import { getBirthdayCelebrants } from "../members/birthday";
 import { isChildMember, sortMembersForDisplay } from "../members/permissions";
-import { subscribeMembers } from "../members/service";
-import type { MemberRecord } from "../members/types";
-import type { DemoData, DutyRequirement, RsvpStatus, SessionDoc, Todo } from "../types";
+import { subscribeMemberRelations, subscribeMembers } from "../members/service";
+import type { MemberRecord, MemberRelationRecord } from "../members/types";
+import type {
+  AttendanceTransportMethod,
+  DemoData,
+  DutyRequirement,
+  RsvpStatus,
+  SessionDoc,
+  Todo,
+} from "../types";
 import {
   formatDateYmd,
   formatTimeNoLeadingZero,
@@ -15,7 +24,6 @@ import {
   todayDateKey,
   weekdayTone,
 } from "../utils/date";
-import { canViewSharedTodo, makeSessionRelatedId, sortTodosOpenFirst } from "../utils/todoUtils";
 
 type TodayPageProps = {
   data: DemoData;
@@ -30,6 +38,10 @@ type AttendanceRow = {
   uid: string;
   displayName: string;
   status: RsvpStatus;
+};
+
+type AttendanceMemberModalState = {
+  member: MemberRecord;
 };
 
 const typeLabel: Record<SessionDoc["type"], string> = {
@@ -69,6 +81,16 @@ const statusSymbol: Record<RsvpStatus, string> = {
   maybe: "△",
   no: "×",
   unknown: "ー",
+};
+
+const transportSymbol: Record<AttendanceTransportMethod, string> = {
+  car: "🚗",
+  walk: "🚶",
+};
+
+const transportLabel: Record<AttendanceTransportMethod, string> = {
+  car: "🚗",
+  walk: "🚶",
 };
 
 const toFamilyName = (name?: string): string => {
@@ -112,20 +134,30 @@ const countAttendanceRows = (rows: AttendanceRow[]) => ({
   unknown: rows.filter((item) => item.status === "unknown").length,
 });
 
-const getSessionDisplayTitle = (session: SessionDoc): string =>
-  session.type === "event" && session.eventName?.trim() ? session.eventName.trim() : typeLabel[session.type];
-
 export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRole, saveTodo }: TodayPageProps) {
+  void currentUid;
+  void saveTodo;
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [selectedSession, setSelectedSession] = useState<SessionDoc | null>(null);
+  const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
+  const [selectedAttendanceMember, setSelectedAttendanceMember] = useState<AttendanceMemberModalState | null>(null);
   const [birthdayModalDate, setBirthdayModalDate] = useState<string | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(todayDateKey().slice(0, 7));
   const [noticeExpanded, setNoticeExpanded] = useState(false);
   const [noticeCanToggle, setNoticeCanToggle] = useState(false);
   const [members, setMembers] = useState<MemberRecord[]>([]);
+  const [relations, setRelations] = useState<MemberRelationRecord[]>([]);
   const [pageError, setPageError] = useState("");
+  const [relationsError, setRelationsError] = useState("");
+  const [attendanceSaveError, setAttendanceSaveError] = useState("");
+  const [attendanceToast, setAttendanceToast] = useState("");
+  const [isSavingAttendance, setIsSavingAttendance] = useState(false);
+  const [attendanceDraftBySessionOrder, setAttendanceDraftBySessionOrder] = useState<Record<number, RsvpStatus>>({});
+  const [transportDraft, setTransportDraft] = useState<{
+    to: AttendanceTransportMethod;
+    from: AttendanceTransportMethod;
+  }>({ to: "car", from: "car" });
   const calendarWrapRef = useRef<HTMLDivElement>(null);
   const noticeContentRef = useRef<HTMLDivElement>(null);
   const today = todayDateKey();
@@ -157,6 +189,18 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
   }, []);
 
   useEffect(() => {
+    try {
+      return subscribeMemberRelations((rows) => {
+        setRelations(rows);
+        setRelationsError("");
+      });
+    } catch (error) {
+      setRelationsError(error instanceof Error ? error.message : "紐づき関係の読み込みに失敗しました。");
+      return undefined;
+    }
+  }, []);
+
+  useEffect(() => {
     if (!queryDate) return;
     if (!isValidDateKey(queryDate)) {
       setSearchParams({}, { replace: true });
@@ -176,6 +220,12 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
     document.addEventListener("mousedown", onPointerDown);
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, []);
+
+  useEffect(() => {
+    if (!attendanceToast) return;
+    const timer = window.setTimeout(() => setAttendanceToast(""), 2200);
+    return () => window.clearTimeout(timer);
+  }, [attendanceToast]);
 
   useEffect(() => {
     setNoticeExpanded(false);
@@ -226,23 +276,23 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
       return result;
     }, {});
   }, [sessions, visibleChildMembers]);
-
-  const selectedRows = selectedSession ? attendanceRowsByOrder[selectedSession.order] ?? [] : [];
-  const selectedCounts = useMemo(() => countAttendanceRows(selectedRows), [selectedRows]);
-  const selectedSessionTodos = useMemo(() => {
-    if (!selectedSession) return [] as Todo[];
-    const relatedId = makeSessionRelatedId(date, selectedSession.order);
-    return sortTodosOpenFirst(
-      data.todos.filter(
-        (todo) =>
-          todo.kind === "shared" &&
-          todo.related?.type === "session" &&
-          todo.related.id === relatedId &&
-          canViewSharedTodo(todo, linkedMember, authRole),
-      ),
-    );
-  }, [authRole, data.todos, date, linkedMember, selectedSession]);
   const birthdayCelebrants = useMemo(() => getBirthdayCelebrants(members, date), [date, members]);
+
+  const editableMemberIds = useMemo(
+    () => resolveEditableAttendanceMemberIds(linkedMember, authRole, visibleChildMembers, relations),
+    [authRole, linkedMember, relations, visibleChildMembers],
+  );
+
+  const memberById = useMemo(
+    () =>
+      visibleChildMembers.reduce<Record<string, MemberRecord>>((result, member) => {
+        result[member.id] = member;
+        return result;
+      }, {}),
+    [visibleChildMembers],
+  );
+
+  const dayTransport = day?.attendanceTransport ?? {};
 
   const hasSessions = sessions.length > 0;
   const calendarCells = useMemo(() => buildMonthCells(calendarMonth), [calendarMonth]);
@@ -273,16 +323,93 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
     navigate(`/logs/${date}`);
   };
 
-  const assigneeLabel = (uid: string | null): string => {
-    if (!uid) return "未アサイン";
-    return data.users[uid]?.displayName ?? uid;
+  const openAttendanceModal = () => {
+    setAttendanceSaveError("");
+    setAttendanceToast("");
+    setIsAttendanceModalOpen(true);
   };
 
-  const takeoverLabel = (todo: Todo): string | null => {
-    if (todo.completed) return null;
-    if (todo.assigneeUid === null) return "引き取る";
-    if (todo.assigneeUid !== currentUid) return "引き継ぐ";
-    return null;
+  const closeAttendanceModal = () => {
+    if (isSavingAttendance) return;
+    setIsAttendanceModalOpen(false);
+  };
+
+  const openAttendanceMemberModal = (member: MemberRecord) => {
+    if (!editableMemberIds.has(member.id)) return;
+    setAttendanceDraftBySessionOrder(
+      sessions.reduce<Record<number, RsvpStatus>>((result, session) => {
+        const matched =
+          session.demoRsvps?.find(
+            (item) =>
+              item.uid === member.authUid ||
+              item.uid === member.id ||
+              item.uid === member.loginId,
+          ) ?? null;
+        result[session.order] = matched?.status ?? "unknown";
+        return result;
+      }, {}),
+    );
+    const currentTransport = dayTransport[member.id];
+    setTransportDraft({
+      to: currentTransport?.to ?? "car",
+      from: currentTransport?.from ?? "car",
+    });
+    setAttendanceSaveError("");
+    setSelectedAttendanceMember({ member });
+  };
+
+  const closeAttendanceMemberModal = () => {
+    if (isSavingAttendance) return;
+    setSelectedAttendanceMember(null);
+    setAttendanceSaveError("");
+  };
+
+  const saveAttendanceMember = async () => {
+    if (!selectedAttendanceMember) return;
+    const member = selectedAttendanceMember.member;
+    setIsSavingAttendance(true);
+    setAttendanceSaveError("");
+    try {
+      const matchedMember = memberById[member.id];
+      if (!matchedMember) {
+        throw new Error("対象メンバーが見つかりません。");
+      }
+
+      await Promise.all(
+        sessions.map(async (session) => {
+          if (!session.id) {
+            throw new Error("予定IDが見つからないため、出欠を保存できません。");
+          }
+          const nextStatus = attendanceDraftBySessionOrder[session.order] ?? "unknown";
+          const remaining = (session.demoRsvps ?? []).filter(
+            (item) =>
+              item.uid !== matchedMember.id &&
+              item.uid !== matchedMember.authUid &&
+              item.uid !== matchedMember.loginId,
+          );
+          const nextRsvps =
+            nextStatus === "unknown"
+              ? remaining
+              : [
+                  ...remaining,
+                  {
+                    uid: matchedMember.id,
+                    displayName: matchedMember.name,
+                    status: nextStatus,
+                  },
+                ];
+          await saveSessionRsvps(date, session.id, nextRsvps);
+        }),
+      );
+
+      await saveDayAttendanceTransport(date, member.id, transportDraft);
+      setAttendanceToast(`${member.name} の出欠を保存しました。`);
+      setSelectedAttendanceMember(null);
+    } catch (error) {
+      setAttendanceSaveError(error instanceof Error ? error.message : "出欠の保存に失敗しました。");
+    } finally {
+      setIsSavingAttendance(false);
+    }
   };
 
   if (view) {
@@ -393,7 +520,9 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
         </div>
       </div>
 
+      {attendanceToast && <div className="inline-toast">{attendanceToast}</div>}
       {pageError && <p className="field-error">{pageError}</p>}
+      {relationsError && <p className="field-error">{relationsError}</p>}
 
       {noticeText && (
         <div className="notice-block notice-collapsible">
@@ -445,7 +574,7 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
                 <div className="kv-row">
                   <span className="kv-key">出欠:</span>
                   <span className="kv-val">
-                    <button type="button" className="attendance-trigger" onClick={() => setSelectedSession(session)}>
+                    <button type="button" className="attendance-trigger" onClick={openAttendanceModal}>
                       <span className="count-yes">○{counts.yes}</span>
                       <span className="count-maybe">△{counts.maybe}</span>
                       <span className="count-no">×{counts.no}</span>
@@ -465,83 +594,199 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
         </div>
       )}
 
-      {selectedSession && (
-        <div className="modal-backdrop" onClick={() => setSelectedSession(null)}>
-          <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
+      {isAttendanceModalOpen && (
+        <div className="modal-backdrop" onClick={closeAttendanceModal}>
+          <div className="modal-panel today-attendance-day-modal" onClick={(event) => event.stopPropagation()}>
             <button
               type="button"
               className="modal-close"
-              onClick={() => setSelectedSession(null)}
+              onClick={closeAttendanceModal}
+              aria-label="閉じる"
+              title="閉じる"
+            >
+              ×
+            </button>
+            <h3 className="today-attendance-day-title">
+              {formatDateYmd(date)}（{formatWeekdayJa(date)}）
+            </h3>
+            <div className="today-attendance-day-table-wrap">
+              <table className="today-attendance-day-table">
+                <thead>
+                  <tr>
+                    <th className="today-attendance-member-head">メンバー</th>
+                    {sessions.map((session) => {
+                      const counts = countAttendanceRows(attendanceRowsByOrder[session.order] ?? []);
+                      return (
+                        <th key={session.id ?? `${session.order}-${session.startTime}`} className="today-attendance-session-head">
+                          <div className="today-attendance-session-time">
+                            <span>{formatTimeNoLeadingZero(session.startTime)}</span>
+                            <span>{formatTimeNoLeadingZero(session.endTime)}</span>
+                          </div>
+                          <div className="today-attendance-session-type">{typeLabel[session.type]}</div>
+                          <div className="today-attendance-session-counts">
+                            <span className="count-yes">○{counts.yes}</span>
+                            <span className="count-maybe">△{counts.maybe}</span>
+                            <span className="count-no">×{counts.no}</span>
+                            <span className="count-unknown">ー{counts.unknown}</span>
+                          </div>
+                        </th>
+                      );
+                    })}
+                    <th className="today-attendance-transport-head">行き</th>
+                    <th className="today-attendance-transport-head">帰り</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleChildMembers.map((member) => {
+                    const canEdit = editableMemberIds.has(member.id);
+                    const memberTransport = dayTransport[member.id];
+                    return (
+                      <tr key={member.id}>
+                        <th className="today-attendance-member-cell">
+                          {canEdit ? (
+                            <button
+                              type="button"
+                              className="today-attendance-member-button"
+                              onClick={() => openAttendanceMemberModal(member)}
+                            >
+                              {member.name}
+                            </button>
+                          ) : (
+                            <span className="today-attendance-member-label">{member.name}</span>
+                          )}
+                        </th>
+                        {sessions.map((session) => {
+                          const matched =
+                            session.demoRsvps?.find(
+                              (item) =>
+                                item.uid === member.authUid ||
+                                item.uid === member.id ||
+                                item.uid === member.loginId,
+                            ) ?? null;
+                          const status = matched?.status ?? "unknown";
+                          return (
+                            <td key={`${member.id}-${session.id ?? session.order}`} className={`today-attendance-status-cell ${status}`}>
+                              {statusSymbol[status]}
+                            </td>
+                          );
+                        })}
+                        <td className="today-attendance-transport-cell">
+                          {transportSymbol[memberTransport?.to ?? "car"]}
+                        </td>
+                        <td className="today-attendance-transport-cell">
+                          {transportSymbol[memberTransport?.from ?? "car"]}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {visibleChildMembers.length === 0 && (
+                    <tr>
+                      <td className="today-attendance-empty-row" colSpan={sessions.length + 3}>
+                        対象の部員はまだいません。
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedAttendanceMember && (
+        <div className="modal-backdrop">
+          <div className="modal-panel today-attendance-edit-modal" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close"
+              onClick={closeAttendanceMemberModal}
               aria-label="閉じる"
               title="閉じる"
             >
               ×
             </button>
             <p className="modal-context">
-              {formatDateYmd(date)}（{formatWeekdayJa(date)}） /{" "}
-              {formatTimeNoLeadingZero(selectedSession.startTime)}-{formatTimeNoLeadingZero(selectedSession.endTime)}
+              {formatDateYmd(date)}（{formatWeekdayJa(date)}）
             </p>
-            <h3>{getSessionDisplayTitle(selectedSession)}</h3>
-            {selectedSession.location && <p className="modal-summary muted">場所: {selectedSession.location}</p>}
-            <p className="modal-summary">
-              出欠: <span className="count-yes">○{selectedCounts.yes}</span>{" "}
-              <span className="count-maybe">△{selectedCounts.maybe}</span>{" "}
-              <span className="count-no">×{selectedCounts.no}</span>{" "}
-              <span className="count-unknown">ー{selectedCounts.unknown}</span>
-            </p>
-            <div className="rsvp-table">
-              {selectedRows.map((row) => (
-                <div key={row.uid} className="rsvp-row">
-                  <span>{row.displayName}</span>
-                  <span className={`rsvp-mark ${row.status}`}>{statusSymbol[row.status]}</span>
+            <h3>{selectedAttendanceMember.member.name}</h3>
+            <div className="today-attendance-edit-list">
+              {sessions.map((session) => {
+                const currentStatus = attendanceDraftBySessionOrder[session.order] ?? "unknown";
+                return (
+                  <section key={session.id ?? `${session.order}-${session.startTime}`} className="today-attendance-edit-section">
+                    <div className="today-attendance-edit-header">
+                      <strong>{typeLabel[session.type]}</strong>
+                      <span>
+                        {formatTimeNoLeadingZero(session.startTime)} - {formatTimeNoLeadingZero(session.endTime)}
+                      </span>
+                    </div>
+                    <div className="today-attendance-status-options">
+                      {(["yes", "maybe", "no", "unknown"] as RsvpStatus[]).map((status) => (
+                        <button
+                          key={status}
+                          type="button"
+                          className={`attendance-cell-status-option ${status} ${currentStatus === status ? "active" : ""}`}
+                          onClick={() =>
+                            setAttendanceDraftBySessionOrder((current) => ({
+                              ...current,
+                              [session.order]: status,
+                            }))
+                          }
+                        >
+                          <span>{statusSymbol[status]}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+              <section className="today-attendance-edit-section">
+                <div className="today-attendance-edit-header">
+                  <strong>移動手段</strong>
                 </div>
-              ))}
-              {selectedRows.length === 0 && (
-                <div className="rsvp-row">
-                  <span>対象の部員はまだいません。</span>
-                  <span className="rsvp-mark unknown">ー</span>
-                </div>
-              )}
-            </div>
-            {selectedSessionTodos.length > 0 && (
-              <section className="related-todos-block">
-                <h4>関連TODO</h4>
-                <div className="related-todos-list">
-                  {selectedSessionTodos.map((todo) => {
-                    const takeover = takeoverLabel(todo);
-                    return (
-                      <article key={todo.id} className={`todo-row compact ${todo.completed ? "completed" : ""}`}>
-                        <label className="todo-check">
-                          <input
-                            type="checkbox"
-                            checked={todo.completed}
-                            onChange={() => void saveTodo({ ...todo, completed: !todo.completed })}
-                          />
-                        </label>
-                        <div className="todo-main">
-                          <p className="todo-title">{todo.title}</p>
-                          <p className="todo-meta">
-                            <span>担当: {assigneeLabel(todo.assigneeUid)}</span>
-                            <span>期限: {todo.dueDate ?? "—"}</span>
-                          </p>
-                        </div>
-                        <div className="todo-actions">
-                          {takeover && (
-                            <button
-                              type="button"
-                              className="button button-small"
-                              onClick={() => void saveTodo({ ...todo, assigneeUid: currentUid })}
-                            >
-                              {takeover}
-                            </button>
-                          )}
-                        </div>
-                      </article>
-                    );
-                  })}
+                <div className="today-attendance-transport-editor">
+                  <div className="today-attendance-transport-group">
+                    <span className="today-attendance-transport-label">行き</span>
+                    <div className="today-attendance-transport-options">
+                      {(["car", "walk"] as AttendanceTransportMethod[]).map((mode) => (
+                        <button
+                          key={`to-${mode}`}
+                          type="button"
+                          className={`attendance-cell-status-option transport-option ${transportDraft.to === mode ? "active" : ""}`}
+                          onClick={() => setTransportDraft((current) => ({ ...current, to: mode }))}
+                        >
+                          <span>{transportLabel[mode]}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="today-attendance-transport-group">
+                    <span className="today-attendance-transport-label">帰り</span>
+                    <div className="today-attendance-transport-options">
+                      {(["car", "walk"] as AttendanceTransportMethod[]).map((mode) => (
+                        <button
+                          key={`from-${mode}`}
+                          type="button"
+                          className={`attendance-cell-status-option transport-option ${transportDraft.from === mode ? "active" : ""}`}
+                          onClick={() => setTransportDraft((current) => ({ ...current, from: mode }))}
+                        >
+                          <span>{transportLabel[mode]}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </section>
-            )}
+            </div>
+            {attendanceSaveError && <p className="field-error">{attendanceSaveError}</p>}
+            <div className="modal-actions">
+              <button type="button" className="button button-secondary" onClick={closeAttendanceMemberModal}>
+                キャンセル
+              </button>
+              <button type="button" className="button" onClick={() => void saveAttendanceMember()} disabled={isSavingAttendance}>
+                {isSavingAttendance ? "保存中..." : "保存"}
+              </button>
+            </div>
           </div>
         </div>
       )}

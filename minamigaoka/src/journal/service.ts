@@ -9,7 +9,7 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { db, hasFirebaseAppConfig } from "../config/firebase";
-import type { DayLog, DemoRsvp } from "../types";
+import type { AttendanceTransportMethod, DayLog, DemoRsvp } from "../types";
 
 const emptyDayLog = (): DayLog => ({
   notes: "",
@@ -177,4 +177,28 @@ export const saveSessionRsvps = async (
   });
 
   await batch.commit();
+};
+
+export const saveDayAttendanceTransport = async (
+  date: string,
+  memberId: string,
+  transport: {
+    to: AttendanceTransportMethod;
+    from: AttendanceTransportMethod;
+  },
+): Promise<void> => {
+  ensureDb();
+  await setDoc(
+    doc(collection(db!, "scheduleDays"), date),
+    {
+      attendanceTransport: {
+        [memberId]: {
+          to: transport.to,
+          from: transport.from,
+        },
+      },
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
 };
