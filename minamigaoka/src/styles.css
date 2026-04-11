@@ -3690,6 +3690,12 @@ body {
   font-size: 0.92rem;
 }
 
+.today-attendance-edit-session-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .today-rsvp-toggle-group {
   gap: 6px;
   align-items: center;
@@ -6208,10 +6214,37 @@ textarea {
   .today-attendance-edit-header {
     flex-direction: column;
     align-items: flex-start;
+    margin-bottom: 0;
+    min-width: 0;
+  }
+
+  .today-attendance-edit-session-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .today-attendance-edit-header strong,
+  .today-attendance-edit-header span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .today-rsvp-toggle-group {
+    gap: 4px;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+  }
+
+  .today-attendance-transport-section .today-attendance-edit-header {
+    margin-bottom: 4px;
   }
 
   .today-attendance-transport-editor {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
   }
 
   .today-attendance-transport-options {
@@ -6232,6 +6265,19 @@ textarea {
 
   .today-transport-toggle span {
     font-size: 0.74rem;
+  }
+
+  .today-attendance-transport-group {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .today-attendance-transport-label {
+    flex: 0 0 auto;
+    font-size: 0.74rem;
+    white-space: nowrap;
   }
 
   .today-attendance-comment-input {

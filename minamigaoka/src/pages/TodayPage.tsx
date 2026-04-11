@@ -876,33 +876,35 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
                 const currentStatus = attendanceDraftBySessionOrder[session.order] ?? "unknown";
                 return (
                   <section key={session.id ?? `${session.order}-${session.startTime}`} className="today-attendance-edit-section">
-                    <div className="today-attendance-edit-header">
-                      <strong>{typeLabel[session.type]}</strong>
-                      <span>
-                        {formatTimeNoLeadingZero(session.startTime)} - {formatTimeNoLeadingZero(session.endTime)}
-                      </span>
-                    </div>
-                    <div className="rsvp-toggle-group today-rsvp-toggle-group">
-                      {(["yes", "maybe", "no", "unknown"] as RsvpStatus[]).map((status) => (
-                        <button
-                          key={status}
-                          type="button"
-                          className={`rsvp-toggle today-rsvp-toggle ${status} ${currentStatus === status ? "active" : ""}`}
-                          onClick={() =>
-                            setAttendanceDraftBySessionOrder((current) => ({
-                              ...current,
-                              [session.order]: status,
-                            }))
-                          }
-                        >
-                          <span>{statusSymbol[status]}</span>
-                        </button>
-                      ))}
+                    <div className="today-attendance-edit-session-row">
+                      <div className="today-attendance-edit-header">
+                        <strong>{typeLabel[session.type]}</strong>
+                        <span>
+                          {formatTimeNoLeadingZero(session.startTime)} - {formatTimeNoLeadingZero(session.endTime)}
+                        </span>
+                      </div>
+                      <div className="rsvp-toggle-group today-rsvp-toggle-group">
+                        {(["yes", "maybe", "no", "unknown"] as RsvpStatus[]).map((status) => (
+                          <button
+                            key={status}
+                            type="button"
+                            className={`rsvp-toggle today-rsvp-toggle ${status} ${currentStatus === status ? "active" : ""}`}
+                            onClick={() =>
+                              setAttendanceDraftBySessionOrder((current) => ({
+                                ...current,
+                                [session.order]: status,
+                              }))
+                            }
+                          >
+                            <span>{statusSymbol[status]}</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </section>
                 );
               })}
-              <section className="today-attendance-edit-section">
+              <section className="today-attendance-edit-section today-attendance-transport-section">
                 <div className="today-attendance-edit-header">
                   <strong>移動手段</strong>
                 </div>
