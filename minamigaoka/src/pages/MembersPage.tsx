@@ -46,6 +46,7 @@ import {
   deleteMemberRelation,
   linkMemberToAuthUser,
   listAuthUsers,
+  resetMemberTemporaryPassword,
   saveFamily,
   saveMember,
   saveMemberRelation,
@@ -153,6 +154,13 @@ type DeleteDialogState =
 
 type ManagementTab = "family" | "member" | "auth" | "integrity";
 
+type PasswordResetDialogState = {
+  memberId: string;
+  memberName: string;
+  loginId: string;
+  authUid: string;
+};
+
 const emptyFamilyForm = (): FamilyFormState => ({
   id: null,
   name: "",
@@ -210,6 +218,57 @@ const formatMemberKanaLabel = (member: MemberRecord) => {
   const familyNameKana = member.familyNameKana?.trim() ?? "";
   const givenNameKana = member.givenNameKana?.trim() ?? "";
   return `${familyNameKana}${givenNameKana}`.trim() || familyNameKana || givenNameKana;
+};
+
+const generateTemporaryPassword = (): string => {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnopqrstuvwxyz";
+  const numbers = "23456789";
+  const all = `${upper}${lower}${numbers}`;
+  const pick = (source: string) => source[Math.floor(Math.random() * source.length)] ?? "";
+  const values = [pick(upper), pick(lower), pick(numbers)];
+  while (values.length < 12) {
+    values.push(pick(all));
+  }
+  return values
+    .sort(() => Math.random() - 0.5)
+    .join("");
+};
+
+const validateTemporaryPassword = (value: string): string | undefined => {
+  if (!value.trim()) return "新しい仮パスワードを入力してください。";
+  if (value.length < 8) return "仮パスワードは 8 文字以上で入力してください。";
+  if (!/[A-Z]/.test(value) || !/[a-z]/.test(value) || !/\d/.test(value)) {
+    return "仮パスワードは英大文字・英小文字・数字を含めてください。";
+  }
+  return undefined;
+};
+
+const mapPasswordResetError = (error: unknown): string => {
+  const code =
+    typeof error === "object" && error && "code" in error && typeof (error as { code?: unknown }).code === "string"
+      ? String((error as { code: string }).code)
+      : "";
+  const message =
+    typeof error === "object" && error && "message" in error && typeof (error as { message?: unknown }).message === "string"
+      ? String((error as { message: string }).message)
+      : "";
+
+  if (code === "functions/permission-denied") {
+    return "管理者のみ実行できます。";
+  }
+  if (code === "functions/failed-precondition") {
+    return "authUid 未設定のため仮パスワードを再設定できません。";
+  }
+  if (code === "functions/not-found") {
+    return "対象の認証ユーザーが見つかりませんでした。";
+  }
+  if (code === "functions/invalid-argument") {
+    if (message.includes("8 文字以上")) return "仮パスワードは 8 文字以上で入力してください。";
+    if (message.includes("英大文字")) return "仮パスワードは英大文字・英小文字・数字を含めてください。";
+    return "仮パスワードの入力内容を確認してください。";
+  }
+  return "仮パスワードの再設定に失敗しました。";
 };
 
 type PermissionSectionProps = {
@@ -295,6 +354,13 @@ export function MembersManagementPage() {
   const [familyVehicleDetailTarget, setFamilyVehicleDetailTarget] = useState<FamilyRecord | null>(null);
   const [linkTargetMemberId, setLinkTargetMemberId] = useState<string | null>(null);
   const [selectedAuthUid, setSelectedAuthUid] = useState("");
+  const [passwordResetTarget, setPasswordResetTarget] = useState<PasswordResetDialogState | null>(null);
+  const [passwordResetValue, setPasswordResetValue] = useState("");
+  const [passwordResetConfirmValue, setPasswordResetConfirmValue] = useState("");
+  const [passwordResetErrors, setPasswordResetErrors] = useState<FieldErrors>({});
+  const [passwordResetStatus, setPasswordResetStatus] = useState("");
+  const [passwordResetSuccessValue, setPasswordResetSuccessValue] = useState("");
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState>(null);
   const [deleteError, setDeleteError] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
@@ -607,6 +673,40 @@ export function MembersManagementPage() {
     const candidate = findAuthCandidate(member, authUsers);
     setLinkTargetMemberId(member.id);
     setSelectedAuthUid(candidate?.uid ?? "");
+  };
+
+  const openPasswordResetModal = (member: MemberRecord) => {
+    if (!member.authUid.trim()) return;
+    setPasswordResetTarget({
+      memberId: member.id,
+      memberName: member.name,
+      loginId: member.loginId,
+      authUid: member.authUid,
+    });
+    setPasswordResetValue("");
+    setPasswordResetConfirmValue("");
+    setPasswordResetErrors({});
+    setPasswordResetStatus("");
+    setPasswordResetSuccessValue("");
+  };
+
+  const closePasswordResetModal = () => {
+    if (isResettingPassword) return;
+    setPasswordResetTarget(null);
+    setPasswordResetValue("");
+    setPasswordResetConfirmValue("");
+    setPasswordResetErrors({});
+    setPasswordResetStatus("");
+    setPasswordResetSuccessValue("");
+  };
+
+  const fillGeneratedPassword = () => {
+    const next = generateTemporaryPassword();
+    setPasswordResetValue(next);
+    setPasswordResetConfirmValue(next);
+    setPasswordResetErrors({});
+    setPasswordResetStatus("");
+    setPasswordResetSuccessValue("");
   };
 
   const openDeleteDialog = (
@@ -936,6 +1036,48 @@ export function MembersManagementPage() {
       await refreshAuthUsers();
     } catch (error) {
       setPageError(error instanceof Error ? error.message : "Auth 紐付けに失敗しました。");
+    }
+  };
+
+  const submitPasswordReset = async () => {
+    if (!passwordResetTarget) return;
+
+    const nextErrors: FieldErrors = {};
+    const passwordError = validateTemporaryPassword(passwordResetValue);
+    if (passwordError) {
+      nextErrors.password = passwordError;
+    }
+    if (!passwordResetConfirmValue.trim()) {
+      nextErrors.passwordConfirm = "確認用の仮パスワードを入力してください。";
+    } else if (passwordResetValue !== passwordResetConfirmValue) {
+      nextErrors.passwordConfirm = "確認用の仮パスワードが一致していません。";
+    }
+
+    setPasswordResetErrors(nextErrors);
+    setPasswordResetStatus("");
+    if (Object.values(nextErrors).some(Boolean)) return;
+
+    setIsResettingPassword(true);
+    try {
+      await resetMemberTemporaryPassword(passwordResetTarget.memberId, passwordResetValue);
+      setPasswordResetSuccessValue(passwordResetValue);
+      setPasswordResetStatus("仮パスワードを更新しました。本人への連絡前に必要ならコピーしてください。");
+      setToastMessage("仮パスワードを更新しました。");
+    } catch (error) {
+      setPasswordResetStatus(mapPasswordResetError(error));
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
+  const copyResetPassword = async () => {
+    const value = passwordResetSuccessValue || passwordResetValue;
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setToastMessage("仮パスワードをコピーしました。");
+    } catch {
+      setPasswordResetStatus("仮パスワードのコピーに失敗しました。");
     }
   };
 
@@ -1468,6 +1610,15 @@ export function MembersManagementPage() {
                   <div className="members-admin-row-actions">
                     <button type="button" className="button button-small" onClick={() => openLinkModal(member)}>
                       Auth紐付け
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-small button-secondary"
+                      onClick={() => openPasswordResetModal(member)}
+                      disabled={!member.authUid.trim()}
+                      title={!member.authUid.trim() ? "authUid 未設定のため再設定できません。" : undefined}
+                    >
+                      仮PW再設定
                     </button>
                   </div>
                 </article>
@@ -2171,6 +2322,93 @@ export function MembersManagementPage() {
               </button>
               <button type="button" className="button" onClick={() => void submitRelation()}>
                 保存
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {passwordResetTarget && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <section className="modal-panel">
+            <button
+              type="button"
+              className="modal-close"
+              aria-label="閉じる"
+              title="閉じる"
+              onClick={closePasswordResetModal}
+              disabled={isResettingPassword}
+            >
+              ×
+            </button>
+            <h3>仮パスワード再設定</h3>
+            <p className="modal-summary">{passwordResetTarget.memberName}</p>
+            <p className="muted">loginId: {passwordResetTarget.loginId || "-"}</p>
+            <p className="muted">authUid: {passwordResetTarget.authUid}</p>
+            <label>
+              新しい仮パスワード
+              <input
+                type="text"
+                autoComplete="new-password"
+                value={passwordResetValue}
+                onChange={(event) => {
+                  setPasswordResetValue(event.target.value);
+                  setPasswordResetErrors((current) => ({ ...current, password: undefined }));
+                  setPasswordResetStatus("");
+                  setPasswordResetSuccessValue("");
+                }}
+              />
+              {passwordResetErrors.password && <span className="field-error">{passwordResetErrors.password}</span>}
+            </label>
+            <label>
+              新しい仮パスワード（確認）
+              <input
+                type="text"
+                autoComplete="new-password"
+                value={passwordResetConfirmValue}
+                onChange={(event) => {
+                  setPasswordResetConfirmValue(event.target.value);
+                  setPasswordResetErrors((current) => ({ ...current, passwordConfirm: undefined }));
+                  setPasswordResetStatus("");
+                  setPasswordResetSuccessValue("");
+                }}
+              />
+              {passwordResetErrors.passwordConfirm && (
+                <span className="field-error">{passwordResetErrors.passwordConfirm}</span>
+              )}
+            </label>
+            <div className="members-admin-row-actions">
+              <button
+                type="button"
+                className="button button-small button-secondary"
+                onClick={fillGeneratedPassword}
+                disabled={isResettingPassword}
+              >
+                自動生成
+              </button>
+              <button
+                type="button"
+                className="button button-small button-secondary"
+                onClick={() => void copyResetPassword()}
+                disabled={!passwordResetValue}
+              >
+                コピー
+              </button>
+            </div>
+            {passwordResetStatus && (
+              <p className={passwordResetSuccessValue ? "modal-summary" : "field-error"}>{passwordResetStatus}</p>
+            )}
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={closePasswordResetModal}
+                disabled={isResettingPassword}
+              >
+                キャンセル
+              </button>
+              <button type="button" className="button" onClick={() => void submitPasswordReset()} disabled={isResettingPassword}>
+                {isResettingPassword ? "更新中..." : "仮パスワードを更新"}
               </button>
             </div>
           </section>

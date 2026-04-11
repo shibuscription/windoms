@@ -54,6 +54,16 @@ const generateTemporaryPassword = (): string => {
 const normalizeOptionalString = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
+const validateTemporaryPassword = (value: string): string | null => {
+  if (value.length < 8) {
+    return "仮パスワードは 8 文字以上で入力してください。";
+  }
+  if (!/[A-Z]/.test(value) || !/[a-z]/.test(value) || !/\d/.test(value)) {
+    return "仮パスワードは英大文字・英小文字・数字を含めてください。";
+  }
+  return null;
+};
+
 const escapeIcsText = (value: string): string =>
   value
     .replace(/\\/g, "\\\\")
@@ -537,6 +547,81 @@ export const linkMemberAuth = onCall(async (request) => {
     authUid: authUser.uid,
     authEmail: authUser.email ?? "",
   };
+});
+
+export const resetMemberTemporaryPassword = onCall(async (request) => {
+  await assertAdmin(request.auth);
+
+  const memberId = typeof request.data?.memberId === "string" ? request.data.memberId.trim() : "";
+  const newPassword =
+    typeof request.data?.newPassword === "string" ? request.data.newPassword.trim() : "";
+
+  if (!memberId || !newPassword) {
+    throw new HttpsError("invalid-argument", "memberId and newPassword are required.");
+  }
+
+  const passwordError = validateTemporaryPassword(newPassword);
+  if (passwordError) {
+    throw new HttpsError("invalid-argument", passwordError, {
+      errorCode: "auth/weak-password",
+      errorMessage: passwordError,
+    });
+  }
+
+  const memberRef = firestore.collection("members").doc(memberId);
+  const memberSnapshot = await memberRef.get();
+  if (!memberSnapshot.exists) {
+    throw new HttpsError("not-found", "Target member was not found.");
+  }
+
+  const authUid = typeof memberSnapshot.get("authUid") === "string" ? String(memberSnapshot.get("authUid")).trim() : "";
+  if (!authUid) {
+    throw new HttpsError("failed-precondition", "Target member does not have linked authUid.", {
+      errorCode: "auth/member-auth-not-linked",
+      errorMessage: "members.authUid が未設定のため再設定できません。",
+    });
+  }
+
+  try {
+    await adminAuth.updateUser(authUid, { password: newPassword });
+    await memberRef.set(
+      {
+        updatedAt: new Date(),
+      },
+      { merge: true },
+    );
+    return { authUid };
+  } catch (error) {
+    const errorCode =
+      typeof error === "object" && error && "code" in error && typeof (error as { code?: unknown }).code === "string"
+        ? String((error as { code: string }).code)
+        : "";
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    if (errorCode === "auth/user-not-found") {
+      throw new HttpsError("not-found", "Auth user was not found.", {
+        errorCode,
+        errorMessage,
+      });
+    }
+    if (errorCode === "auth/invalid-password" || errorCode === "auth/weak-password") {
+      throw new HttpsError("invalid-argument", "仮パスワードが Firebase の要件を満たしていません。", {
+        errorCode,
+        errorMessage,
+      });
+    }
+    logger.error("resetMemberTemporaryPassword failed", {
+      projectId: serverProjectId || "(unknown)",
+      functionsRegion,
+      authUid: request.auth?.uid ?? "",
+      targetAuthUid: authUid,
+      errorCode,
+      errorMessage,
+    });
+    throw new HttpsError("internal", "仮パスワードの再設定に失敗しました。", {
+      errorCode: errorCode || "auth/reset-password-failed",
+      errorMessage,
+    });
+  }
 });
 
 type BulkRegisterRowInput = {

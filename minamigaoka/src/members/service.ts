@@ -524,6 +524,19 @@ export const linkMemberToAuthUser = async (
   return result.data;
 };
 
+export const resetMemberTemporaryPassword = async (
+  memberId: string,
+  newPassword: string,
+): Promise<{ authUid: string }> => {
+  ensureFunctions();
+  const callable = httpsCallable<
+    { memberId: string; newPassword: string },
+    { authUid: string }
+  >(functions!, "resetMemberTemporaryPassword");
+  const result = await callable({ memberId, newPassword });
+  return result.data;
+};
+
 export const bulkRegisterMembers = async (
   rows: BulkRegisterMemberRow[],
 ): Promise<BulkRegisterMembersResponse> => {
