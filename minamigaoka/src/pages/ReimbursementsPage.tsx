@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { DemoData, Reimbursement, ReimbursementStatus } from "../types";
 import { LinkifiedText } from "../components/LinkifiedText";
 import { ReceiptImagePicker } from "../components/ReceiptImagePicker";
@@ -215,6 +216,9 @@ export function ReimbursementsPage({
       resolved.loginId === currentUserMember.loginId
     );
   };
+
+  const renderFrontModal = (content: ReactNode) =>
+    typeof document === "undefined" ? content : createPortal(content, document.body);
 
   const visibleByRole = useMemo(
     () =>
@@ -779,9 +783,10 @@ export function ReimbursementsPage({
         )}
       </div>
 
-      {isCreateModalOpen && (
-        <div className="modal-backdrop modal-backdrop-front" role="dialog" aria-modal="true">
-          <section className="modal-panel purchases-complete-modal" onClick={(event) => event.stopPropagation()}>
+      {isCreateModalOpen &&
+        renderFrontModal(
+          <div className="modal-backdrop modal-backdrop-front" role="dialog" aria-modal="true">
+            <section className="modal-panel purchases-complete-modal" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeCreateModal}>
               ×
             </button>
@@ -958,13 +963,15 @@ export function ReimbursementsPage({
                 {editingTarget ? "更新" : "追加"}
               </button>
             </div>
-          </section>
-        </div>
-      )}
+            </section>
+          </div>,
+        )}
 
-      {isCreateModalOpen && isReadingReceipt && (
-        <div className="modal-backdrop modal-backdrop-front" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
-          <section className="modal-panel ocr-progress-modal" onClick={(event) => event.stopPropagation()}>
+      {isCreateModalOpen &&
+        isReadingReceipt &&
+        renderFrontModal(
+          <div className="modal-backdrop modal-backdrop-front" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
+            <section className="modal-panel ocr-progress-modal" onClick={(event) => event.stopPropagation()}>
             <h3>レシートから金額を読み取り中です</h3>
             <p className="muted">完了までしばらくお待ちください。中止して手入力に切り替えることもできます。</p>
             <p className="ocr-progress-phase">{ocrPhaseLabel}</p>
@@ -976,9 +983,9 @@ export function ReimbursementsPage({
                 中止
               </button>
             </div>
-          </section>
-        </div>
-      )}
+            </section>
+          </div>,
+        )}
 
       {detailTarget && (
         <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setDetailTarget(null)}>
@@ -1034,9 +1041,10 @@ export function ReimbursementsPage({
         </div>
       )}
 
-      {paidModalTarget && (
-        <div className="modal-backdrop modal-backdrop-front" role="dialog" aria-modal="true">
-          <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
+      {paidModalTarget &&
+        renderFrontModal(
+          <div className="modal-backdrop modal-backdrop-front" role="dialog" aria-modal="true">
+            <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeMarkPaidModal}>
               ×
             </button>
@@ -1118,13 +1126,14 @@ export function ReimbursementsPage({
                 支払済にする
               </button>
             </div>
-          </section>
-        </div>
-      )}
+            </section>
+          </div>,
+        )}
 
-      {confirmDialog && (
-        <div className="modal-backdrop modal-backdrop-front" role="dialog" aria-modal="true">
-          <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
+      {confirmDialog &&
+        renderFrontModal(
+          <div className="modal-backdrop modal-backdrop-front" role="dialog" aria-modal="true">
+            <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setConfirmDialog(null)}>
               ×
             </button>
@@ -1148,9 +1157,9 @@ export function ReimbursementsPage({
                 {confirmDialog.mode === "delete" ? "削除" : "確定"}
               </button>
             </div>
-          </section>
-        </div>
-      )}
+            </section>
+          </div>,
+        )}
     </section>
   );
 }
