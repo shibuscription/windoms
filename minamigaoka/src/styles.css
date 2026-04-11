@@ -5546,12 +5546,16 @@ body {
   color: #0f172a;
 }
 
-.logs-list-card.created {
-  background: #ffffff;
+.logs-list-card.not-created {
+  background: #f3f4f6;
 }
 
-.logs-list-card.pending {
-  background: #f3f4f6;
+.logs-list-card.in-progress {
+  background: #fffbeb;
+}
+
+.logs-list-card.completed {
+  background: #f0fdf4;
 }
 
 .logs-list-card:disabled {
@@ -5603,14 +5607,19 @@ body {
   font-weight: 700;
 }
 
-.logs-list-status-badge.created {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.logs-list-status-badge.pending {
+.logs-list-status-badge.not-created {
   background: #e5e7eb;
   color: #374151;
+}
+
+.logs-list-status-badge.in-progress {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.logs-list-status-badge.completed {
+  background: #dcfce7;
+  color: #166534;
 }
 
 .logs-list-sessions {

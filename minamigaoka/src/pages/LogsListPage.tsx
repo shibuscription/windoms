@@ -24,6 +24,8 @@ type LogsListItem = {
   log: DayLog | null;
 };
 
+type LogProgressStatus = "not-created" | "in-progress" | "completed";
+
 const toFamilyName = (value?: string): string => {
   const trimmed = value?.trim() ?? "";
   if (!trimmed) return "-";
@@ -44,6 +46,25 @@ const sessionBadgeLabel = (session: SessionDoc): string => {
 const sessionDetail = (session: SessionDoc): string | null => {
   if (session.type !== "event") return null;
   return session.eventName?.trim() || "イベント名未設定";
+};
+
+const hasAssignedDuty = (session: SessionDoc): boolean => Boolean(session.assigneeNameSnapshot?.trim());
+
+const resolveDutyOrderKey = (session: SessionDoc, index: number): string => String(session.order ?? index + 1);
+
+const resolveLogProgressStatus = (sessions: SessionDoc[], log: DayLog | null): LogProgressStatus => {
+  if (!log) return "not-created";
+  const requiredDutyKeys = sessions.flatMap((session, index) =>
+    hasAssignedDuty(session) ? [resolveDutyOrderKey(session, index)] : [],
+  );
+  const areAllRequiredStampsPresent = requiredDutyKeys.every((key) => Boolean(log.dutyStamps?.[key]));
+  return areAllRequiredStampsPresent ? "completed" : "in-progress";
+};
+
+const logProgressLabel: Record<LogProgressStatus, string> = {
+  "not-created": "未作成",
+  "in-progress": "作成中",
+  completed: "作成済み",
 };
 
 function DutyStampPreview({
@@ -159,14 +180,14 @@ export function LogsListPage({ data, ensureDayLog }: LogsListPageProps) {
       ) : (
         <div className="logs-list-cards">
           {items.map((item) => {
-            const isCreated = Boolean(item.log);
+            const progressStatus = resolveLogProgressStatus(item.sessions, item.log);
             const isOpening = openingDate === item.date;
 
             return (
               <button
                 key={item.date}
                 type="button"
-                className={`logs-list-card ${isCreated ? "created" : "pending"}`}
+                className={`logs-list-card ${progressStatus}`}
                 onClick={() => void onOpenLog(item.date)}
                 disabled={isOpening}
               >
@@ -175,9 +196,7 @@ export function LogsListPage({ data, ensureDayLog }: LogsListPageProps) {
                     <strong className="logs-list-date">{formatDateYmd(item.date)}</strong>
                     <span className={`logs-list-weekday ${weekdayTone(item.date)}`}>（{formatWeekdayJa(item.date)}）</span>
                   </div>
-                  <span className={`logs-list-status-badge ${isCreated ? "created" : "pending"}`}>
-                    {isCreated ? "作成済み" : "未作成"}
-                  </span>
+                  <span className={`logs-list-status-badge ${progressStatus}`}>{logProgressLabel[progressStatus]}</span>
                 </div>
 
                 <div className="logs-list-sessions">
