@@ -32,6 +32,12 @@ type AttendanceRow = {
   status: RsvpStatus;
 };
 
+type PendingRemoveArrayItemState = {
+  field: "actualInstructors" | "actualSeniors";
+  index: number;
+  label: string;
+};
+
 type WeatherValue = "" | "晴れ" | "くもり" | "雨" | "雪" | "その他";
 
 const weatherOptions: ReadonlyArray<{
@@ -634,6 +640,7 @@ export function LogPage({
   const [stampMessage, setStampMessage] = useState("");
   const [animatingStampOrder, setAnimatingStampOrder] = useState<number | null>(null);
   const [pendingDeleteActivityIndex, setPendingDeleteActivityIndex] = useState<number | null>(null);
+  const [pendingRemoveArrayItem, setPendingRemoveArrayItem] = useState<PendingRemoveArrayItemState | null>(null);
   const [pendingStampSession, setPendingStampSession] = useState<{
     sessionOrder: number;
     mode: "undo" | "overwrite";
@@ -983,6 +990,20 @@ export function LogPage({
     }));
   };
 
+  const requestRemoveArrayItem = (
+    field: "actualInstructors" | "actualSeniors",
+    index: number,
+    label: string,
+  ) => {
+    setPendingRemoveArrayItem({ field, index, label });
+  };
+
+  const confirmRemoveArrayItem = () => {
+    if (!pendingRemoveArrayItem) return;
+    removeArrayItem(pendingRemoveArrayItem.field, pendingRemoveArrayItem.index);
+    setPendingRemoveArrayItem(null);
+  };
+
   const toggleMainInstructorAttendance = (sessionOrder: number) => {
     const key = String(sessionOrder);
     applyDayLogUpdate((prev) => ({
@@ -1277,7 +1298,9 @@ export function LogPage({
           <div className="panel-body">
             <InlineSuggestAdd<string>
               selectedLabels={log.actualInstructors}
-              onRemove={(index) => removeArrayItem("actualInstructors", index)}
+              onRemove={(index) =>
+                requestRemoveArrayItem("actualInstructors", index, log.actualInstructors[index] ?? "")
+              }
               inputPlaceholder="名前を入力"
               getSuggestions={(draft) =>
                 filterSuggestions(instructorSuggestions, draft)
@@ -1312,7 +1335,9 @@ export function LogPage({
           <div className="panel-body">
             <InlineSuggestAdd<string>
               selectedLabels={log.actualSeniors}
-              onRemove={(index) => removeArrayItem("actualSeniors", index)}
+              onRemove={(index) =>
+                requestRemoveArrayItem("actualSeniors", index, log.actualSeniors[index] ?? "")
+              }
               inputPlaceholder="名前を入力"
               getSuggestions={(draft) =>
                 filterSuggestions(seniorSuggestions, draft)
@@ -1454,6 +1479,39 @@ export function LogPage({
                 やめる
               </button>
               <button type="button" className="button button-small" onClick={confirmDeleteActivity}>
+                実行する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingRemoveArrayItem && (
+        <div className="modal-backdrop">
+          <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close"
+              onClick={() => setPendingRemoveArrayItem(null)}
+              aria-label="閉じる" title="閉じる"
+            >
+              ×
+            </button>
+            <p className="modal-context">
+              {pendingRemoveArrayItem.field === "actualInstructors"
+                ? "この外部講師を削除しますか？"
+                : "この先輩を削除しますか？"}
+            </p>
+            {pendingRemoveArrayItem.label && <p className="modal-summary">{pendingRemoveArrayItem.label}</p>}
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => setPendingRemoveArrayItem(null)}
+              >
+                やめる
+              </button>
+              <button type="button" className="button button-small" onClick={confirmRemoveArrayItem}>
                 実行する
               </button>
             </div>
