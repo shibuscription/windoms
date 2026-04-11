@@ -112,6 +112,15 @@ export type RelatedRef = {
 export type EventKind = "コンクール" | "演奏会" | "合同練習" | "その他";
 export type EventState = "active" | "done";
 
+export type EventCarpoolVehicle = {
+  familyId: string;
+  familyNameSnapshot: string;
+  vehicleIndex: number;
+  maker: string;
+  model: string;
+  capacity: number | null;
+};
+
 export type EventRecord = {
   id: string;
   title: string;
@@ -120,6 +129,7 @@ export type EventRecord = {
   eventSortDate: string;
   memo?: string;
   sessionIds?: string[];
+  carpoolVehicles?: EventCarpoolVehicle[];
 };
 
 export type Todo = {

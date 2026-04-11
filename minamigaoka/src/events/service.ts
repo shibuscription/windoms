@@ -8,7 +8,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { db, hasFirebaseAppConfig } from "../config/firebase";
-import type { EventKind, EventRecord, EventState } from "../types";
+import type { EventCarpoolVehicle, EventKind, EventRecord, EventState } from "../types";
 
 const eventsCollection = db ? collection(db, "events") : null;
 
@@ -37,6 +37,32 @@ const toOptionalString = (value: unknown): string | undefined => {
   return normalized ? normalized : undefined;
 };
 
+const toOptionalCapacity = (value: unknown): number | null => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() && /^\d+$/.test(value.trim())) return Number(value.trim());
+  return null;
+};
+
+const toCarpoolVehicle = (value: unknown): EventCarpoolVehicle | null => {
+  if (!value || typeof value !== "object") return null;
+  const source = value as Record<string, unknown>;
+  const familyId = typeof source.familyId === "string" ? source.familyId : "";
+  const familyNameSnapshot = typeof source.familyNameSnapshot === "string" ? source.familyNameSnapshot : "";
+  const vehicleIndex =
+    typeof source.vehicleIndex === "number" && Number.isFinite(source.vehicleIndex) ? source.vehicleIndex : -1;
+
+  if (!familyId || vehicleIndex < 0) return null;
+
+  return {
+    familyId,
+    familyNameSnapshot,
+    vehicleIndex,
+    maker: typeof source.maker === "string" ? source.maker : "",
+    model: typeof source.model === "string" ? source.model : "",
+    capacity: toOptionalCapacity(source.capacity),
+  };
+};
+
 const toEventRecord = (id: string, value: Record<string, unknown>): EventRecord => ({
   id,
   title: typeof value.title === "string" ? value.title : "",
@@ -47,6 +73,13 @@ const toEventRecord = (id: string, value: Record<string, unknown>): EventRecord 
   sessionIds: Array.isArray(value.sessionIds)
     ? value.sessionIds.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
     : [],
+  carpoolVehicles: Array.isArray(value.carpoolVehicles)
+    ? value.carpoolVehicles.reduce<EventCarpoolVehicle[]>((result, item) => {
+        const normalized = toCarpoolVehicle(item);
+        if (normalized) result.push(normalized);
+        return result;
+      }, [])
+    : [],
 });
 
 const toPayload = (event: Omit<EventRecord, "id">) => ({
@@ -56,6 +89,16 @@ const toPayload = (event: Omit<EventRecord, "id">) => ({
   eventSortDate: event.eventSortDate,
   memo: event.memo?.trim() || "",
   sessionIds: Array.isArray(event.sessionIds) ? event.sessionIds : [],
+  carpoolVehicles: Array.isArray(event.carpoolVehicles)
+    ? event.carpoolVehicles.map((vehicle) => ({
+        familyId: vehicle.familyId,
+        familyNameSnapshot: vehicle.familyNameSnapshot.trim(),
+        vehicleIndex: vehicle.vehicleIndex,
+        maker: vehicle.maker.trim(),
+        model: vehicle.model.trim(),
+        capacity: toOptionalCapacity(vehicle.capacity),
+      }))
+    : [],
   updatedAt: serverTimestamp(),
 });
 

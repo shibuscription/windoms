@@ -1263,6 +1263,13 @@ body {
   color: #1e40af;
 }
 
+.events-detail-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
 .events-detail-actions {
   display: flex;
   align-items: center;
@@ -1337,6 +1344,85 @@ body {
   list-style: none;
   display: grid;
   gap: 6px;
+}
+
+.events-carpool-editor {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 10px;
+}
+
+.events-carpool-editor-header {
+  display: grid;
+  gap: 4px;
+}
+
+.events-carpool-editor-header h4 {
+  margin: 0;
+  font-size: 0.94rem;
+}
+
+.events-carpool-editor-header .muted {
+  margin: 0;
+}
+
+.events-carpool-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.events-carpool-list {
+  display: grid;
+  gap: 8px;
+}
+
+.events-carpool-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  background: #fff;
+  padding: 8px 10px;
+}
+
+.events-carpool-row > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.events-carpool-name,
+.events-carpool-capacity,
+.events-carpool-total {
+  margin: 0;
+}
+
+.events-carpool-name {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.events-carpool-capacity {
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.events-carpool-total {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.events-carpool-modal {
+  width: min(520px, calc(100vw - 24px));
+  display: grid;
+  gap: 10px;
 }
 
 .events-todo-item {

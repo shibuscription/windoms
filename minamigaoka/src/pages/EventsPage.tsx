@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { LinkifiedText } from "../components/LinkifiedText";
-import type { MemberRecord } from "../members/types";
-import type { DemoData, EventKind, EventRecord, SessionDoc, Todo } from "../types";
+import { subscribeFamilies } from "../members/service";
+import type { FamilyRecord, MemberRecord } from "../members/types";
+import type { DemoData, EventCarpoolVehicle, EventKind, EventRecord, SessionDoc, Todo } from "../types";
 import { canViewSharedTodo, sortTodosOpenFirst } from "../utils/todoUtils";
 import { todayDateKey } from "../utils/date";
 import { toDemoFamilyName } from "../utils/demoName";
@@ -27,11 +28,18 @@ type EventFormDraft = {
   eventSortDate: string;
   memo: string;
   state: EventRecord["state"];
+  carpoolVehicles: EventCarpoolVehicle[];
 };
 
 type EventFormErrors = {
   title?: string;
   eventSortDate?: string;
+};
+
+type CarpoolVehicleOption = {
+  key: string;
+  label: string;
+  vehicle: EventCarpoolVehicle;
 };
 
 const canManageEvents = (menuRole: DemoMenuRole): boolean => menuRole === "admin";
@@ -56,7 +64,20 @@ const createInitialDraft = (): EventFormDraft => ({
   eventSortDate: "",
   memo: "",
   state: "active",
+  carpoolVehicles: [],
 });
+
+const toVehicleLabel = (familyName: string, maker: string, model: string): string => {
+  const familyLabel = familyName.trim() || "名称未設定";
+  const vehicleLabel = [maker.trim(), model.trim()].filter(Boolean).join("/");
+  return vehicleLabel ? `${familyLabel}（${vehicleLabel}）` : familyLabel;
+};
+
+const toPassengerCapacity = (capacity: number | null | undefined): number =>
+  Math.max(0, typeof capacity === "number" && Number.isFinite(capacity) ? capacity - 1 : 0);
+
+const sumPassengerCapacity = (vehicles: EventCarpoolVehicle[]): number =>
+  vehicles.reduce((total, vehicle) => total + toPassengerCapacity(vehicle.capacity), 0);
 
 const toLinkedSession = (date: string, session: SessionDoc): LinkedSession => ({
   id: session.id ?? `session:${date}:${session.order}`,
@@ -98,12 +119,15 @@ export function EventsPage({
   const [activeTab, setActiveTab] = useState<"active" | "done">("active");
   const [isLinkedSessionsModalOpen, setIsLinkedSessionsModalOpen] = useState(false);
   const [isSessionBindModalOpen, setIsSessionBindModalOpen] = useState(false);
+  const [isCarpoolModalOpen, setIsCarpoolModalOpen] = useState(false);
   const [unlinkTargetSessionId, setUnlinkTargetSessionId] = useState<string | null>(null);
   const [editingEventId, setEditingEventId] = useState<string | "__new__" | null>(null);
   const [formDraft, setFormDraft] = useState<EventFormDraft>(createInitialDraft());
   const [formErrors, setFormErrors] = useState<EventFormErrors>({});
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [families, setFamilies] = useState<FamilyRecord[]>([]);
+  const [selectedVehicleKey, setSelectedVehicleKey] = useState("");
   const { eventId } = useParams<{ eventId?: string }>();
   const navigate = useNavigate();
   const today = todayDateKey();
@@ -111,6 +135,7 @@ export function EventsPage({
   const [selectedDoneYear, setSelectedDoneYear] = useState<number>(defaultClubYear);
 
   const isManager = canManageEvents(menuRole);
+  useEffect(() => subscribeFamilies(setFamilies), []);
   const selectedEvent = eventId ? data.events.find((item) => item.id === eventId) ?? null : null;
   const editingEvent =
     editingEventId && editingEventId !== "__new__"
@@ -160,6 +185,25 @@ export function EventsPage({
         (session) => !linkedSessionIds.has(session.id) && !otherEventLinkedSessionIds.has(session.id),
       ),
     [allEventSessions, linkedSessionIds, otherEventLinkedSessionIds],
+  );
+
+  const carpoolOptions = useMemo<CarpoolVehicleOption[]>(
+    () =>
+      families.flatMap((family) =>
+        family.vehicles.map((vehicle, vehicleIndex) => ({
+          key: `${family.id}:${vehicleIndex}`,
+          label: toVehicleLabel(family.name, vehicle.maker, vehicle.model),
+          vehicle: {
+            familyId: family.id,
+            familyNameSnapshot: family.name,
+            vehicleIndex,
+            maker: vehicle.maker,
+            model: vehicle.model,
+            capacity: vehicle.capacity,
+          },
+        })),
+      ),
+    [families],
   );
 
   const activeEvents = useMemo(
@@ -220,6 +264,9 @@ export function EventsPage({
     );
   }, [authRole, data.todos, linkedMember, selectedEvent]);
 
+  const selectedEventCarpoolVehicles = selectedEvent?.carpoolVehicles ?? [];
+  const selectedEventCarpoolCapacity = sumPassengerCapacity(selectedEventCarpoolVehicles);
+
   const showFeedback = (message: string) => {
     setFeedback(message);
     window.setTimeout(() => {
@@ -232,6 +279,7 @@ export function EventsPage({
   };
 
   const closeDetail = () => {
+    setIsCarpoolModalOpen(false);
     setIsLinkedSessionsModalOpen(false);
     setIsSessionBindModalOpen(false);
     navigate("/events");
@@ -254,6 +302,7 @@ export function EventsPage({
     setEditingEventId("__new__");
     setFormDraft(createInitialDraft());
     setFormErrors({});
+    setSelectedVehicleKey("");
   };
 
   const openEditModal = (event: EventRecord) => {
@@ -265,13 +314,16 @@ export function EventsPage({
       eventSortDate: event.eventSortDate,
       memo: event.memo ?? "",
       state: event.state,
+      carpoolVehicles: event.carpoolVehicles ?? [],
     });
     setFormErrors({});
+    setSelectedVehicleKey("");
   };
 
   const closeEditModal = () => {
     setEditingEventId(null);
     setFormErrors({});
+    setSelectedVehicleKey("");
   };
 
   const validateForm = (): EventFormErrors => {
@@ -279,6 +331,34 @@ export function EventsPage({
     if (!formDraft.title.trim()) errors.title = "タイトルは必須です";
     if (!formDraft.eventSortDate.trim()) errors.eventSortDate = "代表日は必須です";
     return errors;
+  };
+
+  const addCarpoolVehicle = () => {
+    if (!selectedVehicleKey) return;
+    const option = carpoolOptions.find((item) => item.key === selectedVehicleKey);
+    if (!option) return;
+
+    setFormDraft((current) => {
+      const alreadyAdded = current.carpoolVehicles.some(
+        (vehicle) =>
+          vehicle.familyId === option.vehicle.familyId && vehicle.vehicleIndex === option.vehicle.vehicleIndex,
+      );
+      if (alreadyAdded) return current;
+      return {
+        ...current,
+        carpoolVehicles: [...current.carpoolVehicles, option.vehicle],
+      };
+    });
+    setSelectedVehicleKey("");
+  };
+
+  const removeCarpoolVehicle = (vehicleKey: string) => {
+    setFormDraft((current) => ({
+      ...current,
+      carpoolVehicles: current.carpoolVehicles.filter(
+        (vehicle) => `${vehicle.familyId}:${vehicle.vehicleIndex}` !== vehicleKey,
+      ),
+    }));
   };
 
   const saveEventDraft = async () => {
@@ -296,6 +376,7 @@ export function EventsPage({
           eventSortDate: formDraft.eventSortDate,
           memo: formDraft.memo.trim() || undefined,
           sessionIds: [],
+          carpoolVehicles: formDraft.carpoolVehicles,
         });
       } else if (editingEvent) {
         await saveEvent({
@@ -305,6 +386,7 @@ export function EventsPage({
           state: formDraft.state,
           eventSortDate: formDraft.eventSortDate,
           memo: formDraft.memo.trim() || undefined,
+          carpoolVehicles: formDraft.carpoolVehicles,
         });
       }
 
@@ -312,18 +394,6 @@ export function EventsPage({
       showFeedback("保存しました");
     } catch {
       showFailure("保存に失敗しました");
-    }
-  };
-
-  const toggleEventState = async () => {
-    if (!isManager || !selectedEvent) return;
-    try {
-      await saveEvent({
-        ...selectedEvent,
-        state: selectedEvent.state === "active" ? "done" : "active",
-      });
-    } catch {
-      showFailure("状態更新に失敗しました");
     }
   };
 
@@ -483,9 +553,16 @@ export function EventsPage({
                 <LinkifiedText text={selectedEvent.memo} className="todo-linkified-text" />
               </p>
             )}
+            <div className="events-detail-links">
               <button type="button" className="events-linked-summary" onClick={() => setIsLinkedSessionsModalOpen(true)}>
                 紐付け予定: {linkedSessions.length}件
               </button>
+              {selectedEventCarpoolVehicles.length > 0 && (
+                <button type="button" className="events-linked-summary" onClick={() => setIsCarpoolModalOpen(true)}>
+                  配車{selectedEventCarpoolVehicles.length}台
+                </button>
+              )}
+            </div>
             <section className="related-todos-block">
               <h4>関連TODO</h4>
               <div className="related-todos-list">
@@ -528,20 +605,43 @@ export function EventsPage({
                 })}
                 {eventRelatedTodos.length === 0 && <p className="muted">関連TODOはありません。</p>}
               </div>
-            </section>
-            <div className="events-detail-actions">
-              <button type="button" className="button button-small button-secondary" onClick={() => navigate("/todos")}>
-                TODOページへ
-              </button>
-              {isManager && (
-                <button
-                  type="button"
-                  className={`button button-small ${selectedEvent.state === "done" ? "events-reopen-button" : "events-complete-button"}`}
-                  onClick={() => void toggleEventState()}
-                >
-                  {selectedEvent.state === "done" ? "進行中に戻す" : "完了にする"}
+              <div className="related-todos-footer">
+                <button type="button" className="button button-small button-secondary" onClick={() => navigate("/todos")}>
+                  TODOページへ
                 </button>
-              )}
+              </div>
+            </section>
+          </section>
+        </div>
+      )}
+
+      {selectedEvent && isCarpoolModalOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setIsCarpoolModalOpen(false)}>
+          <section className="modal-panel events-carpool-modal" onClick={(event) => event.stopPropagation()}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsCarpoolModalOpen(false)}>
+              ×
+            </button>
+            <h3>配車</h3>
+            <p className="modal-context">{selectedEvent.title}</p>
+            <div className="events-carpool-list">
+              {selectedEventCarpoolVehicles.map((vehicle) => (
+                <article key={`${vehicle.familyId}:${vehicle.vehicleIndex}`} className="events-carpool-row">
+                  <div>
+                    <p className="events-carpool-name">
+                      {toVehicleLabel(vehicle.familyNameSnapshot, vehicle.maker, vehicle.model)}
+                    </p>
+                    <p className="events-carpool-capacity">
+                      乗車定員（運転手除く）: {toPassengerCapacity(vehicle.capacity)}人
+                    </p>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <p className="events-carpool-total">合計人数: {selectedEventCarpoolCapacity}人</p>
+            <div className="modal-actions">
+              <button type="button" className="button button-small" onClick={() => setIsCarpoolModalOpen(false)}>
+                閉じる
+              </button>
             </div>
           </section>
         </div>
@@ -721,6 +821,49 @@ export function EventsPage({
                 <option value="done">完了</option>
               </select>
             </label>
+            <section className="events-carpool-editor">
+              <div className="events-carpool-editor-header">
+                <h4>配車</h4>
+                <p className="muted">乗車定員（運転手除く）を表示します。</p>
+              </div>
+              <div className="events-carpool-picker">
+                <select value={selectedVehicleKey} onChange={(event) => setSelectedVehicleKey(event.target.value)}>
+                  <option value="">車両を選択</option>
+                  {carpoolOptions.map((option) => (
+                    <option key={option.key} value={option.key}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className="button button-small button-secondary" onClick={addCarpoolVehicle}>
+                  追加
+                </button>
+              </div>
+              <div className="events-carpool-list">
+                {formDraft.carpoolVehicles.map((vehicle) => (
+                  <article key={`${vehicle.familyId}:${vehicle.vehicleIndex}`} className="events-carpool-row">
+                    <div>
+                      <p className="events-carpool-name">
+                        {toVehicleLabel(vehicle.familyNameSnapshot, vehicle.maker, vehicle.model)}
+                      </p>
+                      <p className="events-carpool-capacity">
+                        乗車定員（運転手除く）: {toPassengerCapacity(vehicle.capacity)}人
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="link-icon-button"
+                      aria-label="削除"
+                      onClick={() => removeCarpoolVehicle(`${vehicle.familyId}:${vehicle.vehicleIndex}`)}
+                    >
+                      ×
+                    </button>
+                  </article>
+                ))}
+                {formDraft.carpoolVehicles.length === 0 && <p className="muted">配車はまだ登録されていません。</p>}
+              </div>
+              <p className="events-carpool-total">合計人数: {sumPassengerCapacity(formDraft.carpoolVehicles)}人</p>
+            </section>
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={closeEditModal}>
                 キャンセル
