@@ -9,6 +9,7 @@ import { isValidDateKey, todayDateKey, weekdayTone } from "../utils/date";
 import { useAccountingStore } from "../accounting/useAccountingStore";
 import { groupedAccountingSubjects } from "../accounting/fixedSubjects";
 import { comparePeriodAccounts } from "../accounting/sort";
+import { toDemoFamilyName } from "../utils/demoName";
 
 type LunchPageProps = {
   data: DemoData;
@@ -88,15 +89,43 @@ const resolveDisplayName = (data: DemoData, uid?: string, fallback = "未定"): 
   return user?.displayName?.trim() || fallback;
 };
 
+const trimFamilySuffix = (value?: string): string => {
+  const normalized = (value ?? "").trim();
+  if (!normalized) return "";
+  return normalized.endsWith("家") ? normalized.slice(0, -1) : normalized;
+};
+
+const resolveHouseholdFamilyName = (data: DemoData, householdId?: string): string => {
+  if (!householdId) return "";
+  return trimFamilySuffix(data.households[householdId]?.label ?? "");
+};
+
+const resolveUserFamilyName = (data: DemoData, uid?: string, fallback = "未定"): string => {
+  if (!uid) return fallback;
+  const user = data.users[uid];
+  const householdLabel = resolveHouseholdFamilyName(data, user?.householdId);
+  if (householdLabel) return householdLabel;
+  return trimFamilySuffix(toDemoFamilyName(user?.displayName, fallback));
+};
+
+const resolveSessionDutyFamilyName = (data: DemoData, session: DemoData["scheduleDays"][string]["sessions"][number]): string => {
+  const snapshotFamily = trimFamilySuffix(session.assigneeNameSnapshot);
+  if (snapshotFamily) return snapshotFamily;
+  const assigneeFamily = resolveUserFamilyName(data, session.assignees[0], "");
+  if (assigneeFamily) return assigneeFamily;
+  return "未定";
+};
+
 const resolveDutyName = (data: DemoData, record: LunchRecord): string => {
-  if (record.dutyHouseholdId) {
-    const label = data.households[record.dutyHouseholdId]?.label ?? record.dutyHouseholdId;
-    return label.endsWith("家") ? label.slice(0, -1) : label;
-  }
   if (record.dutyMemberId) {
-    return resolveDisplayName(data, record.dutyMemberId, record.dutyMemberId);
+    const familyLabel = resolveUserFamilyName(data, record.dutyMemberId, "");
+    if (familyLabel) return familyLabel;
   }
-  return resolveDisplayName(data, record.buyer, record.buyer);
+  if (record.dutyHouseholdId) {
+    const householdLabel = resolveHouseholdFamilyName(data, record.dutyHouseholdId);
+    if (householdLabel) return householdLabel;
+  }
+  return resolveUserFamilyName(data, record.buyer, resolveDisplayName(data, record.buyer, record.buyer));
 };
 
 const resolveBuyerName = (data: DemoData, record: LunchRecord): string =>
@@ -141,6 +170,7 @@ export function LunchPage({
       demoRole === "admin" ? account.label === "現金（会長手元金）" : account.label === "現金（会計手元金）",
     )?.accountId ?? "";
   const accountingSubjectGroups = useMemo(() => groupedAccountingSubjects("expense"), []);
+  const currentUserHouseholdId = data.users[currentUid]?.householdId;
 
   const sortedRecords = useMemo(
     () =>
@@ -164,21 +194,24 @@ export function LunchPage({
         day.sessions
           .filter(
             (session) =>
-              session.dutyRequirement === "duty" &&
+              (session.dutyRequirement === "duty" || session.dutyRequirement === "watch") &&
               session.startTime >= "12:00" &&
               (weekdayTone(dateKey) === "sat" || weekdayTone(dateKey) === "sun"),
           )
           .map((session) => ({
             dateKey,
-            dutyName:
-              session.assigneeNameSnapshot ||
-              resolveDisplayName(data, session.assignees[0], "未定"),
-            isCurrentUserDuty: session.assignees.includes(currentUid),
+            dutyName: resolveSessionDutyFamilyName(data, session),
+            isCurrentUserDuty:
+              session.assignees.includes(currentUid) ||
+              Boolean(
+                currentUserHouseholdId &&
+                  session.assignees.some((uid) => data.users[uid]?.householdId === currentUserHouseholdId),
+              ),
           })),
       )
       .sort((left, right) => left.dateKey.localeCompare(right.dateKey))
       .slice(0, 2);
-  }, [currentUid, data, targetDate]);
+  }, [currentUid, currentUserHouseholdId, data, targetDate]);
 
   const amountNumber = Number(draft.amount || "0");
 
@@ -217,13 +250,22 @@ export function LunchPage({
     clearReceiptPreviews();
   };
 
-  const resolveDutyMemberId = (dateKey: string): string => {
+  const resolveDutyAssignment = (dateKey: string): { buyerUid: string; dutyMemberId?: string; dutyHouseholdId?: string } => {
     const day = data.scheduleDays[dateKey];
-    const candidate = day?.sessions.find((session) => session.dutyRequirement === "duty")?.assignees[0];
-    return candidate ?? currentUid;
+    const session = day?.sessions.find(
+      (item) =>
+        (item.dutyRequirement === "duty" || item.dutyRequirement === "watch") &&
+        item.startTime >= "12:00" &&
+        (weekdayTone(dateKey) === "sat" || weekdayTone(dateKey) === "sun"),
+    );
+    const dutyMemberId = session?.assignees[0];
+    const dutyHouseholdId = dutyMemberId ? data.users[dutyMemberId]?.householdId : undefined;
+    return {
+      buyerUid: dutyMemberId ?? currentUid,
+      dutyMemberId: dutyMemberId ?? undefined,
+      dutyHouseholdId: dutyHouseholdId ?? currentUserHouseholdId,
+    };
   };
-
-  const resolveDutyHouseholdId = (): string | undefined => data.users[currentUid]?.householdId;
 
   const submitLunchRecord = async () => {
     const nextErrors: { title?: string; amount?: string; purchasedAt?: string; accountingAccountId?: string; accountingCategoryId?: string; accountingMemo?: string } = {};
@@ -248,6 +290,7 @@ export function LunchPage({
     setIsSubmitting(true);
     setSubmitError("");
     try {
+      const dutyAssignment = resolveDutyAssignment(dateKey);
       if (editingTarget) {
         await saveLunchRecord({
           ...editingTarget,
@@ -269,9 +312,9 @@ export function LunchPage({
             amount: amountNumber,
             purchasedAt: purchasedAtIso,
             date: dateKey,
-            buyer: currentUid,
-            dutyMemberId: resolveDutyMemberId(dateKey),
-            dutyHouseholdId: resolveDutyHouseholdId(),
+            buyer: dutyAssignment.buyerUid,
+            dutyMemberId: dutyAssignment.dutyMemberId,
+            dutyHouseholdId: dutyAssignment.dutyHouseholdId,
             memo: draft.memo.trim() || undefined,
             paymentMethod: canManageAccounting ? draft.paymentMethod : "reimbursement",
             reimbursementLinked: (canManageAccounting ? draft.paymentMethod : "reimbursement") === "reimbursement",
