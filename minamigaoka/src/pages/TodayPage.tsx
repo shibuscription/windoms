@@ -24,6 +24,7 @@ import {
   todayDateKey,
   weekdayTone,
 } from "../utils/date";
+import { canViewSharedTodo, makeSessionRelatedId, sortTodosOpenFirst } from "../utils/todoUtils";
 
 type TodayPageProps = {
   data: DemoData;
@@ -135,12 +136,11 @@ const countAttendanceRows = (rows: AttendanceRow[]) => ({
 });
 
 export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRole, saveTodo }: TodayPageProps) {
-  void currentUid;
-  void saveTodo;
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
   const [selectedAttendanceMember, setSelectedAttendanceMember] = useState<AttendanceMemberModalState | null>(null);
+  const [selectedTodoSession, setSelectedTodoSession] = useState<SessionDoc | null>(null);
   const [birthdayModalDate, setBirthdayModalDate] = useState<string | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(todayDateKey().slice(0, 7));
@@ -293,6 +293,28 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
   );
 
   const dayTransport = day?.attendanceTransport ?? {};
+  const sessionTodosByOrder = useMemo(
+    () =>
+      sessions.reduce<Record<number, Todo[]>>((result, session) => {
+        const relatedId = makeSessionRelatedId(date, session.order);
+        result[session.order] = sortTodosOpenFirst(
+          data.todos.filter(
+            (todo) =>
+              todo.kind === "shared" &&
+              todo.related?.type === "session" &&
+              todo.related.id === relatedId &&
+              canViewSharedTodo(todo, linkedMember, authRole),
+          ),
+        );
+        return result;
+      }, {}),
+    [authRole, data.todos, date, linkedMember, sessions],
+  );
+
+  const selectedSessionTodos = useMemo(() => {
+    if (!selectedTodoSession) return [] as Todo[];
+    return sessionTodosByOrder[selectedTodoSession.order] ?? [];
+  }, [selectedTodoSession, sessionTodosByOrder]);
 
   const hasSessions = sessions.length > 0;
   const calendarCells = useMemo(() => buildMonthCells(calendarMonth), [calendarMonth]);
@@ -321,6 +343,18 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
     if (!hasSessions) return;
     await ensureDayLog(date);
     navigate(`/logs/${date}`);
+  };
+
+  const assigneeLabel = (uid: string | null): string => {
+    if (!uid) return "未アサイン";
+    return data.users[uid]?.displayName ?? uid;
+  };
+
+  const takeoverLabel = (todo: Todo): string | null => {
+    if (todo.completed) return null;
+    if (todo.assigneeUid === null) return "引き取る";
+    if (todo.assigneeUid !== currentUid) return "引き継ぐ";
+    return null;
   };
 
   const openAttendanceModal = () => {
@@ -609,25 +643,50 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
             <h3 className="today-attendance-day-title">
               {formatDateYmd(date)}（{formatWeekdayJa(date)}）
             </h3>
+            <div className="today-attendance-session-summary-list">
+              {sessions.map((session) => {
+                const counts = countAttendanceRows(attendanceRowsByOrder[session.order] ?? []);
+                const relatedTodos = sessionTodosByOrder[session.order] ?? [];
+                return (
+                  <div key={session.id ?? `${session.order}-${session.startTime}`} className="today-attendance-session-summary">
+                    <div className="today-attendance-session-summary-main">
+                      <div className="today-attendance-session-summary-time">
+                        {formatTimeNoLeadingZero(session.startTime)} - {formatTimeNoLeadingZero(session.endTime)}
+                      </div>
+                      <div className="today-attendance-session-summary-type">{typeLabel[session.type]}</div>
+                      <div className="today-attendance-session-summary-counts">
+                        <span className="count-yes">○{counts.yes}</span>
+                        <span className="count-maybe">△{counts.maybe}</span>
+                        <span className="count-no">×{counts.no}</span>
+                        <span className="count-unknown">ー{counts.unknown}</span>
+                      </div>
+                    </div>
+                    {relatedTodos.length > 0 && (
+                      <button
+                        type="button"
+                        className="today-attendance-session-todo-trigger"
+                        onClick={() => setSelectedTodoSession(session)}
+                        aria-label={`${typeLabel[session.type]} の関連TODOを開く`}
+                        title="関連TODO"
+                      >
+                        ✅
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
             <div className="today-attendance-day-table-wrap">
               <table className="today-attendance-day-table">
                 <thead>
                   <tr>
                     <th className="today-attendance-member-head">メンバー</th>
                     {sessions.map((session) => {
-                      const counts = countAttendanceRows(attendanceRowsByOrder[session.order] ?? []);
                       return (
                         <th key={session.id ?? `${session.order}-${session.startTime}`} className="today-attendance-session-head">
                           <div className="today-attendance-session-time">
                             <span>{formatTimeNoLeadingZero(session.startTime)}</span>
                             <span>{formatTimeNoLeadingZero(session.endTime)}</span>
-                          </div>
-                          <div className="today-attendance-session-type">{typeLabel[session.type]}</div>
-                          <div className="today-attendance-session-counts">
-                            <span className="count-yes">○{counts.yes}</span>
-                            <span className="count-maybe">△{counts.maybe}</span>
-                            <span className="count-no">×{counts.no}</span>
-                            <span className="count-unknown">ー{counts.unknown}</span>
                           </div>
                         </th>
                       );
@@ -688,6 +747,65 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedTodoSession && (
+        <div className="modal-backdrop" onClick={() => setSelectedTodoSession(null)}>
+          <div className="modal-panel today-attendance-todo-modal" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close"
+              onClick={() => setSelectedTodoSession(null)}
+              aria-label="閉じる"
+              title="閉じる"
+            >
+              ×
+            </button>
+            <p className="modal-context">
+              {formatDateYmd(date)}（{formatWeekdayJa(date)}）
+            </p>
+            <h3>
+              {typeLabel[selectedTodoSession.type]}{" "}
+              {formatTimeNoLeadingZero(selectedTodoSession.startTime)} - {formatTimeNoLeadingZero(selectedTodoSession.endTime)}
+            </h3>
+            <div className="related-todos-list">
+              {selectedSessionTodos.map((todo) => {
+                const takeover = takeoverLabel(todo);
+                return (
+                  <article key={todo.id} className={`todo-row compact ${todo.completed ? "completed" : ""}`}>
+                    <label className="todo-check">
+                      <input
+                        type="checkbox"
+                        checked={todo.completed}
+                        onChange={() => void saveTodo({ ...todo, completed: !todo.completed })}
+                      />
+                    </label>
+                    <div className="todo-main">
+                      <p className="todo-title">{todo.title}</p>
+                      {todo.memo?.trim() && <p className="todo-description">{todo.memo}</p>}
+                      <p className="todo-meta">
+                        <span>担当: {assigneeLabel(todo.assigneeUid)}</span>
+                        <span>期限: {todo.dueDate ?? "—"}</span>
+                      </p>
+                    </div>
+                    <div className="todo-actions">
+                      {takeover && (
+                        <button
+                          type="button"
+                          className="button button-small"
+                          onClick={() => void saveTodo({ ...todo, assigneeUid: currentUid })}
+                        >
+                          {takeover}
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+              {selectedSessionTodos.length === 0 && <p className="muted">関連TODOはありません。</p>}
             </div>
           </div>
         </div>

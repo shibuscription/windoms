@@ -3402,6 +3402,72 @@ body {
   font-size: 1.15rem;
 }
 
+.today-attendance-session-summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.today-attendance-session-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid #dbe3ef;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 8px 10px;
+}
+
+.today-attendance-session-summary-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.today-attendance-session-summary-time {
+  font-weight: 600;
+  color: #111827;
+  white-space: nowrap;
+}
+
+.today-attendance-session-summary-type {
+  color: #475569;
+  white-space: nowrap;
+}
+
+.today-attendance-session-summary-counts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 0.85rem;
+}
+
+.today-attendance-session-todo-trigger {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: #fff;
+  color: #334155;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+}
+
+.today-attendance-session-todo-trigger:hover,
+.today-attendance-session-todo-trigger:focus-visible {
+  outline: 0;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.14);
+}
+
 .today-attendance-day-table-wrap {
   overflow: auto;
   max-height: min(68vh, 620px);
@@ -3413,7 +3479,7 @@ body {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  min-width: 720px;
+  min-width: 620px;
 }
 
 .today-attendance-day-table th,
@@ -3431,7 +3497,7 @@ body {
   left: 0;
   z-index: 1;
   text-align: left !important;
-  min-width: 140px;
+  min-width: 118px;
   background: #f8fafc !important;
 }
 
@@ -3449,7 +3515,7 @@ body {
 }
 
 .today-attendance-session-head {
-  min-width: 112px;
+  min-width: 74px;
 }
 
 .today-attendance-session-time {
@@ -3457,25 +3523,9 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: #475569;
   line-height: 1.2;
-}
-
-.today-attendance-session-type {
-  margin-top: 4px;
-  font-weight: 600;
-  font-size: 0.86rem;
-  white-space: nowrap;
-}
-
-.today-attendance-session-counts {
-  margin-top: 6px;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 4px 6px;
-  font-size: 0.8rem;
 }
 
 .today-attendance-member-button {
@@ -3539,7 +3589,7 @@ body {
 .today-attendance-edit-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   max-height: min(62vh, 520px);
   overflow-y: auto;
   padding-right: 2px;
@@ -3548,8 +3598,8 @@ body {
 .today-attendance-edit-section {
   border: 1px solid #dbe3ef;
   border-radius: 10px;
-  padding: 12px;
-  background: #f8fafc;
+  padding: 10px 12px;
+  background: #fff;
 }
 
 .today-attendance-edit-header {
@@ -3565,6 +3615,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
 }
 
 .today-attendance-transport-editor {
@@ -3586,11 +3637,23 @@ body {
 
 .today-attendance-transport-options {
   display: flex;
-  gap: 8px;
+  gap: 6px;
+  justify-content: flex-start;
+  align-items: center;
 }
 
 .transport-option {
-  min-width: 56px;
+  min-width: 46px;
+  width: 46px;
+  height: 40px;
+}
+
+.transport-option span {
+  font-size: 1rem;
+}
+
+.today-attendance-todo-modal {
+  width: min(560px, calc(100vw - 24px));
 }
 
 .log-status {
@@ -5959,12 +6022,20 @@ textarea {
   }
 
   .today-attendance-day-table {
-    min-width: 640px;
+    min-width: 540px;
   }
 
   .today-attendance-member-head,
   .today-attendance-member-cell {
-    min-width: 120px;
+    min-width: 104px;
+  }
+
+  .today-attendance-session-summary {
+    align-items: flex-start;
+  }
+
+  .today-attendance-session-summary-main {
+    gap: 6px 10px;
   }
 
   .today-attendance-edit-header {
@@ -5974,6 +6045,11 @@ textarea {
 
   .today-attendance-transport-editor {
     grid-template-columns: 1fr;
+  }
+
+  .today-attendance-session-todo-trigger {
+    width: 32px;
+    height: 32px;
   }
 
   .log-time-range-inline {
