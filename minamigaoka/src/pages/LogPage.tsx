@@ -634,7 +634,11 @@ export function LogPage({
   const [stampMessage, setStampMessage] = useState("");
   const [animatingStampOrder, setAnimatingStampOrder] = useState<number | null>(null);
   const [pendingDeleteActivityIndex, setPendingDeleteActivityIndex] = useState<number | null>(null);
-  const [pendingStampSession, setPendingStampSession] = useState<{ sessionOrder: number; fromName: string } | null>(null);
+  const [pendingStampSession, setPendingStampSession] = useState<{
+    sessionOrder: number;
+    mode: "undo" | "overwrite";
+    fromName: string;
+  } | null>(null);
   const [notesDraft, setNotesDraft] = useState(log.notes ?? "");
   const latestLogRef = useRef<DayLog>(log);
   const saveRequestIdRef = useRef(0);
@@ -1061,22 +1065,37 @@ export function LogPage({
     }, 260);
   };
 
+  const removeDutyStamp = (sessionOrder: number) => {
+    const key = String(sessionOrder);
+    applyDayLogUpdate((prev) => {
+      const nextDutyStamps = { ...(prev.dutyStamps ?? {}) };
+      delete nextDutyStamps[key];
+      return {
+        ...prev,
+        dutyStamps: nextDutyStamps,
+      };
+    });
+    setStampMessage("捺印を取り消しました");
+  };
+
   const onStampDuty = (sessionOrder: number, plannedName: string) => {
     const key = String(sessionOrder);
     const current = log.dutyStamps?.[key];
 
-    if (current?.stampedByUid === currentStampUid) {
-      setStampMessage("捺印済みです");
+    if (!current) {
+      applyDutyStamp(sessionOrder);
       return;
     }
 
-    const needsConfirm = Boolean(current) || (Boolean(plannedName) && plannedName !== currentStampFamilyName);
-    if (needsConfirm) {
-      const fromName = current?.stampedByName ?? (plannedName || "未設定");
-      setPendingStampSession({ sessionOrder, fromName });
+    const stampedFamilyName = toFamilyName(current.stampedByName ?? "");
+    const fromName = stampedFamilyName || toFamilyName(plannedName || "") || "未設定";
+
+    if (stampedFamilyName === currentStampFamilyName) {
+      setPendingStampSession({ sessionOrder, mode: "undo", fromName });
       return;
     }
-    applyDutyStamp(sessionOrder);
+
+    setPendingStampSession({ sessionOrder, mode: "overwrite", fromName });
   };
 
   return (
@@ -1449,7 +1468,9 @@ export function LogPage({
               ×
             </button>
             <p className="modal-context">
-              当番者を「{pendingStampSession.fromName}」から「{currentStampFamilyName}」に変更して捺印します。よろしいですか？
+              {pendingStampSession.mode === "undo"
+                ? `「${pendingStampSession.fromName}」の捺印を取り消して未押下に戻しますか？`
+                : `当番者を「${pendingStampSession.fromName}」から「${currentStampFamilyName}」に書き換えます。よろしいですか？`}
             </p>
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={() => setPendingStampSession(null)}>
@@ -1459,7 +1480,11 @@ export function LogPage({
                 type="button"
                 className="button button-small"
                 onClick={() => {
-                  applyDutyStamp(pendingStampSession.sessionOrder);
+                  if (pendingStampSession.mode === "undo") {
+                    removeDutyStamp(pendingStampSession.sessionOrder);
+                  } else {
+                    applyDutyStamp(pendingStampSession.sessionOrder);
+                  }
                   setPendingStampSession(null);
                 }}
               >
