@@ -1444,8 +1444,10 @@ export function App() {
                   data={context.data}
                   canManageSessions={canManageCalendarSessions}
                   ensureDayLog={context.ensureDayLog}
+                  currentUid={currentUid}
                   linkedMember={linkedMember}
                   authRole={authUser?.role ?? null}
+                  saveTodo={saveTodo}
                 />
             }
           />

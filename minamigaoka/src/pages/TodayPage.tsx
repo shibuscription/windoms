@@ -1,18 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { resolveEditableAttendanceMemberIds } from "../attendance/utils";
 import { BirthdayCelebrationModal } from "../components/BirthdayCelebrationModal";
-import { saveDayAttendanceTransport, saveSessionRsvps } from "../journal/service";
+import { DayAttendanceModal } from "../components/DayAttendanceModal";
 import { getBirthdayCelebrants } from "../members/birthday";
 import { isChildMember, sortMembersForDisplay } from "../members/permissions";
 import { subscribeMemberRelations, subscribeMembers } from "../members/service";
 import type { MemberRecord, MemberRelationRecord } from "../members/types";
 import type {
-  AttendanceTransportMethod,
   DemoData,
   DutyRequirement,
   RsvpStatus,
-  SessionDoc,
   Todo,
 } from "../types";
 import {
@@ -24,7 +21,6 @@ import {
   todayDateKey,
   weekdayTone,
 } from "../utils/date";
-import { canViewSharedTodo, makeSessionRelatedId, sortTodosOpenFirst } from "../utils/todoUtils";
 
 type TodayPageProps = {
   data: DemoData;
@@ -41,16 +37,7 @@ type AttendanceRow = {
   status: RsvpStatus;
 };
 
-type AttendanceMemberModalState = {
-  member: MemberRecord;
-};
-
-type AttendanceCommentModalState = {
-  memberName: string;
-  comment: string;
-};
-
-const typeLabel: Record<SessionDoc["type"], string> = {
+const typeLabel: Record<"normal" | "self" | "event", string> = {
   normal: "通常練習",
   self: "自主練",
   event: "イベント",
@@ -80,23 +67,6 @@ const demoViewTitle: Record<string, string> = {
   members: "メンバー",
   links: "リンク集",
   settings: "設定",
-};
-
-const statusSymbol: Record<RsvpStatus, string> = {
-  yes: "◯",
-  maybe: "△",
-  no: "×",
-  unknown: "ー",
-};
-
-const transportSymbol: Record<AttendanceTransportMethod, string> = {
-  car: "🚗",
-  walk: "🚶",
-};
-
-const transportLabel: Record<AttendanceTransportMethod, string> = {
-  car: "🚗",
-  walk: "🚶",
 };
 
 const toFamilyName = (name?: string): string => {
@@ -144,9 +114,6 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
-  const [selectedAttendanceMember, setSelectedAttendanceMember] = useState<AttendanceMemberModalState | null>(null);
-  const [selectedAttendanceComment, setSelectedAttendanceComment] = useState<AttendanceCommentModalState | null>(null);
-  const [selectedTodoSession, setSelectedTodoSession] = useState<SessionDoc | null>(null);
   const [birthdayModalDate, setBirthdayModalDate] = useState<string | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(todayDateKey().slice(0, 7));
@@ -156,15 +123,6 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
   const [relations, setRelations] = useState<MemberRelationRecord[]>([]);
   const [pageError, setPageError] = useState("");
   const [relationsError, setRelationsError] = useState("");
-  const [attendanceSaveError, setAttendanceSaveError] = useState("");
-  const [attendanceToast, setAttendanceToast] = useState("");
-  const [isSavingAttendance, setIsSavingAttendance] = useState(false);
-  const [attendanceDraftBySessionOrder, setAttendanceDraftBySessionOrder] = useState<Record<number, RsvpStatus>>({});
-  const [transportDraft, setTransportDraft] = useState<{
-    to: AttendanceTransportMethod;
-    from: AttendanceTransportMethod;
-    comment: string;
-  }>({ to: "car", from: "car", comment: "" });
   const calendarWrapRef = useRef<HTMLDivElement>(null);
   const noticeContentRef = useRef<HTMLDivElement>(null);
   const today = todayDateKey();
@@ -229,12 +187,6 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
   }, []);
 
   useEffect(() => {
-    if (!attendanceToast) return;
-    const timer = window.setTimeout(() => setAttendanceToast(""), 2200);
-    return () => window.clearTimeout(timer);
-  }, [attendanceToast]);
-
-  useEffect(() => {
     setNoticeExpanded(false);
     if (!noticeText) {
       setNoticeCanToggle(false);
@@ -283,45 +235,10 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
       return result;
     }, {});
   }, [sessions, visibleChildMembers]);
+
   const birthdayCelebrants = useMemo(() => getBirthdayCelebrants(members, date), [date, members]);
 
-  const editableMemberIds = useMemo(
-    () => resolveEditableAttendanceMemberIds(linkedMember, authRole, visibleChildMembers, relations),
-    [authRole, linkedMember, relations, visibleChildMembers],
-  );
-
-  const memberById = useMemo(
-    () =>
-      visibleChildMembers.reduce<Record<string, MemberRecord>>((result, member) => {
-        result[member.id] = member;
-        return result;
-      }, {}),
-    [visibleChildMembers],
-  );
-
   const dayTransport = day?.attendanceTransport ?? {};
-  const sessionTodosByOrder = useMemo(
-    () =>
-      sessions.reduce<Record<number, Todo[]>>((result, session) => {
-        const relatedId = makeSessionRelatedId(date, session.order);
-        result[session.order] = sortTodosOpenFirst(
-          data.todos.filter(
-            (todo) =>
-              todo.kind === "shared" &&
-              todo.related?.type === "session" &&
-              todo.related.id === relatedId &&
-              canViewSharedTodo(todo, linkedMember, authRole),
-          ),
-        );
-        return result;
-      }, {}),
-    [authRole, data.todos, date, linkedMember, sessions],
-  );
-
-  const selectedSessionTodos = useMemo(() => {
-    if (!selectedTodoSession) return [] as Todo[];
-    return sessionTodosByOrder[selectedTodoSession.order] ?? [];
-  }, [selectedTodoSession, sessionTodosByOrder]);
 
   const hasSessions = sessions.length > 0;
   const calendarCells = useMemo(() => buildMonthCells(calendarMonth), [calendarMonth]);
@@ -352,106 +269,12 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
     navigate(`/logs/${date}`);
   };
 
-  const assigneeLabel = (uid: string | null): string => {
-    if (!uid) return "未アサイン";
-    return data.users[uid]?.displayName ?? uid;
-  };
-
-  const takeoverLabel = (todo: Todo): string | null => {
-    if (todo.completed) return null;
-    if (todo.assigneeUid === null) return "引き取る";
-    if (todo.assigneeUid !== currentUid) return "引き継ぐ";
-    return null;
-  };
-
   const openAttendanceModal = () => {
-    setAttendanceSaveError("");
-    setAttendanceToast("");
     setIsAttendanceModalOpen(true);
   };
 
   const closeAttendanceModal = () => {
-    if (isSavingAttendance) return;
     setIsAttendanceModalOpen(false);
-  };
-
-  const openAttendanceMemberModal = (member: MemberRecord) => {
-    if (!editableMemberIds.has(member.id)) return;
-    setAttendanceDraftBySessionOrder(
-      sessions.reduce<Record<number, RsvpStatus>>((result, session) => {
-        const matched =
-          session.demoRsvps?.find(
-            (item) =>
-              item.uid === member.authUid ||
-              item.uid === member.id ||
-              item.uid === member.loginId,
-          ) ?? null;
-        result[session.order] = matched?.status ?? "unknown";
-        return result;
-      }, {}),
-    );
-    const currentTransport = dayTransport[member.id];
-    setTransportDraft({
-      to: currentTransport?.to ?? "car",
-      from: currentTransport?.from ?? "car",
-      comment: currentTransport?.comment ?? "",
-    });
-    setAttendanceSaveError("");
-    setSelectedAttendanceMember({ member });
-  };
-
-  const closeAttendanceMemberModal = () => {
-    if (isSavingAttendance) return;
-    setSelectedAttendanceMember(null);
-    setAttendanceSaveError("");
-  };
-
-  const saveAttendanceMember = async () => {
-    if (!selectedAttendanceMember) return;
-    const member = selectedAttendanceMember.member;
-    setIsSavingAttendance(true);
-    setAttendanceSaveError("");
-    try {
-      const matchedMember = memberById[member.id];
-      if (!matchedMember) {
-        throw new Error("対象メンバーが見つかりません。");
-      }
-
-      await Promise.all(
-        sessions.map(async (session) => {
-          if (!session.id) {
-            throw new Error("予定IDが見つからないため、出欠を保存できません。");
-          }
-          const nextStatus = attendanceDraftBySessionOrder[session.order] ?? "unknown";
-          const remaining = (session.demoRsvps ?? []).filter(
-            (item) =>
-              item.uid !== matchedMember.id &&
-              item.uid !== matchedMember.authUid &&
-              item.uid !== matchedMember.loginId,
-          );
-          const nextRsvps =
-            nextStatus === "unknown"
-              ? remaining
-              : [
-                  ...remaining,
-                  {
-                    uid: matchedMember.id,
-                    displayName: matchedMember.name,
-                    status: nextStatus,
-                  },
-                ];
-          await saveSessionRsvps(date, session.id, nextRsvps);
-        }),
-      );
-
-      await saveDayAttendanceTransport(date, member.id, transportDraft);
-      setAttendanceToast(`${member.name} の出欠を保存しました。`);
-      setSelectedAttendanceMember(null);
-    } catch (error) {
-      setAttendanceSaveError(error instanceof Error ? error.message : "出欠の保存に失敗しました。");
-    } finally {
-      setIsSavingAttendance(false);
-    }
   };
 
   if (view) {
@@ -562,7 +385,6 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
         </div>
       </div>
 
-      {attendanceToast && <div className="inline-toast">{attendanceToast}</div>}
       {pageError && <p className="field-error">{pageError}</p>}
       {relationsError && <p className="field-error">{relationsError}</p>}
 
@@ -637,371 +459,19 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
       )}
 
       {isAttendanceModalOpen && (
-        <div className="modal-backdrop" onClick={closeAttendanceModal}>
-          <div className="modal-panel today-attendance-day-modal" onClick={(event) => event.stopPropagation()}>
-            <button
-              type="button"
-              className="modal-close"
-              onClick={closeAttendanceModal}
-              aria-label="閉じる"
-              title="閉じる"
-            >
-              ×
-            </button>
-            <h3 className="today-attendance-day-title">
-              {formatDateYmd(date)}（{formatWeekdayJa(date)}）
-            </h3>
-            <div className="today-attendance-session-summary-list">
-              {sessions.map((session) => {
-                const counts = countAttendanceRows(attendanceRowsByOrder[session.order] ?? []);
-                const relatedTodos = sessionTodosByOrder[session.order] ?? [];
-                return (
-                  <div
-                    key={session.id ?? `${session.order}-${session.startTime}`}
-                    className={`today-attendance-session-summary ${session.type}`}
-                  >
-                    <span className={`session-type-badge today-attendance-session-summary-badge ${session.type}`}>
-                      {typeLabel[session.type]}
-                    </span>
-                    <div className="today-attendance-session-summary-main">
-                      <div className="today-attendance-session-summary-time">
-                        {formatTimeNoLeadingZero(session.startTime)} - {formatTimeNoLeadingZero(session.endTime)}
-                      </div>
-                      <div className="today-attendance-session-summary-counts">
-                        <span className="count-yes">◯{counts.yes}</span>
-                        <span className="count-maybe">△{counts.maybe}</span>
-                        <span className="count-no">×{counts.no}</span>
-                        <span className="count-unknown">ー{counts.unknown}</span>
-                      </div>
-                    </div>
-                    {relatedTodos.length > 0 && (
-                      <button
-                        type="button"
-                        className="today-attendance-session-todo-trigger"
-                        onClick={() => setSelectedTodoSession(session)}
-                        aria-label={`${typeLabel[session.type]} の関連TODOを開く`}
-                        title="関連TODO"
-                      >
-                        ✅
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="today-attendance-day-table-wrap">
-              <table className="today-attendance-day-table">
-                <thead>
-                  <tr>
-                    <th className="today-attendance-member-head">メンバー</th>
-                    {sessions.map((session) => {
-                      return (
-                        <th key={session.id ?? `${session.order}-${session.startTime}`} className="today-attendance-session-head">
-                          <div className="today-attendance-session-time">
-                            <span>{formatTimeNoLeadingZero(session.startTime)}</span>
-                            <span>{formatTimeNoLeadingZero(session.endTime)}</span>
-                          </div>
-                        </th>
-                      );
-                    })}
-                    <th className="today-attendance-transport-head">行き</th>
-                    <th className="today-attendance-transport-head">帰り</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleChildMembers.map((member) => {
-                    const canEdit = editableMemberIds.has(member.id);
-                    const memberTransport = dayTransport[member.id];
-                    return (
-                      <tr key={member.id}>
-                        <th className="today-attendance-member-cell">
-                          {canEdit ? (
-                            <span className="today-attendance-member-name-wrap">
-                              <button
-                                type="button"
-                                className="today-attendance-member-button"
-                                onClick={() => openAttendanceMemberModal(member)}
-                              >
-                                {member.name}
-                              </button>
-                              {memberTransport?.comment?.trim() && (
-                                <button
-                                  type="button"
-                                  className="today-attendance-comment-trigger"
-                                  onClick={() =>
-                                    setSelectedAttendanceComment({
-                                      memberName: member.name,
-                                      comment: memberTransport.comment?.trim() ?? "",
-                                    })
-                                  }
-                                  aria-label={`${member.name} のコメントを見る`}
-                                  title="コメントを見る"
-                                >
-                                  📝
-                                </button>
-                              )}
-                            </span>
-                          ) : (
-                            <span className="today-attendance-member-name-wrap">
-                              <span className="today-attendance-member-label">{member.name}</span>
-                              {memberTransport?.comment?.trim() && (
-                                <button
-                                  type="button"
-                                  className="today-attendance-comment-trigger"
-                                  onClick={() =>
-                                    setSelectedAttendanceComment({
-                                      memberName: member.name,
-                                      comment: memberTransport.comment?.trim() ?? "",
-                                    })
-                                  }
-                                  aria-label={`${member.name} のコメントを見る`}
-                                  title="コメントを見る"
-                                >
-                                  📝
-                                </button>
-                              )}
-                            </span>
-                          )}
-                        </th>
-                        {sessions.map((session) => {
-                          const matched =
-                            session.demoRsvps?.find(
-                              (item) =>
-                                item.uid === member.authUid ||
-                                item.uid === member.id ||
-                                item.uid === member.loginId,
-                            ) ?? null;
-                          const status = matched?.status ?? "unknown";
-                          return (
-                            <td key={`${member.id}-${session.id ?? session.order}`} className={`today-attendance-status-cell ${status}`}>
-                              {statusSymbol[status]}
-                            </td>
-                          );
-                        })}
-                        <td className="today-attendance-transport-cell">
-                          {transportSymbol[memberTransport?.to ?? "car"]}
-                        </td>
-                        <td className="today-attendance-transport-cell">
-                          {transportSymbol[memberTransport?.from ?? "car"]}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {visibleChildMembers.length === 0 && (
-                    <tr>
-                      <td className="today-attendance-empty-row" colSpan={sessions.length + 3}>
-                        対象の部員はまだいません。
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {selectedTodoSession && (
-        <div className="modal-backdrop" onClick={() => setSelectedTodoSession(null)}>
-          <div className="modal-panel today-attendance-todo-modal" onClick={(event) => event.stopPropagation()}>
-            <button
-              type="button"
-              className="modal-close"
-              onClick={() => setSelectedTodoSession(null)}
-              aria-label="閉じる"
-              title="閉じる"
-            >
-              ×
-            </button>
-            <p className="modal-context">
-              {formatDateYmd(date)}（{formatWeekdayJa(date)}）
-            </p>
-            <h3>
-              {typeLabel[selectedTodoSession.type]}{" "}
-              {formatTimeNoLeadingZero(selectedTodoSession.startTime)} - {formatTimeNoLeadingZero(selectedTodoSession.endTime)}
-            </h3>
-            <div className="related-todos-list">
-              {selectedSessionTodos.map((todo) => {
-                const takeover = takeoverLabel(todo);
-                return (
-                  <article key={todo.id} className={`todo-row compact ${todo.completed ? "completed" : ""}`}>
-                    <label className="todo-check">
-                      <input
-                        type="checkbox"
-                        checked={todo.completed}
-                        onChange={() => void saveTodo({ ...todo, completed: !todo.completed })}
-                      />
-                    </label>
-                    <div className="todo-main">
-                      <p className="todo-title">{todo.title}</p>
-                      {todo.memo?.trim() && <p className="todo-description">{todo.memo}</p>}
-                      <p className="todo-meta">
-                        <span>担当: {assigneeLabel(todo.assigneeUid)}</span>
-                        <span>期限: {todo.dueDate ?? "—"}</span>
-                      </p>
-                    </div>
-                    <div className="todo-actions">
-                      {takeover && (
-                        <button
-                          type="button"
-                          className="button button-small"
-                          onClick={() => void saveTodo({ ...todo, assigneeUid: currentUid })}
-                        >
-                          {takeover}
-                        </button>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-              {selectedSessionTodos.length === 0 && <p className="muted">関連TODOはありません。</p>}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {selectedAttendanceMember && (
-        <div className="modal-backdrop">
-          <div className="modal-panel today-attendance-edit-modal" onClick={(event) => event.stopPropagation()}>
-            <button
-              type="button"
-              className="modal-close"
-              onClick={closeAttendanceMemberModal}
-              aria-label="閉じる"
-              title="閉じる"
-            >
-              ×
-            </button>
-            <p className="modal-context">
-              {formatDateYmd(date)}（{formatWeekdayJa(date)}）
-            </p>
-            <h3>{selectedAttendanceMember.member.name}</h3>
-            <div className="today-attendance-edit-list">
-              {sessions.map((session) => {
-                const currentStatus = attendanceDraftBySessionOrder[session.order] ?? "unknown";
-                return (
-                  <section key={session.id ?? `${session.order}-${session.startTime}`} className="today-attendance-edit-section">
-                    <div className="today-attendance-edit-session-row">
-                      <div className="today-attendance-edit-header">
-                        <strong>{typeLabel[session.type]}</strong>
-                        <span>
-                          {formatTimeNoLeadingZero(session.startTime)} - {formatTimeNoLeadingZero(session.endTime)}
-                        </span>
-                      </div>
-                      <div className="rsvp-toggle-group today-rsvp-toggle-group">
-                        {(["yes", "maybe", "no", "unknown"] as RsvpStatus[]).map((status) => (
-                          <button
-                            key={status}
-                            type="button"
-                            className={`rsvp-toggle today-rsvp-toggle ${status} ${currentStatus === status ? "active" : ""}`}
-                            onClick={() =>
-                              setAttendanceDraftBySessionOrder((current) => ({
-                                ...current,
-                                [session.order]: status,
-                              }))
-                            }
-                          >
-                            <span>{statusSymbol[status]}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </section>
-                );
-              })}
-              <section className="today-attendance-edit-section today-attendance-transport-section">
-                <div className="today-attendance-edit-header">
-                  <strong>移動手段</strong>
-                </div>
-                <div className="today-attendance-transport-editor">
-                  <div className="today-attendance-transport-group">
-                    <span className="today-attendance-transport-label">行き</span>
-                    <div className="today-attendance-transport-options">
-                      {(["car", "walk"] as AttendanceTransportMethod[]).map((mode) => (
-                        <button
-                          key={`to-${mode}`}
-                          type="button"
-                          className={`today-transport-toggle ${transportDraft.to === mode ? "active" : ""}`}
-                          onClick={() => setTransportDraft((current) => ({ ...current, to: mode }))}
-                        >
-                          <span>{transportLabel[mode]}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="today-attendance-transport-group">
-                    <span className="today-attendance-transport-label">帰り</span>
-                    <div className="today-attendance-transport-options">
-                      {(["car", "walk"] as AttendanceTransportMethod[]).map((mode) => (
-                        <button
-                          key={`from-${mode}`}
-                          type="button"
-                          className={`today-transport-toggle ${transportDraft.from === mode ? "active" : ""}`}
-                          onClick={() => setTransportDraft((current) => ({ ...current, from: mode }))}
-                        >
-                          <span>{transportLabel[mode]}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </section>
-              <section className="today-attendance-edit-section">
-                <div className="today-attendance-edit-header">
-                  <strong>コメント</strong>
-                  <span>その日全体について</span>
-                </div>
-                <textarea
-                  className="today-attendance-comment-input"
-                  rows={3}
-                  value={transportDraft.comment}
-                  onChange={(event) =>
-                    setTransportDraft((current) => ({
-                      ...current,
-                      comment: event.target.value,
-                    }))
-                  }
-                  placeholder="11時から参加します。 / Aさんに送迎してもらいます。"
-                />
-              </section>
-            </div>
-            {attendanceSaveError && <p className="field-error">{attendanceSaveError}</p>}
-            <div className="modal-actions">
-              <button type="button" className="button button-secondary" onClick={closeAttendanceMemberModal}>
-                キャンセル
-              </button>
-              <button type="button" className="button" onClick={() => void saveAttendanceMember()} disabled={isSavingAttendance}>
-                {isSavingAttendance ? "保存中..." : "保存"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {selectedAttendanceComment && (
-        <div className="modal-backdrop" onClick={() => setSelectedAttendanceComment(null)}>
-          <div className="modal-panel today-attendance-comment-modal" onClick={(event) => event.stopPropagation()}>
-            <button
-              type="button"
-              className="modal-close"
-              onClick={() => setSelectedAttendanceComment(null)}
-              aria-label="閉じる"
-              title="閉じる"
-            >
-              ×
-            </button>
-            <p className="modal-context">
-              {formatDateYmd(date)}（{formatWeekdayJa(date)}）
-            </p>
-            <h3>{selectedAttendanceComment.memberName} のコメント</h3>
-            <div className="today-attendance-comment-body">{selectedAttendanceComment.comment}</div>
-            <div className="modal-actions">
-              <button type="button" className="button" onClick={() => setSelectedAttendanceComment(null)}>
-                閉じる
-              </button>
-            </div>
-          </div>
-        </div>
+        <DayAttendanceModal
+          date={date}
+          sessions={sessions}
+          dayTransport={dayTransport}
+          members={members}
+          relations={relations}
+          linkedMember={linkedMember}
+          authRole={authRole}
+          currentUid={currentUid}
+          todos={data.todos}
+          saveTodo={saveTodo}
+          onClose={closeAttendanceModal}
+        />
       )}
 
       {birthdayModalDate && birthdayCelebrants.length > 0 && (

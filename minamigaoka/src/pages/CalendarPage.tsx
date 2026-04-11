@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { BirthdayCelebrationModal } from "../components/BirthdayCelebrationModal";
-import { LinkifiedText } from "../components/LinkifiedText";
+import { DayAttendanceModal } from "../components/DayAttendanceModal";
 import { getBirthdayCelebrants } from "../members/birthday";
 import { sortFamiliesByDisplayOrder } from "../members/familyOrder";
 import {
@@ -12,8 +12,8 @@ import {
   type SaveCalendarSessionInput,
 } from "../schedule/service";
 import { isChildMember, sortMembersForDisplay } from "../members/permissions";
-import { subscribeFamilies, subscribeMembers } from "../members/service";
-import type { FamilyRecord, MemberRecord } from "../members/types";
+import { subscribeFamilies, subscribeMemberRelations, subscribeMembers } from "../members/service";
+import type { FamilyRecord, MemberRecord, MemberRelationRecord } from "../members/types";
 import type { DemoData, RsvpStatus, SessionDoc, Todo } from "../types";
 import {
   formatDateYmd,
@@ -22,14 +22,15 @@ import {
   isValidDateKey,
   todayDateKey,
 } from "../utils/date";
-import { canViewSharedTodo, makeSessionRelatedId, sortTodosOpenFirst } from "../utils/todoUtils";
 
 type CalendarPageProps = {
   data: DemoData;
   canManageSessions: boolean;
   ensureDayLog: (date: string) => Promise<void>;
+  currentUid: string;
   linkedMember: MemberRecord | null;
   authRole?: "parent" | "admin" | null;
+  saveTodo: (todo: Todo) => Promise<void>;
 };
 
 type EditableSessionType = "normal" | "self" | "event";
@@ -89,13 +90,6 @@ const BASE_TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
 
 const assigneeRoleLabel = (session: SessionDoc): string =>
   session.type === "self" ? "見守り" : "当番";
-
-const statusSymbol: Record<RsvpStatus, string> = {
-  yes: "○",
-  maybe: "△",
-  no: "×",
-  unknown: "ー",
-};
 
 const toFamilyName = (name?: string): string => {
   const value = (name ?? "").trim();
@@ -308,13 +302,15 @@ export function CalendarPage({
   data,
   canManageSessions,
   ensureDayLog,
+  currentUid,
   linkedMember,
   authRole,
+  saveTodo,
 }: CalendarPageProps) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedDay, setSelectedDay] = useState<DaySelection | null>(null);
   const [dialog, setDialog] = useState<CalendarDialog | null>(null);
-  const [attendanceSession, setAttendanceSession] = useState<SessionDoc | null>(null);
+  const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
   const [birthdayModalDate, setBirthdayModalDate] = useState<string | null>(null);
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
   const [sessionForm, setSessionForm] = useState<SessionFormState>(emptySessionForm(todayDateKey()));
@@ -339,6 +335,7 @@ export function CalendarPage({
   }, [data.events]);
   const [families, setFamilies] = useState<FamilyRecord[]>([]);
   const [members, setMembers] = useState<MemberRecord[]>([]);
+  const [relations, setRelations] = useState<MemberRelationRecord[]>([]);
   const monthPickerRef = useRef<HTMLDivElement | null>(null);
   const navigate = useNavigate();
   const today = todayDateKey();
@@ -389,6 +386,7 @@ export function CalendarPage({
 
   useEffect(() => subscribeFamilies(setFamilies), []);
   useEffect(() => subscribeMembers(setMembers), []);
+  useEffect(() => subscribeMemberRelations(setRelations), []);
   useEffect(() => {
     setMonthPickerYear(Number(monthKey.slice(0, 4)));
   }, [monthKey]);
@@ -477,26 +475,6 @@ export function CalendarPage({
     }, {}) ?? {};
   }, [selectedDay?.sessions, visibleChildMembers]);
 
-  const selectedAttendanceRows = attendanceSession
-    ? attendanceRowsByOrder[attendanceSession.order] ?? []
-    : [];
-  const selectedAttendanceCounts = useMemo(
-    () => countAttendanceRows(selectedAttendanceRows),
-    [selectedAttendanceRows],
-  );
-  const selectedSessionTodos = useMemo(() => {
-    if (!selectedDay || !attendanceSession) return [] as Todo[];
-    const relatedId = makeSessionRelatedId(selectedDay.date, attendanceSession.order);
-    return sortTodosOpenFirst(
-      data.todos.filter(
-        (todo) =>
-          todo.kind === "shared" &&
-          todo.related?.type === "session" &&
-          todo.related.id === relatedId &&
-          canViewSharedTodo(todo, linkedMember, authRole),
-      ),
-    );
-  }, [attendanceSession, authRole, data.todos, linkedMember, selectedDay]);
   const birthdayCelebrants = useMemo(
     () => (birthdayModalDate ? getBirthdayCelebrants(members, birthdayModalDate) : []),
     [birthdayModalDate, members],
@@ -570,7 +548,7 @@ export function CalendarPage({
   };
 
   const closeAttendanceModal = () => {
-    setAttendanceSession(null);
+    setIsAttendanceModalOpen(false);
   };
 
   const openCreateSession = () => {
@@ -965,7 +943,7 @@ export function CalendarPage({
                             <button
                               type="button"
                             className="attendance-trigger"
-                            onClick={() => setAttendanceSession(session)}
+                            onClick={() => setIsAttendanceModalOpen(true)}
                           >
                             <span className="count-yes">○{counts.yes}</span>
                             <span className="count-maybe">△{counts.maybe}</span>
@@ -1244,70 +1222,20 @@ export function CalendarPage({
         </div>
       )}
 
-      {attendanceSession && selectedDay && (
-        <div className="modal-backdrop calendar-attendance-backdrop" onClick={closeAttendanceModal}>
-          <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
-            <button
-              type="button"
-              className="modal-close"
-              onClick={closeAttendanceModal}
-              aria-label="閉じる"
-              title="閉じる"
-            >
-              ×
-            </button>
-            <p className="modal-context">
-              {formatDateYmd(selectedDay.date)}（{formatWeekdayJa(selectedDay.date)}） /{" "}
-              {formatTimeNoLeadingZero(attendanceSession.startTime)}-
-              {formatTimeNoLeadingZero(attendanceSession.endTime)}
-            </p>
-            <h3>{getSessionDisplayTitle(attendanceSession)}</h3>
-            {attendanceSession.location && (
-              <p className="modal-summary muted">場所: {attendanceSession.location}</p>
-            )}
-            <p className="modal-summary">
-              出欠: <span className="count-yes">○{selectedAttendanceCounts.yes}</span>{" "}
-              <span className="count-maybe">△{selectedAttendanceCounts.maybe}</span>{" "}
-              <span className="count-no">×{selectedAttendanceCounts.no}</span>{" "}
-              <span className="count-unknown">ー{selectedAttendanceCounts.unknown}</span>
-            </p>
-            <div className="rsvp-table">
-              {selectedAttendanceRows.length === 0 ? (
-                <div className="rsvp-row">
-                  <span>対象の部員はまだいません。</span>
-                  <span className="rsvp-mark unknown">ー</span>
-                </div>
-              ) : (
-                selectedAttendanceRows.map((row) => (
-                  <div key={row.uid} className="rsvp-row">
-                    <span>{row.displayName}</span>
-                    <span className={`rsvp-mark ${row.status}`}>{statusSymbol[row.status]}</span>
-                  </div>
-                ))
-              )}
-            </div>
-            {selectedSessionTodos.length > 0 && (
-              <div className="related-todos-block">
-                <p className="related-todos-title">関連TODO</p>
-                <div className="related-todos-list">
-                  {selectedSessionTodos.map((todo) => (
-                    <label key={todo.id} className={`todo-check ${todo.completed ? "done" : ""}`}>
-                      <input type="checkbox" checked={todo.completed} readOnly />
-                      <span>
-                        <span>{todo.title}</span>
-                        {todo.memo?.trim() && (
-                          <span className="todo-memo-preview compact">
-                            <LinkifiedText text={todo.memo} className="todo-linkified-text" />
-                          </span>
-                        )}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+      {isAttendanceModalOpen && selectedDay && (
+        <DayAttendanceModal
+          date={selectedDay.date}
+          sessions={selectedDay.sessions}
+          dayTransport={data.scheduleDays[selectedDay.date]?.attendanceTransport ?? {}}
+          members={members}
+          relations={relations}
+          linkedMember={linkedMember}
+          authRole={authRole}
+          currentUid={currentUid}
+          todos={data.todos}
+          saveTodo={saveTodo}
+          onClose={closeAttendanceModal}
+        />
       )}
 
       {birthdayModalDate && birthdayCelebrants.length > 0 && (
