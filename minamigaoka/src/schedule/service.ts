@@ -143,6 +143,7 @@ const toAttendanceTransport = (value: unknown): Record<string, AttendanceTranspo
       result[memberId] = {
         to: normalizeTransportMethod(source.to),
         from: normalizeTransportMethod(source.from),
+        comment: typeof source.comment === "string" ? source.comment : "",
       };
       return result;
     },

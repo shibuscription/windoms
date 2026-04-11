@@ -185,6 +185,7 @@ export const saveDayAttendanceTransport = async (
   transport: {
     to: AttendanceTransportMethod;
     from: AttendanceTransportMethod;
+    comment?: string;
   },
 ): Promise<void> => {
   ensureDb();
@@ -195,6 +196,7 @@ export const saveDayAttendanceTransport = async (
         [memberId]: {
           to: transport.to,
           from: transport.from,
+          comment: typeof transport.comment === "string" ? transport.comment : "",
         },
       },
       updatedAt: serverTimestamp(),

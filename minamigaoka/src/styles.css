@@ -3553,6 +3553,13 @@ body {
   text-decoration: underline;
 }
 
+.today-attendance-member-name-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+}
+
 .today-attendance-member-label {
   font-weight: 600;
   color: #111827;
@@ -3561,6 +3568,30 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.today-attendance-comment-trigger {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+  font-size: 0.86rem;
+}
+
+.today-attendance-comment-trigger:hover,
+.today-attendance-comment-trigger:focus-visible {
+  outline: 0;
+  color: #1d4ed8;
+  background: #eff6ff;
 }
 
 .today-attendance-status-cell {
@@ -3713,6 +3744,23 @@ body {
   border-color: #2563eb;
   background: #eff6ff;
   color: #1d4ed8;
+}
+
+.today-attendance-comment-input {
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
+}
+
+.today-attendance-comment-modal {
+  width: min(480px, calc(100vw - 24px));
+}
+
+.today-attendance-comment-body {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  color: #0f172a;
+  line-height: 1.6;
 }
 
 .today-attendance-todo-modal {
@@ -6059,9 +6107,10 @@ textarea {
   .today-secondary-actions {
     grid-area: secondary;
     min-width: 0;
-    width: 100%;
+    width: auto;
     justify-content: flex-end;
     justify-self: end;
+    margin-left: auto;
   }
 
   .today-next-day-button {
@@ -6124,6 +6173,16 @@ textarea {
     gap: 6px 10px;
   }
 
+  .today-attendance-member-name-wrap {
+    gap: 2px;
+  }
+
+  .today-attendance-comment-trigger {
+    width: 18px;
+    height: 18px;
+    font-size: 0.76rem;
+  }
+
   .today-attendance-edit-header {
     flex-direction: column;
     align-items: flex-start;
@@ -6151,6 +6210,11 @@ textarea {
 
   .today-transport-toggle span {
     font-size: 0.74rem;
+  }
+
+  .today-attendance-comment-input {
+    min-height: 80px;
+    font-size: 0.88rem;
   }
 
   .log-time-range-inline {

@@ -45,6 +45,11 @@ type AttendanceMemberModalState = {
   member: MemberRecord;
 };
 
+type AttendanceCommentModalState = {
+  memberName: string;
+  comment: string;
+};
+
 const typeLabel: Record<SessionDoc["type"], string> = {
   normal: "通常練習",
   self: "自主練",
@@ -140,6 +145,7 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
   const navigate = useNavigate();
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
   const [selectedAttendanceMember, setSelectedAttendanceMember] = useState<AttendanceMemberModalState | null>(null);
+  const [selectedAttendanceComment, setSelectedAttendanceComment] = useState<AttendanceCommentModalState | null>(null);
   const [selectedTodoSession, setSelectedTodoSession] = useState<SessionDoc | null>(null);
   const [birthdayModalDate, setBirthdayModalDate] = useState<string | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -157,7 +163,8 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
   const [transportDraft, setTransportDraft] = useState<{
     to: AttendanceTransportMethod;
     from: AttendanceTransportMethod;
-  }>({ to: "car", from: "car" });
+    comment: string;
+  }>({ to: "car", from: "car", comment: "" });
   const calendarWrapRef = useRef<HTMLDivElement>(null);
   const noticeContentRef = useRef<HTMLDivElement>(null);
   const today = todayDateKey();
@@ -387,6 +394,7 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
     setTransportDraft({
       to: currentTransport?.to ?? "car",
       from: currentTransport?.from ?? "car",
+      comment: currentTransport?.comment ?? "",
     });
     setAttendanceSaveError("");
     setSelectedAttendanceMember({ member });
@@ -703,15 +711,51 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
                       <tr key={member.id}>
                         <th className="today-attendance-member-cell">
                           {canEdit ? (
-                            <button
-                              type="button"
-                              className="today-attendance-member-button"
-                              onClick={() => openAttendanceMemberModal(member)}
-                            >
-                              {member.name}
-                            </button>
+                            <span className="today-attendance-member-name-wrap">
+                              <button
+                                type="button"
+                                className="today-attendance-member-button"
+                                onClick={() => openAttendanceMemberModal(member)}
+                              >
+                                {member.name}
+                              </button>
+                              {memberTransport?.comment?.trim() && (
+                                <button
+                                  type="button"
+                                  className="today-attendance-comment-trigger"
+                                  onClick={() =>
+                                    setSelectedAttendanceComment({
+                                      memberName: member.name,
+                                      comment: memberTransport.comment?.trim() ?? "",
+                                    })
+                                  }
+                                  aria-label={`${member.name} のコメントを見る`}
+                                  title="コメントを見る"
+                                >
+                                  📝
+                                </button>
+                              )}
+                            </span>
                           ) : (
-                            <span className="today-attendance-member-label">{member.name}</span>
+                            <span className="today-attendance-member-name-wrap">
+                              <span className="today-attendance-member-label">{member.name}</span>
+                              {memberTransport?.comment?.trim() && (
+                                <button
+                                  type="button"
+                                  className="today-attendance-comment-trigger"
+                                  onClick={() =>
+                                    setSelectedAttendanceComment({
+                                      memberName: member.name,
+                                      comment: memberTransport.comment?.trim() ?? "",
+                                    })
+                                  }
+                                  aria-label={`${member.name} のコメントを見る`}
+                                  title="コメントを見る"
+                                >
+                                  📝
+                                </button>
+                              )}
+                            </span>
                           )}
                         </th>
                         {sessions.map((session) => {
@@ -895,6 +939,24 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
                   </div>
                 </div>
               </section>
+              <section className="today-attendance-edit-section">
+                <div className="today-attendance-edit-header">
+                  <strong>コメント</strong>
+                  <span>その日全体について</span>
+                </div>
+                <textarea
+                  className="today-attendance-comment-input"
+                  rows={3}
+                  value={transportDraft.comment}
+                  onChange={(event) =>
+                    setTransportDraft((current) => ({
+                      ...current,
+                      comment: event.target.value,
+                    }))
+                  }
+                  placeholder="11時から参加します。 / Aさんに送迎してもらいます。"
+                />
+              </section>
             </div>
             {attendanceSaveError && <p className="field-error">{attendanceSaveError}</p>}
             <div className="modal-actions">
@@ -903,6 +965,32 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
               </button>
               <button type="button" className="button" onClick={() => void saveAttendanceMember()} disabled={isSavingAttendance}>
                 {isSavingAttendance ? "保存中..." : "保存"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedAttendanceComment && (
+        <div className="modal-backdrop" onClick={() => setSelectedAttendanceComment(null)}>
+          <div className="modal-panel today-attendance-comment-modal" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close"
+              onClick={() => setSelectedAttendanceComment(null)}
+              aria-label="閉じる"
+              title="閉じる"
+            >
+              ×
+            </button>
+            <p className="modal-context">
+              {formatDateYmd(date)}（{formatWeekdayJa(date)}）
+            </p>
+            <h3>{selectedAttendanceComment.memberName} のコメント</h3>
+            <div className="today-attendance-comment-body">{selectedAttendanceComment.comment}</div>
+            <div className="modal-actions">
+              <button type="button" className="button" onClick={() => setSelectedAttendanceComment(null)}>
+                閉じる
               </button>
             </div>
           </div>

@@ -64,6 +64,7 @@ export type AttendanceTransportMethod = "car" | "walk";
 export type AttendanceTransportRecord = {
   to?: AttendanceTransportMethod;
   from?: AttendanceTransportMethod;
+  comment?: string;
 };
 
 export type ScheduleDayDoc = {
