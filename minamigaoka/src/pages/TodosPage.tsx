@@ -98,7 +98,7 @@ const applyDraft = (source: Todo, draft: TodoDraft): Todo => ({
   assigneeUid: draft.kind === "shared" ? draft.assigneeUid || null : null,
   dueDate: draft.dueDate || undefined,
   related:
-    draft.kind === "private" || draft.relatedType === "none"
+    draft.relatedType === "none"
       ? null
       : {
           type: draft.relatedType,
