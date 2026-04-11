@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { LinkifiedText } from "../components/LinkifiedText";
-import { subscribeFamilies } from "../members/service";
+import { buildFamilyMap, buildMemberIndexes, resolveFamilyNameFromIdentifier } from "../members/familyNameResolver";
+import { subscribeFamilies, subscribeMembers } from "../members/service";
 import type { FamilyRecord, MemberRecord } from "../members/types";
 import type { DemoData, EventCarpoolVehicle, EventKind, EventRecord, SessionDoc, Todo } from "../types";
 import { canViewSharedTodo, sortTodosOpenFirst } from "../utils/todoUtils";
 import { todayDateKey } from "../utils/date";
-import { toDemoFamilyName } from "../utils/demoName";
 
 type DemoMenuRole = "child" | "parent" | "admin";
 type SessionType = "normal" | "self" | "event";
@@ -127,6 +127,7 @@ export function EventsPage({
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [families, setFamilies] = useState<FamilyRecord[]>([]);
+  const [members, setMembers] = useState<MemberRecord[]>([]);
   const [selectedVehicleKey, setSelectedVehicleKey] = useState("");
   const { eventId } = useParams<{ eventId?: string }>();
   const navigate = useNavigate();
@@ -136,6 +137,7 @@ export function EventsPage({
 
   const isManager = canManageEvents(menuRole);
   useEffect(() => subscribeFamilies(setFamilies), []);
+  useEffect(() => subscribeMembers(setMembers), []);
   const selectedEvent = eventId ? data.events.find((item) => item.id === eventId) ?? null : null;
   const editingEvent =
     editingEventId && editingEventId !== "__new__"
@@ -205,6 +207,8 @@ export function EventsPage({
       ),
     [families],
   );
+  const memberIndexes = useMemo(() => buildMemberIndexes(members), [members]);
+  const familiesById = useMemo(() => buildFamilyMap(families), [families]);
 
   const activeEvents = useMemo(
     () =>
@@ -287,7 +291,14 @@ export function EventsPage({
 
   const assigneeLabel = (uid: string | null): string => {
     if (!uid) return "未アサイン";
-    return toDemoFamilyName(data.users[uid]?.displayName ?? uid, uid);
+    return (
+      resolveFamilyNameFromIdentifier({
+        identifier: uid,
+        memberIndexes,
+        familiesById,
+        fallback: uid,
+      }) || uid
+    );
   };
 
   const takeoverLabel = (todo: Todo): string | null => {
@@ -628,7 +639,16 @@ export function EventsPage({
                 <article key={`${vehicle.familyId}:${vehicle.vehicleIndex}`} className="events-carpool-row">
                   <div>
                     <p className="events-carpool-name">
-                      {toVehicleLabel(vehicle.familyNameSnapshot, vehicle.maker, vehicle.model)}
+                      {toVehicleLabel(
+                        resolveFamilyNameFromIdentifier({
+                          identifier: vehicle.familyId,
+                          memberIndexes,
+                          familiesById,
+                          fallback: vehicle.familyNameSnapshot || "名称未設定",
+                        }) || vehicle.familyNameSnapshot || "名称未設定",
+                        vehicle.maker,
+                        vehicle.model,
+                      )}
                     </p>
                     <p className="events-carpool-capacity">
                       乗車定員（運転手除く）: {toPassengerCapacity(vehicle.capacity)}人
@@ -844,7 +864,16 @@ export function EventsPage({
                   <article key={`${vehicle.familyId}:${vehicle.vehicleIndex}`} className="events-carpool-row">
                     <div>
                       <p className="events-carpool-name">
-                        {toVehicleLabel(vehicle.familyNameSnapshot, vehicle.maker, vehicle.model)}
+                        {toVehicleLabel(
+                          resolveFamilyNameFromIdentifier({
+                            identifier: vehicle.familyId,
+                            memberIndexes,
+                            familiesById,
+                            fallback: vehicle.familyNameSnapshot || "名称未設定",
+                          }) || vehicle.familyNameSnapshot || "名称未設定",
+                          vehicle.maker,
+                          vehicle.model,
+                        )}
                       </p>
                       <p className="events-carpool-capacity">
                         乗車定員（運転手除く）: {toPassengerCapacity(vehicle.capacity)}人

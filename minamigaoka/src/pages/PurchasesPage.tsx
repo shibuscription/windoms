@@ -6,8 +6,10 @@ import { useReceiptPreviews } from "../hooks/useReceiptPreviews";
 import { useAccountingStore } from "../accounting/useAccountingStore";
 import { groupedAccountingSubjects } from "../accounting/fixedSubjects";
 import { comparePeriodAccounts } from "../accounting/sort";
+import { buildFamilyMap, buildMemberIndexes, resolveFamilyNameFromIdentifier } from "../members/familyNameResolver";
+import { subscribeFamilies, subscribeMembers } from "../members/service";
+import type { FamilyRecord, MemberRecord } from "../members/types";
 import type { DemoData, PurchaseRequest } from "../types";
-import { toDemoFamilyName } from "../utils/demoName";
 
 type PurchaseTab = "open" | "bought";
 type DemoRole = "admin" | "parent";
@@ -146,7 +148,12 @@ export function PurchasesPage({
   const [confirmDialog, setConfirmDialog] = useState<PurchaseConfirmDialogState>(null);
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [members, setMembers] = useState<MemberRecord[]>([]);
+  const [families, setFamilies] = useState<FamilyRecord[]>([]);
   const { previews: receiptPreviews, addFiles, removePreview, clearPreviews } = useReceiptPreviews();
+
+  useEffect(() => subscribeMembers(setMembers), []);
+  useEffect(() => subscribeFamilies(setFamilies), []);
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
@@ -173,6 +180,8 @@ export function PurchasesPage({
       isAdmin ? account.label === "現金（会長手元金）" : account.label === "現金（会計手元金）",
     )?.accountId ?? "";
   const accountingSubjectGroups = useMemo(() => groupedAccountingSubjects("expense"), []);
+  const memberIndexes = useMemo(() => buildMemberIndexes(members), [members]);
+  const familiesById = useMemo(() => buildFamilyMap(families), [families]);
 
   const openRows = useMemo(
     () =>
@@ -209,7 +218,15 @@ export function PurchasesPage({
     [data.purchaseRequests, titleQuery],
   );
 
-  const userName = (uid?: string): string => (uid ? toDemoFamilyName(data.users[uid]?.displayName ?? uid, uid) : "—");
+  const userName = (identifier?: string): string =>
+    identifier
+      ? resolveFamilyNameFromIdentifier({
+          identifier,
+          memberIndexes,
+          familiesById,
+          fallback: identifier,
+        }) || identifier
+      : "未設定";
   const canEditPurchase = (purchase: PurchaseRequest): boolean => isAdmin || (purchase.status === "OPEN" && purchase.createdBy === currentUid);
   const canDeletePurchase = (purchase: PurchaseRequest): boolean => isAdmin || (purchase.status === "OPEN" && purchase.createdBy === currentUid);
 

@@ -2660,6 +2660,8 @@ TODO：
 - 表示用の名前解決も Firestore の `members` / `families` を正とする。
 - 解決できない場合に demo family 名へ寄せる fallback は、仮運用対象モジュールでは採用しない。
 - `お弁当` と `立替` の Family 名表示は、保存済みの `buyer` / `dutyMemberId` / `dutyHouseholdId` を Firestore の `members` / `families` から解決して表示する。
+- `購入依頼` と `イベント` の Family 名表示も同じ方針とし、demo / mock fallback ではなく Firestore の `members` / `families` を正として解決する。
+- 未解決時は demo 固定 family 名へ寄せず、`未設定` または生値のままなど、誤解を生まない自然な fallback に留める。
 - `シフト作成` モジュールは未着手のため、今回の仮運用実データ化の例外対象として扱う。
 
 ### 30.8 データ移行の考え方
