@@ -838,12 +838,12 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
                         {formatTimeNoLeadingZero(session.startTime)} - {formatTimeNoLeadingZero(session.endTime)}
                       </span>
                     </div>
-                    <div className="today-attendance-status-options">
+                    <div className="rsvp-toggle-group today-rsvp-toggle-group">
                       {(["yes", "maybe", "no", "unknown"] as RsvpStatus[]).map((status) => (
                         <button
                           key={status}
                           type="button"
-                          className={`attendance-cell-status-option ${status} ${currentStatus === status ? "active" : ""}`}
+                          className={`rsvp-toggle today-rsvp-toggle ${status} ${currentStatus === status ? "active" : ""}`}
                           onClick={() =>
                             setAttendanceDraftBySessionOrder((current) => ({
                               ...current,
@@ -870,7 +870,7 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
                         <button
                           key={`to-${mode}`}
                           type="button"
-                          className={`attendance-cell-status-option transport-option ${transportDraft.to === mode ? "active" : ""}`}
+                          className={`today-transport-toggle ${transportDraft.to === mode ? "active" : ""}`}
                           onClick={() => setTransportDraft((current) => ({ ...current, to: mode }))}
                         >
                           <span>{transportLabel[mode]}</span>
@@ -885,7 +885,7 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
                         <button
                           key={`from-${mode}`}
                           type="button"
-                          className={`attendance-cell-status-option transport-option ${transportDraft.from === mode ? "active" : ""}`}
+                          className={`today-transport-toggle ${transportDraft.from === mode ? "active" : ""}`}
                           onClick={() => setTransportDraft((current) => ({ ...current, from: mode }))}
                         >
                           <span>{transportLabel[mode]}</span>

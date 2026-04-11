@@ -3499,9 +3499,9 @@ body {
   left: 0;
   z-index: 1;
   text-align: left !important;
-  width: 96px;
-  min-width: 96px;
-  max-width: 96px;
+  width: 88px;
+  min-width: 88px;
+  max-width: 88px;
   background: #f8fafc !important;
 }
 
@@ -3519,8 +3519,8 @@ body {
 }
 
 .today-attendance-session-head {
-  width: 58px;
-  min-width: 58px;
+  width: 52px;
+  min-width: 52px;
 }
 
 .today-attendance-session-time {
@@ -3586,8 +3586,8 @@ body {
 
 .today-attendance-transport-head,
 .today-attendance-transport-cell {
-  width: 48px;
-  min-width: 48px;
+  width: 40px;
+  min-width: 40px;
 }
 
 .today-attendance-transport-cell {
@@ -3639,11 +3639,19 @@ body {
   font-size: 0.92rem;
 }
 
-.today-attendance-status-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+.today-rsvp-toggle-group {
+  gap: 6px;
   align-items: center;
+}
+
+.today-rsvp-toggle {
+  flex: 0 0 auto;
+}
+
+.today-rsvp-toggle.unknown.active {
+  background: #64748b;
+  border-color: #64748b;
+  color: #fff;
 }
 
 .today-attendance-transport-editor {
@@ -3668,22 +3676,43 @@ body {
   gap: 4px;
   justify-content: flex-start;
   align-items: center;
-  padding: 2px;
+  padding: 2px 3px;
   border: 1px solid #dbe3ef;
   border-radius: 999px;
   width: fit-content;
   background: #f8fafc;
 }
 
-.transport-option {
-  min-width: 38px;
-  width: 38px;
-  height: 34px;
+.today-transport-toggle {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border: 1px solid #cbd5e1;
   border-radius: 999px;
+  background: #fff;
+  color: #475569;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
 }
 
-.transport-option span {
-  font-size: 0.92rem;
+.today-transport-toggle span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 0.84rem;
+  line-height: 1;
+}
+
+.today-transport-toggle.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
 }
 
 .today-attendance-todo-modal {
@@ -6056,25 +6085,35 @@ textarea {
   }
 
   .today-attendance-day-table {
-    min-width: 460px;
+    min-width: 388px;
   }
 
   .today-attendance-member-head,
   .today-attendance-member-cell {
-    width: 82px;
-    min-width: 82px;
-    max-width: 82px;
+    width: 68px;
+    min-width: 68px;
+    max-width: 68px;
   }
 
   .today-attendance-session-head {
-    width: 52px;
-    min-width: 52px;
+    width: 42px;
+    min-width: 42px;
   }
 
   .today-attendance-transport-head,
   .today-attendance-transport-cell {
-    width: 42px;
-    min-width: 42px;
+    width: 34px;
+    min-width: 34px;
+  }
+
+  .today-attendance-day-table th,
+  .today-attendance-day-table td {
+    padding: 6px 3px;
+    font-size: 0.82rem;
+  }
+
+  .today-attendance-session-time {
+    font-size: 0.64rem;
   }
 
   .today-attendance-session-summary {
@@ -6096,11 +6135,22 @@ textarea {
 
   .today-attendance-transport-options {
     gap: 3px;
+    padding: 2px;
   }
 
   .today-attendance-session-todo-trigger {
     width: 32px;
     height: 32px;
+  }
+
+  .today-transport-toggle {
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+  }
+
+  .today-transport-toggle span {
+    font-size: 0.74rem;
   }
 
   .log-time-range-inline {
