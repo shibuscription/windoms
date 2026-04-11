@@ -84,8 +84,6 @@ const normalizeDraftForKind = (draft: TodoDraft): TodoDraft =>
     ? {
         ...draft,
         assigneeUid: "",
-        relatedType: "none",
-        relatedId: "",
       }
     : draft;
 
@@ -247,7 +245,7 @@ export function TodosPage({
   const validateDraft = (draft: TodoDraft): TodoFormErrors => {
     const errors: TodoFormErrors = {};
     if (!draft.title.trim()) errors.title = "タイトルは必須です";
-    if (draft.kind === "shared" && draft.relatedType !== "none" && !draft.relatedId) {
+    if (draft.relatedType !== "none" && !draft.relatedId) {
       errors.relatedId = "紐付け先を選択してください";
     }
     return errors;
@@ -371,7 +369,7 @@ export function TodosPage({
       assigneeUid: normalizedDraft.kind === "shared" ? normalizedDraft.assigneeUid || null : null,
       dueDate: normalizedDraft.dueDate || undefined,
       related:
-        normalizedDraft.kind === "private" || normalizedDraft.relatedType === "none"
+        normalizedDraft.relatedType === "none"
           ? null
           : {
               type: normalizedDraft.relatedType,
@@ -444,7 +442,7 @@ export function TodosPage({
             <span>{todo.kind === "shared" ? `担当: ${userNameByUid(todo.assigneeUid)}` : "種別: 個人TODO"}</span>
             <span className={`todo-due todo-due-${dueDisplay.tone}`}>期限: {dueDisplay.text}</span>
           </p>
-          {todo.kind === "shared" && relatedPath ? (
+          {relatedPath ? (
             <button
               type="button"
               className="todo-related-link"
@@ -675,36 +673,32 @@ export function TodosPage({
                 </label>
               )}
             </div>
-            {editDraft.kind === "shared" && (
-              <>
-                <div className="todo-modal-grid shared">
-                  <label>
-                    紐付け種別
-                    <select value={editDraft.relatedType} onChange={(event) => updateDraftRelationType(setEditDraft, event.target.value as RelatedInputType)}>
-                      <option value="none">なし</option>
-                      <option value="session">予定</option>
-                      <option value="event">イベント</option>
-                    </select>
-                  </label>
-                  {editDraft.relatedType !== "none" ? (
-                    <label>
-                      紐付け先
-                      <select value={editDraft.relatedId} onChange={(event) => setEditDraft((prev) => ({ ...prev, relatedId: event.target.value }))}>
-                        <option value="">選択してください</option>
-                        {(editDraft.relatedType === "session" ? sessionOptions : eventOptions).map((option) => (
-                          <option key={option.id} value={option.id}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                      {editErrors.relatedId && <span className="field-error">{editErrors.relatedId}</span>}
-                    </label>
-                  ) : (
-                    <div className="todo-modal-grid-spacer" aria-hidden="true" />
-                  )}
-                </div>
-              </>
-            )}
+            <div className="todo-modal-grid shared">
+              <label>
+                紐付け種別
+                <select value={editDraft.relatedType} onChange={(event) => updateDraftRelationType(setEditDraft, event.target.value as RelatedInputType)}>
+                  <option value="none">なし</option>
+                  <option value="session">予定</option>
+                  <option value="event">イベント</option>
+                </select>
+              </label>
+              {editDraft.relatedType !== "none" ? (
+                <label>
+                  紐付け先
+                  <select value={editDraft.relatedId} onChange={(event) => setEditDraft((prev) => ({ ...prev, relatedId: event.target.value }))}>
+                    <option value="">選択してください</option>
+                    {(editDraft.relatedType === "session" ? sessionOptions : eventOptions).map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  {editErrors.relatedId && <span className="field-error">{editErrors.relatedId}</span>}
+                </label>
+              ) : (
+                <div className="todo-modal-grid-spacer" aria-hidden="true" />
+              )}
+            </div>
             <label className="todo-completed-toggle">
               <input
                 type="checkbox"
@@ -808,46 +802,42 @@ export function TodosPage({
                 </label>
               )}
             </div>
-            {createDraftState.kind === "shared" && (
-              <>
-                <div className="todo-modal-grid shared">
-                  <label>
-                    紐付け種別
-                    <select
-                      value={createDraftState.relatedType}
-                      onChange={(event) =>
-                        updateDraftRelationType(setCreateDraftState, event.target.value as RelatedInputType)
-                      }
-                    >
-                      <option value="none">なし</option>
-                      <option value="session">予定</option>
-                      <option value="event">イベント</option>
-                    </select>
-                  </label>
-                  {createDraftState.relatedType !== "none" ? (
-                    <label>
-                      紐付け先
-                      <select
-                        value={createDraftState.relatedId}
-                        onChange={(event) =>
-                          setCreateDraftState((prev) => ({ ...prev, relatedId: event.target.value }))
-                        }
-                      >
-                        <option value="">選択してください</option>
-                        {(createDraftState.relatedType === "session" ? sessionOptions : eventOptions).map((option) => (
-                          <option key={option.id} value={option.id}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                      {createErrors.relatedId && <span className="field-error">{createErrors.relatedId}</span>}
-                    </label>
-                  ) : (
-                    <div className="todo-modal-grid-spacer" aria-hidden="true" />
-                  )}
-                </div>
-              </>
-            )}
+            <div className="todo-modal-grid shared">
+              <label>
+                紐付け種別
+                <select
+                  value={createDraftState.relatedType}
+                  onChange={(event) =>
+                    updateDraftRelationType(setCreateDraftState, event.target.value as RelatedInputType)
+                  }
+                >
+                  <option value="none">なし</option>
+                  <option value="session">予定</option>
+                  <option value="event">イベント</option>
+                </select>
+              </label>
+              {createDraftState.relatedType !== "none" ? (
+                <label>
+                  紐付け先
+                  <select
+                    value={createDraftState.relatedId}
+                    onChange={(event) =>
+                      setCreateDraftState((prev) => ({ ...prev, relatedId: event.target.value }))
+                    }
+                  >
+                    <option value="">選択してください</option>
+                    {(createDraftState.relatedType === "session" ? sessionOptions : eventOptions).map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  {createErrors.relatedId && <span className="field-error">{createErrors.relatedId}</span>}
+                </label>
+              ) : (
+                <div className="todo-modal-grid-spacer" aria-hidden="true" />
+              )}
+            </div>
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={() => setIsAddModalOpen(false)}>
                 キャンセル

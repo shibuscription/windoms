@@ -10,7 +10,7 @@ import type {
   Todo,
 } from "../types";
 import { formatDateYmd, formatTimeNoLeadingZero, formatWeekdayJa } from "../utils/date";
-import { canViewSharedTodo, makeSessionRelatedId, sortTodosOpenFirst } from "../utils/todoUtils";
+import { canViewTodoByScope, makeSessionRelatedId, sortTodosOpenFirst } from "../utils/todoUtils";
 import { resolveEditableAttendanceMemberIds } from "../attendance/utils";
 
 type AttendanceRow = {
@@ -152,10 +152,9 @@ export function DayAttendanceModal({
         result[session.order] = sortTodosOpenFirst(
           todos.filter(
             (todo) =>
-              todo.kind === "shared" &&
               todo.related?.type === "session" &&
               todo.related.id === relatedId &&
-              canViewSharedTodo(todo, linkedMember, authRole),
+              canViewTodoByScope(todo, linkedMember, currentUid, authRole),
           ),
         );
         return result;
@@ -497,7 +496,7 @@ export function DayAttendanceModal({
                       <p className="todo-title">{todo.title}</p>
                       {todo.memo?.trim() && <p className="todo-description">{todo.memo}</p>}
                       <p className="todo-meta">
-                        <span>担当: {assigneeLabel(todo.assigneeUid)}</span>
+                        <span>{todo.kind === "shared" ? `担当: ${assigneeLabel(todo.assigneeUid)}` : "種別: 個人TODO"}</span>
                         <span>期限: {todo.dueDate ?? "-"}</span>
                       </p>
                     </div>

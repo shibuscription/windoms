@@ -5,7 +5,7 @@ import { buildFamilyMap, buildMemberIndexes, resolveFamilyNameFromIdentifier } f
 import { subscribeFamilies, subscribeMembers } from "../members/service";
 import type { FamilyRecord, MemberRecord } from "../members/types";
 import type { DemoData, EventCarpoolVehicle, EventKind, EventRecord, SessionDoc, Todo } from "../types";
-import { canViewSharedTodo, sortTodosOpenFirst } from "../utils/todoUtils";
+import { canViewTodoByScope, sortTodosOpenFirst } from "../utils/todoUtils";
 import { todayDateKey } from "../utils/date";
 
 type DemoMenuRole = "child" | "parent" | "admin";
@@ -260,10 +260,9 @@ export function EventsPage({
     return sortTodosOpenFirst(
       data.todos.filter(
         (todo) =>
-          todo.kind === "shared" &&
           todo.related?.type === "event" &&
           todo.related.id === selectedEvent.id &&
-          canViewSharedTodo(todo, linkedMember, authRole),
+          canViewTodoByScope(todo, linkedMember, currentUid, authRole),
       ),
     );
   }, [authRole, data.todos, linkedMember, selectedEvent]);
@@ -596,7 +595,7 @@ export function EventsPage({
                           </p>
                         )}
                         <p className="todo-meta">
-                          <span>担当: {assigneeLabel(todo.assigneeUid)}</span>
+                          <span>{todo.kind === "shared" ? `担当: ${assigneeLabel(todo.assigneeUid)}` : "種別: 個人TODO"}</span>
                           <span>期限: {todo.dueDate ?? "—"}</span>
                         </p>
                       </div>

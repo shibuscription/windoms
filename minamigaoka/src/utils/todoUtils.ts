@@ -196,6 +196,9 @@ export const getCreatableSharedScopesForRole = (role: TodoAudienceRole): TodoSha
 export const getTodoKindOptionsForRole = (role: TodoAudienceRole): TodoKind[] =>
   getCreatableSharedScopesForRole(role).length > 0 ? ["shared", "private"] : ["private"];
 
+export const canViewPrivateTodo = (todo: Todo, currentUid: string): boolean =>
+  todo.kind === "private" && !!todo.createdByUid && todo.createdByUid === currentUid;
+
 export const canViewSharedTodo = (
   todo: Todo,
   linkedMember: MemberRecord | null,
@@ -203,6 +206,18 @@ export const canViewSharedTodo = (
 ): boolean => {
   if (todo.kind !== "shared" || !todo.sharedScope) return false;
   return getVisibleSharedScopesForRole(resolveTodoAudienceRole(linkedMember, fallbackRole)).includes(todo.sharedScope);
+};
+
+export const canViewTodoByScope = (
+  todo: Todo,
+  linkedMember: MemberRecord | null,
+  currentUid: string,
+  fallbackRole?: "parent" | "admin" | null,
+): boolean => {
+  if (todo.kind === "shared") {
+    return canViewSharedTodo(todo, linkedMember, fallbackRole);
+  }
+  return canViewPrivateTodo(todo, currentUid);
 };
 
 export const canMemberBeAssignedToSharedScope = (
