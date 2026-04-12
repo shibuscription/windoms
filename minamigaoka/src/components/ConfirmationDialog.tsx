@@ -6,6 +6,7 @@ type ConfirmationDialogProps = {
   cancelLabel?: string;
   danger?: boolean;
   busy?: boolean;
+  front?: boolean;
   onClose: () => void;
   onConfirm: () => void | Promise<void>;
 };
@@ -18,11 +19,12 @@ export function ConfirmationDialog({
   cancelLabel = "キャンセル",
   danger = false,
   busy = false,
+  front = false,
   onClose,
   onConfirm,
 }: ConfirmationDialogProps) {
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true">
+    <div className={`modal-backdrop ${front ? "modal-backdrop-front" : ""}`.trim()} role="dialog" aria-modal="true">
       <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
         <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={onClose}>
           ×

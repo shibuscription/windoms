@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { BirthdayCelebrationModal } from "../components/BirthdayCelebrationModal";
 import { DayAttendanceModal } from "../components/DayAttendanceModal";
+import { DayNoticeEditorModal, DayNoticeViewModal } from "../components/DayNoticeModals";
+import { ConfirmationDialog } from "../components/ConfirmationDialog";
 import { getBirthdayCelebrants } from "../members/birthday";
 import { isChildMember, sortMembersForDisplay } from "../members/permissions";
 import { subscribeMemberRelations, subscribeMembers } from "../members/service";
@@ -13,6 +15,7 @@ import {
   sessionTypeLabel,
   showSessionAssignee,
 } from "../schedule/sessionMeta";
+import { saveScheduleDayNotice } from "../schedule/service";
 import type {
   DemoData,
   DutyRequirement,
@@ -118,14 +121,17 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
   const [birthdayModalDate, setBirthdayModalDate] = useState<string | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(todayDateKey().slice(0, 7));
-  const [noticeExpanded, setNoticeExpanded] = useState(false);
-  const [noticeCanToggle, setNoticeCanToggle] = useState(false);
+  const [isNoticeModalOpen, setIsNoticeModalOpen] = useState(false);
+  const [isNoticeEditorOpen, setIsNoticeEditorOpen] = useState(false);
+  const [isDeleteNoticeConfirmOpen, setIsDeleteNoticeConfirmOpen] = useState(false);
+  const [noticeDraft, setNoticeDraft] = useState("");
+  const [noticeError, setNoticeError] = useState("");
+  const [isSavingNotice, setIsSavingNotice] = useState(false);
   const [members, setMembers] = useState<MemberRecord[]>([]);
   const [relations, setRelations] = useState<MemberRelationRecord[]>([]);
   const [pageError, setPageError] = useState("");
   const [relationsError, setRelationsError] = useState("");
   const calendarWrapRef = useRef<HTMLDivElement>(null);
-  const noticeContentRef = useRef<HTMLDivElement>(null);
   const today = todayDateKey();
   const view = searchParams.get("view") ?? "";
   const queryDate = searchParams.get("date") ?? "";
@@ -133,6 +139,7 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
   const day = data.scheduleDays[date];
   const dayDefaultLocation = day?.defaultLocation;
   const noticeText = day?.notice?.trim() ?? "";
+  const canManageDayNotice = linkedMember?.adminRole === "admin" || authRole === "admin";
   const eventIdBySessionId = useMemo(() => {
     const map = new Map<string, string>();
     data.events.forEach((event) => {
@@ -188,18 +195,13 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
   }, []);
 
   useEffect(() => {
-    setNoticeExpanded(false);
-    if (!noticeText) {
-      setNoticeCanToggle(false);
-      return;
-    }
-    const raf = window.requestAnimationFrame(() => {
-      const element = noticeContentRef.current;
-      if (!element) return;
-      setNoticeCanToggle(element.scrollHeight > element.clientHeight + 1);
-    });
-    return () => window.cancelAnimationFrame(raf);
-  }, [noticeText, date]);
+    setIsNoticeModalOpen(false);
+    setIsNoticeEditorOpen(false);
+    setIsDeleteNoticeConfirmOpen(false);
+    setNoticeDraft("");
+    setNoticeError("");
+    setIsSavingNotice(false);
+  }, [date]);
 
   const sessions = useMemo(
     () => [...(day?.sessions ?? [])].sort((a, b) => a.order - b.order),
@@ -278,6 +280,61 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
 
   const closeAttendanceModal = () => {
     setIsAttendanceModalOpen(false);
+  };
+
+  const openNoticeModal = () => {
+    if (!noticeText) return;
+    setIsNoticeModalOpen(true);
+  };
+
+  const closeNoticeModal = () => {
+    setIsNoticeModalOpen(false);
+  };
+
+  const openNoticeEditor = () => {
+    setNoticeDraft(noticeText);
+    setNoticeError("");
+    setIsNoticeEditorOpen(true);
+  };
+
+  const closeNoticeEditor = () => {
+    if (isSavingNotice) return;
+    setIsNoticeEditorOpen(false);
+    setIsDeleteNoticeConfirmOpen(false);
+    setNoticeError("");
+  };
+
+  const handleSaveNotice = async () => {
+    const trimmed = noticeDraft.trim();
+    if (!trimmed) {
+      setNoticeError("注意事項を入力してください");
+      return;
+    }
+    setIsSavingNotice(true);
+    setNoticeError("");
+    try {
+      await saveScheduleDayNotice(date, trimmed);
+      setIsNoticeEditorOpen(false);
+    } catch (error) {
+      setNoticeError(error instanceof Error ? error.message : "注意事項の保存に失敗しました。");
+    } finally {
+      setIsSavingNotice(false);
+    }
+  };
+
+  const handleDeleteNotice = async () => {
+    setIsSavingNotice(true);
+    setNoticeError("");
+    try {
+      await saveScheduleDayNotice(date, "");
+      setIsDeleteNoticeConfirmOpen(false);
+      setIsNoticeEditorOpen(false);
+      setIsNoticeModalOpen(false);
+    } catch (error) {
+      setNoticeError(error instanceof Error ? error.message : "注意事項の削除に失敗しました。");
+    } finally {
+      setIsSavingNotice(false);
+    }
   };
 
   if (view) {
@@ -369,6 +426,11 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
           </button>
         </div>
         <div className="today-secondary-actions">
+          {canManageDayNotice && (
+            <button type="button" className="button button-small button-secondary" onClick={openNoticeEditor}>
+              {noticeText ? "注意事項を編集" : "注意事項を追加"}
+            </button>
+          )}
           {birthdayCelebrants.length > 0 && (
             <button
               type="button"
@@ -391,27 +453,26 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
       {pageError && <p className="field-error">{pageError}</p>}
       {relationsError && <p className="field-error">{relationsError}</p>}
 
-      {noticeText && (
-        <div className="notice-block notice-collapsible">
-          <div
-            ref={noticeContentRef}
-            className={`notice-content ${noticeExpanded ? "expanded" : "collapsed"}`}
-            onClick={noticeCanToggle ? () => setNoticeExpanded((prev) => !prev) : undefined}
-          >
-            {noticeText}
-          </div>
-          {noticeCanToggle && (
-            <button type="button" className="notice-toggle" onClick={() => setNoticeExpanded((prev) => !prev)}>
-              {noticeExpanded ? "▲ たたむ" : "▼ ひらく"}
+      {!day || sessions.length === 0 ? (
+        <>
+          {noticeText && (
+            <button type="button" className="day-notice-card" onClick={openNoticeModal}>
+              <span className="day-notice-card-badge">当日の注意事項</span>
+              <span className="day-notice-card-preview todo-memo-preview">{noticeText}</span>
+              <span className="day-notice-card-hint">タップして全文を見る</span>
             </button>
           )}
-        </div>
-      )}
-
-      {!day || sessions.length === 0 ? (
-        <p>この日の予定はまだありません。</p>
+          <p>この日の予定はまだありません。</p>
+        </>
       ) : (
         <div className="session-list">
+          {noticeText && (
+            <button type="button" className="day-notice-card" onClick={openNoticeModal}>
+              <span className="day-notice-card-badge">当日の注意事項</span>
+              <span className="day-notice-card-preview todo-memo-preview">{noticeText}</span>
+              <span className="day-notice-card-hint">タップして全文を見る</span>
+            </button>
+          )}
           {sessions.map((session, index) => {
             const counts = countAttendanceRows(attendanceRowsByOrder[session.order] ?? []);
             return (
@@ -502,6 +563,42 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
           date={birthdayModalDate}
           celebrants={birthdayCelebrants}
           onClose={() => setBirthdayModalDate(null)}
+        />
+      )}
+
+      {isNoticeModalOpen && noticeText && <DayNoticeViewModal date={date} notice={noticeText} onClose={closeNoticeModal} />}
+
+      {isNoticeEditorOpen && (
+        <DayNoticeEditorModal
+          date={date}
+          value={noticeDraft}
+          error={noticeError}
+          busy={isSavingNotice}
+          canDelete={Boolean(noticeText)}
+          onChange={(value) => {
+            setNoticeDraft(value);
+            if (noticeError) setNoticeError("");
+          }}
+          onClose={closeNoticeEditor}
+          onSave={handleSaveNotice}
+          onDelete={() => setIsDeleteNoticeConfirmOpen(true)}
+        />
+      )}
+
+      {isDeleteNoticeConfirmOpen && (
+        <ConfirmationDialog
+          title="注意事項削除"
+          message="この当日の注意事項を削除しますか？"
+          summary={`${formatDateYmd(date)}（${formatWeekdayJa(date)}）`}
+          confirmLabel="削除"
+          danger
+          busy={isSavingNotice}
+          front
+          onClose={() => {
+            if (isSavingNotice) return;
+            setIsDeleteNoticeConfirmOpen(false);
+          }}
+          onConfirm={handleDeleteNotice}
         />
       )}
 

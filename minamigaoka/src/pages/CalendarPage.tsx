@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { BirthdayCelebrationModal } from "../components/BirthdayCelebrationModal";
 import { DayAttendanceModal } from "../components/DayAttendanceModal";
+import { DayNoticeEditorModal, DayNoticeViewModal } from "../components/DayNoticeModals";
+import { ConfirmationDialog } from "../components/ConfirmationDialog";
 import { getBirthdayCelebrants } from "../members/birthday";
 import { sortFamiliesByDisplayOrder } from "../members/familyOrder";
 import {
@@ -16,6 +18,7 @@ import {
   createCalendarSession,
   deleteCalendarSession,
   getCalendarIcsSubscriptionUrl,
+  saveScheduleDayNotice,
   updateCalendarSession,
   type SaveCalendarSessionInput,
 } from "../schedule/service";
@@ -312,6 +315,12 @@ export function CalendarPage({
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
   const [birthdayModalDate, setBirthdayModalDate] = useState<string | null>(null);
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
+  const [isDayNoticeModalOpen, setIsDayNoticeModalOpen] = useState(false);
+  const [isDayNoticeEditorOpen, setIsDayNoticeEditorOpen] = useState(false);
+  const [isDeleteDayNoticeConfirmOpen, setIsDeleteDayNoticeConfirmOpen] = useState(false);
+  const [dayNoticeDraft, setDayNoticeDraft] = useState("");
+  const [dayNoticeError, setDayNoticeError] = useState("");
+  const [isSavingDayNotice, setIsSavingDayNotice] = useState(false);
   const [sessionForm, setSessionForm] = useState<SessionFormState>(emptySessionForm(todayDateKey()));
   const [sessionErrors, setSessionErrors] = useState<FieldErrors>({});
   const [sessionSubmitError, setSessionSubmitError] = useState("");
@@ -456,9 +465,23 @@ export function CalendarPage({
             ...current,
             sessions: latestSessions,
           }
-        : current,
+      : current,
     );
   }, [data.scheduleDays, selectedDay]);
+
+  useEffect(() => {
+    if (selectedDay) {
+      setDayNoticeDraft(data.scheduleDays[selectedDay.date]?.notice?.trim() ?? "");
+      setDayNoticeError("");
+      return;
+    }
+    setIsDayNoticeModalOpen(false);
+    setIsDayNoticeEditorOpen(false);
+    setIsDeleteDayNoticeConfirmOpen(false);
+    setDayNoticeDraft("");
+    setDayNoticeError("");
+    setIsSavingDayNotice(false);
+  }, [selectedDay?.date]);
 
   const attendanceRowsByOrder = useMemo(() => {
     return selectedDay?.sessions.reduce<Record<number, AttendanceRow[]>>((result, session) => {
@@ -494,6 +517,11 @@ export function CalendarPage({
     () => selectedDay?.sessions.filter(isJournalTargetSession) ?? [],
     [selectedDay?.sessions],
   );
+  const selectedDayNoticeText = useMemo(
+    () => (selectedDay ? data.scheduleDays[selectedDay.date]?.notice?.trim() ?? "" : ""),
+    [data.scheduleDays, selectedDay],
+  );
+  const canManageDayNotice = linkedMember?.adminRole === "admin" || authRole === "admin";
 
   const timeOptions = useMemo(
     () => buildTimeOptions(sessionForm.startTime, sessionForm.endTime),
@@ -578,6 +606,64 @@ export function CalendarPage({
 
   const closeSheet = () => {
     setSelectedDay(null);
+  };
+
+  const openDayNoticeModal = () => {
+    if (!selectedDayNoticeText) return;
+    setIsDayNoticeModalOpen(true);
+  };
+
+  const closeDayNoticeModal = () => {
+    setIsDayNoticeModalOpen(false);
+  };
+
+  const openDayNoticeEditor = () => {
+    if (!selectedDay) return;
+    setDayNoticeDraft(data.scheduleDays[selectedDay.date]?.notice?.trim() ?? "");
+    setDayNoticeError("");
+    setIsDayNoticeEditorOpen(true);
+  };
+
+  const closeDayNoticeEditor = () => {
+    if (isSavingDayNotice) return;
+    setIsDayNoticeEditorOpen(false);
+    setIsDeleteDayNoticeConfirmOpen(false);
+    setDayNoticeError("");
+  };
+
+  const saveDayNotice = async () => {
+    if (!selectedDay) return;
+    const trimmed = dayNoticeDraft.trim();
+    if (!trimmed) {
+      setDayNoticeError("注意事項を入力してください");
+      return;
+    }
+    setIsSavingDayNotice(true);
+    setDayNoticeError("");
+    try {
+      await saveScheduleDayNotice(selectedDay.date, trimmed);
+      setIsDayNoticeEditorOpen(false);
+    } catch (error) {
+      setDayNoticeError(error instanceof Error ? error.message : "注意事項の保存に失敗しました。");
+    } finally {
+      setIsSavingDayNotice(false);
+    }
+  };
+
+  const deleteDayNotice = async () => {
+    if (!selectedDay) return;
+    setIsSavingDayNotice(true);
+    setDayNoticeError("");
+    try {
+      await saveScheduleDayNotice(selectedDay.date, "");
+      setIsDeleteDayNoticeConfirmOpen(false);
+      setIsDayNoticeEditorOpen(false);
+      setIsDayNoticeModalOpen(false);
+    } catch (error) {
+      setDayNoticeError(error instanceof Error ? error.message : "注意事項の削除に失敗しました。");
+    } finally {
+      setIsSavingDayNotice(false);
+    }
   };
 
   const closeDialog = () => {
@@ -896,6 +982,11 @@ export function CalendarPage({
                 <button type="button" className="button button-small" onClick={goToTodayFromSheet}>
                   Todayへ
                 </button>
+                {canManageDayNotice && (
+                  <button type="button" className="button button-small button-secondary" onClick={openDayNoticeEditor}>
+                    {selectedDayNoticeText ? "注意事項を編集" : "注意事項を追加"}
+                  </button>
+                )}
                 {selectedDayJournalSessions.length > 0 && (
                   <button
                     type="button"
@@ -916,6 +1007,16 @@ export function CalendarPage({
                 )}
               </div>
             </header>
+            {selectedDayNoticeText && (
+              <div className="calendar-day-sheet-notice-row">
+                <button type="button" className="calendar-day-sheet-notice-trigger" onClick={openDayNoticeModal}>
+                  <span className="calendar-day-sheet-notice-icon" aria-hidden="true">
+                    📝
+                  </span>
+                  <span>当日の注意事項あり</span>
+                </button>
+              </div>
+            )}
             <div className="calendar-day-sheet-list">
               {selectedDay.sessions.length === 0 && (
                 <p className="muted">この日の予定はまだありません。</p>
@@ -1044,6 +1145,44 @@ export function CalendarPage({
                 </div>
               </div>
             </div>
+          )}
+
+          {isDayNoticeModalOpen && selectedDayNoticeText && (
+            <DayNoticeViewModal date={selectedDay.date} notice={selectedDayNoticeText} onClose={closeDayNoticeModal} />
+          )}
+
+          {isDayNoticeEditorOpen && selectedDay && (
+            <DayNoticeEditorModal
+              date={selectedDay.date}
+              value={dayNoticeDraft}
+              error={dayNoticeError}
+              busy={isSavingDayNotice}
+              canDelete={Boolean(selectedDayNoticeText)}
+              onChange={(value) => {
+                setDayNoticeDraft(value);
+                if (dayNoticeError) setDayNoticeError("");
+              }}
+              onClose={closeDayNoticeEditor}
+              onSave={saveDayNotice}
+              onDelete={() => setIsDeleteDayNoticeConfirmOpen(true)}
+            />
+          )}
+
+          {isDeleteDayNoticeConfirmOpen && selectedDay && (
+            <ConfirmationDialog
+              title="注意事項削除"
+              message="この当日の注意事項を削除しますか？"
+              summary={`${formatDateYmd(selectedDay.date)}（${formatWeekdayJa(selectedDay.date)}）`}
+              confirmLabel="削除"
+              danger
+              busy={isSavingDayNotice}
+              front
+              onClose={() => {
+                if (isSavingDayNotice) return;
+                setIsDeleteDayNoticeConfirmOpen(false);
+              }}
+              onConfirm={deleteDayNotice}
+            />
           )}
         </div>
       )}

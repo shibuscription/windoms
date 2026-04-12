@@ -1,4 +1,4 @@
-import { collection, getDocs, onSnapshot } from "firebase/firestore";
+import { collection, deleteField, doc, getDocs, onSnapshot, setDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, firebaseFunctionsRegion, firebaseProjectId, functions, hasFirebaseAppConfig } from "../config/firebase";
 import type {
@@ -206,6 +206,23 @@ export const subscribeScheduleDays = (
     (error) => {
       onError?.(error instanceof Error ? error : new Error("スケジュールの購読に失敗しました。"));
     },
+  );
+};
+
+export const saveScheduleDayNotice = async (date: string, notice: string): Promise<void> => {
+  ensureDb();
+  const dayRef = doc(db!, "scheduleDays", date);
+  const trimmed = notice.trim();
+  await setDoc(
+    dayRef,
+    trimmed
+      ? {
+          notice: trimmed,
+        }
+      : {
+          notice: deleteField(),
+        },
+    { merge: true },
   );
 };
 
