@@ -420,7 +420,7 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
                   <div className="session-time">
                     {formatTimeNoLeadingZero(session.startTime)} - {formatTimeNoLeadingZero(session.endTime)}
                   </div>
-                  {session.type === "event" && session.eventName?.trim() && (
+                  {(session.type === "event" || session.type === "other") && session.eventName?.trim() && (
                     <div className="session-subtitle-row">
                       <div className="session-subtitle">{session.eventName}</div>
                       {session.id && eventIdBySessionId.get(session.id) && (
@@ -435,7 +435,7 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
                     </div>
                   )}
                 {!(
-                  session.type === "event" &&
+                  (session.type === "event" || session.type === "other") &&
                   session.eventName?.trim()
                 ) &&
                   session.id &&

@@ -26,4 +26,6 @@ export const getSessionAssigneeRoleLabel = (session: Pick<SessionDoc, "type">): 
 };
 
 export const getSessionDisplayTitle = (session: Pick<SessionDoc, "type" | "eventName">): string =>
-  session.type === "event" && session.eventName?.trim() ? session.eventName.trim() : sessionTypeLabel[session.type];
+  (session.type === "event" || session.type === "other") && session.eventName?.trim()
+    ? session.eventName.trim()
+    : sessionTypeLabel[session.type];

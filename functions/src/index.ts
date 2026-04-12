@@ -134,7 +134,7 @@ const getCalendarSessionTitle = (session: Record<string, unknown>): string => {
     return assigneeName ? `【吹奏楽】 ${eventName} ${assigneeName}` : `【吹奏楽】 ${eventName}`;
   }
   if (type === "other") {
-    return "【吹奏楽】 その他";
+    return eventName ? `【吹奏楽】 ${eventName}` : "【吹奏楽】 その他";
   }
   return assigneeName ? `【吹奏楽】 ${assigneeName}` : "【吹奏楽】 通常練習";
 };
@@ -359,8 +359,8 @@ const parseCalendarSessionPayload = (
   if (typeValue && !calendarSessionTypes.has(typeValue)) {
     throw new HttpsError("invalid-argument", "種別が不正です。");
   }
-  if (type === "event" && !eventName) {
-    throw new HttpsError("invalid-argument", "イベント名を入力してください。");
+  if ((type === "event" || type === "other") && !eventName) {
+    throw new HttpsError("invalid-argument", "予定名を入力してください。");
   }
 
   return {
@@ -989,7 +989,7 @@ export const createCalendarSession = onCall(async (request) => {
     startTime: payload.startTime,
     endTime: payload.endTime,
     type: payload.type,
-    eventName: payload.type === "event" ? payload.eventName : "",
+    eventName: payload.type === "event" || payload.type === "other" ? payload.eventName : "",
     dutyRequirement: payload.type === "self" || payload.type === "other" ? "watch" : "duty",
     requiresShift: payload.type !== "self" && payload.type !== "other",
     location: payload.location,
@@ -1040,7 +1040,7 @@ export const updateCalendarSession = onCall(async (request) => {
     startTime: payload.startTime,
     endTime: payload.endTime,
     type: payload.type,
-    eventName: payload.type === "event" ? payload.eventName : "",
+    eventName: payload.type === "event" || payload.type === "other" ? payload.eventName : "",
     dutyRequirement: payload.type === "self" || payload.type === "other" ? "watch" : "duty",
     requiresShift: payload.type !== "self" && payload.type !== "other",
     location: payload.location,

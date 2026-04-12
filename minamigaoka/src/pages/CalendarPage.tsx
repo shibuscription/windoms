@@ -281,8 +281,8 @@ const validateSessionForm = (form: SessionFormState): FieldErrors => {
   if (!errors.startTime && !errors.endTime && form.startTime >= form.endTime) {
     errors.endTime = "終了時刻は開始時刻より後にしてください。";
   }
-  if (form.type === "event" && !form.eventName.trim()) {
-    errors.eventName = "イベント名を入力してください。";
+  if ((form.type === "event" || form.type === "other") && !form.eventName.trim()) {
+    errors.eventName = "予定名を入力してください。";
   }
 
   return errors;
@@ -651,7 +651,7 @@ export function CalendarPage({
       const next = {
         ...current,
         [key]: value,
-        ...(key === "type" && value !== "event" ? { eventName: "" } : {}),
+        ...(key === "type" && value !== "event" && value !== "other" ? { eventName: "" } : {}),
         ...(key === "type" && value === "other" ? { assigneeFamilyId: "" } : {}),
       };
 
@@ -664,7 +664,7 @@ export function CalendarPage({
     setSessionErrors((current) => ({
       ...current,
       [key]: undefined,
-      ...(key === "type" && value !== "event" ? { eventName: undefined } : {}),
+      ...(key === "type" && value !== "event" && value !== "other" ? { eventName: undefined } : {}),
       ...(key === "startTime" ? { endTime: undefined } : {}),
     }));
   };
@@ -958,7 +958,7 @@ export function CalendarPage({
                         <p className="calendar-day-sheet-time session-time">
                           {formatTimeNoLeadingZero(session.startTime)}-{formatTimeNoLeadingZero(session.endTime)}
                         </p>
-                        {session.type === "event" && session.eventName?.trim() && (
+                        {(session.type === "event" || session.type === "other") && session.eventName?.trim() && (
                           <p className="calendar-day-sheet-meta">{session.eventName}</p>
                         )}
                       {showSessionAssignee(session) && (
@@ -1125,9 +1125,9 @@ export function CalendarPage({
               </select>
             </label>
 
-            {sessionForm.type === "event" && (
+            {(sessionForm.type === "event" || sessionForm.type === "other") && (
               <label>
-                イベント名
+                予定名
                 <input
                   value={sessionForm.eventName}
                   onChange={(event) => handleSessionFieldChange("eventName", event.target.value)}
