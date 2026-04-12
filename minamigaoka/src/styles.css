@@ -2040,6 +2040,13 @@ body {
   flex-wrap: wrap;
 }
 
+.reimbursements-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .purchases-list,
 .reimbursements-list {
   display: grid;
@@ -2129,6 +2136,35 @@ body {
   right: 8px;
   bottom: 8px;
   display: inline-flex;
+}
+
+.reimbursement-summary-modal {
+  width: min(420px, calc(100vw - 24px));
+}
+
+.reimbursement-summary-list {
+  display: grid;
+  gap: 8px;
+}
+
+.reimbursement-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 10px 12px;
+}
+
+.reimbursement-summary-row strong {
+  min-width: 0;
+}
+
+.reimbursement-summary-row span {
+  color: #475569;
+  white-space: nowrap;
 }
 
 .button-danger {

@@ -79,6 +79,12 @@ const toIsoFromInput = (value: string): string => {
 
 type ReimbursementUiStatus = "unpaid" | "paid" | "done";
 type ReimbursementTab = "unfinished" | "done";
+type ReimbursementPaymentSummaryRow = {
+  buyerKey: string;
+  buyerName: string;
+  count: number;
+  totalAmount: number;
+};
 
 const resolveUiStatus = (item: Reimbursement): ReimbursementUiStatus => {
   const status = resolveReimbursementStatus(item.paidByTreasurerAt, item.receivedByBuyerAt);
@@ -148,6 +154,7 @@ export function ReimbursementsPage({
   const [paidErrors, setPaidErrors] = useState<{ accountId?: string; categoryId?: string; memo?: string }>({});
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
   const [imagePreviewTarget, setImagePreviewTarget] = useState<{ src: string; alt: string } | null>(null);
+  const [isPaymentSummaryOpen, setIsPaymentSummaryOpen] = useState(false);
   const [createTitle, setCreateTitle] = useState("");
   const [createAmount, setCreateAmount] = useState("");
   const [createPurchasedAt, setCreatePurchasedAt] = useState(toDateInputValue(new Date()));
@@ -234,6 +241,32 @@ export function ReimbursementsPage({
       .filter(({ uiStatus }) => isTabMatched(uiStatus, activeTab))
       .sort((a, b) => b.item.purchasedAt.localeCompare(a.item.purchasedAt));
   }, [activeTab, visibleByRole]);
+
+  const paymentSummaryRows = useMemo<ReimbursementPaymentSummaryRow[]>(() => {
+    const buckets = new Map<string, ReimbursementPaymentSummaryRow>();
+    data.reimbursements
+      .filter((item) => resolveUiStatus(item) === "unpaid")
+      .forEach((item) => {
+        const buyerKey = item.buyer || "__unset__";
+        const current = buckets.get(buyerKey);
+        if (current) {
+          current.count += 1;
+          current.totalAmount += item.amount;
+          return;
+        }
+        buckets.set(buyerKey, {
+          buyerKey,
+          buyerName: resolveBuyerFamilyName(item.buyer),
+          count: 1,
+          totalAmount: item.amount,
+        });
+      });
+    return Array.from(buckets.values()).sort((left, right) => {
+      const byName = left.buyerName.localeCompare(right.buyerName, "ja");
+      if (byName !== 0) return byName;
+      return left.buyerKey.localeCompare(right.buyerKey, "ja");
+    });
+  }, [data.reimbursements, familiesById, memberIndexes]);
 
   const openCreateModal = (target?: Reimbursement) => {
     setEditingTarget(target ?? null);
@@ -639,9 +672,21 @@ export function ReimbursementsPage({
     <section className="card reimbursements-page">
       <header className="reimbursements-header">
         <h1>立替</h1>
-        <button type="button" className="button button-small" onClick={() => openCreateModal()} disabled={isSubmitting}>
-          ＋ 追加
-        </button>
+        <div className="reimbursements-header-actions">
+          {canManageAccounting && (
+            <button
+              type="button"
+              className="button button-small button-secondary"
+              onClick={() => setIsPaymentSummaryOpen(true)}
+              disabled={isSubmitting}
+            >
+              支払い待ち集計
+            </button>
+          )}
+          <button type="button" className="button button-small" onClick={() => openCreateModal()} disabled={isSubmitting}>
+            ＋ 追加
+          </button>
+        </div>
       </header>
       {loadError && <p className="field-error">{loadError}</p>}
       {submitError && <p className="field-error">{submitError}</p>}
@@ -1183,6 +1228,37 @@ export function ReimbursementsPage({
         alt={imagePreviewTarget?.alt}
         onClose={() => setImagePreviewTarget(null)}
       />
+
+      {isPaymentSummaryOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setIsPaymentSummaryOpen(false)}>
+          <section className="modal-panel reimbursement-summary-modal" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close"
+              aria-label="閉じる"
+              title="閉じる"
+              onClick={() => setIsPaymentSummaryOpen(false)}
+            >
+              ×
+            </button>
+            <h3>支払い者別集計</h3>
+            {paymentSummaryRows.length === 0 ? (
+              <p className="muted">支払い待ちの立替はありません。</p>
+            ) : (
+              <div className="reimbursement-summary-list">
+                {paymentSummaryRows.map((row) => (
+                  <div key={row.buyerKey} className="reimbursement-summary-row">
+                    <strong>{row.buyerName}</strong>
+                    <span>
+                      {row.count}件 / {row.totalAmount.toLocaleString()}円
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
     </section>
   );
 }
