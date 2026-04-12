@@ -74,6 +74,17 @@ const toPassengerCapacity = (capacity: number | null | undefined): number =>
 const sumPassengerCapacity = (vehicles: EventCarpoolVehicle[]): number =>
   vehicles.reduce((total, vehicle) => total + toPassengerCapacity(vehicle.capacity), 0);
 
+const isOutboundAvailable = (vehicle: EventCarpoolVehicle): boolean => vehicle.canOutbound !== false;
+
+const isReturnAvailable = (vehicle: EventCarpoolVehicle): boolean => vehicle.canReturn !== false;
+
+const toCarpoolDirectionLabel = (vehicle: EventCarpoolVehicle): string => {
+  const labels: string[] = [];
+  if (isOutboundAvailable(vehicle)) labels.push("行き");
+  if (isReturnAvailable(vehicle)) labels.push("帰り");
+  return labels.length > 0 ? labels.join(" / ") : "対象なし";
+};
+
 const toLinkedSession = (date: string, session: SessionDoc): LinkedSession => ({
   id: session.id ?? `session:${date}:${session.order}`,
   date,
@@ -197,6 +208,8 @@ export function EventsPage({
             maker: vehicle.maker,
             model: vehicle.model,
             capacity: vehicle.capacity,
+            canOutbound: true,
+            canReturn: true,
           },
         })),
       ),
@@ -316,7 +329,11 @@ export function EventsPage({
       eventSortDate: event.eventSortDate,
       memo: event.memo ?? "",
       state: event.state,
-      carpoolVehicles: event.carpoolVehicles ?? [],
+      carpoolVehicles: (event.carpoolVehicles ?? []).map((vehicle) => ({
+        ...vehicle,
+        canOutbound: isOutboundAvailable(vehicle),
+        canReturn: isReturnAvailable(vehicle),
+      })),
     });
     setFormErrors({});
     setSelectedVehicleKey("");
@@ -359,6 +376,19 @@ export function EventsPage({
       ...current,
       carpoolVehicles: current.carpoolVehicles.filter(
         (vehicle) => `${vehicle.familyId}:${vehicle.vehicleIndex}` !== vehicleKey,
+      ),
+    }));
+  };
+
+  const updateCarpoolVehicleDirection = (
+    vehicleKey: string,
+    key: "canOutbound" | "canReturn",
+    value: boolean,
+  ) => {
+    setFormDraft((current) => ({
+      ...current,
+      carpoolVehicles: current.carpoolVehicles.map((vehicle) =>
+        `${vehicle.familyId}:${vehicle.vehicleIndex}` === vehicleKey ? { ...vehicle, [key]: value } : vehicle,
       ),
     }));
   };
@@ -644,6 +674,7 @@ export function EventsPage({
                     <p className="events-carpool-capacity">
                       乗車定員（運転手除く）: {toPassengerCapacity(vehicle.capacity)}人
                     </p>
+                    <p className="events-carpool-direction">対応: {toCarpoolDirectionLabel(vehicle)}</p>
                   </div>
                 </article>
               ))}
@@ -799,45 +830,46 @@ export function EventsPage({
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeEditModal}>
               ×
             </button>
-            <h3>{isCreateMode ? "追加" : "イベント編集"}</h3>
-            <label>
-              タイトル
-              <input value={formDraft.title} onChange={(event) => setFormDraft((current) => ({ ...current, title: event.target.value }))} />
-              {formErrors.title && <span className="field-error">{formErrors.title}</span>}
-            </label>
-            <label>
-              種別
-              <select value={formDraft.kind} onChange={(event) => setFormDraft((current) => ({ ...current, kind: event.target.value as EventKind }))}>
-                <option value="コンクール">コンクール</option>
-                <option value="演奏会">演奏会</option>
-                <option value="合同練習">合同練習</option>
-                <option value="その他">その他</option>
-              </select>
-            </label>
-            <label>
-              代表日
-              <input
-                type="date"
-                value={formDraft.eventSortDate}
-                onChange={(event) => setFormDraft((current) => ({ ...current, eventSortDate: event.target.value }))}
-              />
-              {formErrors.eventSortDate && <span className="field-error">{formErrors.eventSortDate}</span>}
-            </label>
-            <label>
-              メモ
-              <textarea value={formDraft.memo} onChange={(event) => setFormDraft((current) => ({ ...current, memo: event.target.value }))} />
-            </label>
-            <label>
-              状態
-              <select value={formDraft.state} onChange={(event) => setFormDraft((current) => ({ ...current, state: event.target.value as EventRecord["state"] }))}>
-                <option value="active">進行中</option>
-                <option value="done">完了</option>
-              </select>
-            </label>
-            <section className="events-carpool-editor">
+            <div className="events-editor-modal-body">
+              <h3>{isCreateMode ? "追加" : "イベント編集"}</h3>
+              <label>
+                タイトル
+                <input value={formDraft.title} onChange={(event) => setFormDraft((current) => ({ ...current, title: event.target.value }))} />
+                {formErrors.title && <span className="field-error">{formErrors.title}</span>}
+              </label>
+              <label>
+                種別
+                <select value={formDraft.kind} onChange={(event) => setFormDraft((current) => ({ ...current, kind: event.target.value as EventKind }))}>
+                  <option value="コンクール">コンクール</option>
+                  <option value="演奏会">演奏会</option>
+                  <option value="合同練習">合同練習</option>
+                  <option value="その他">その他</option>
+                </select>
+              </label>
+              <label>
+                代表日
+                <input
+                  type="date"
+                  value={formDraft.eventSortDate}
+                  onChange={(event) => setFormDraft((current) => ({ ...current, eventSortDate: event.target.value }))}
+                />
+                {formErrors.eventSortDate && <span className="field-error">{formErrors.eventSortDate}</span>}
+              </label>
+              <label>
+                メモ
+                <textarea value={formDraft.memo} onChange={(event) => setFormDraft((current) => ({ ...current, memo: event.target.value }))} />
+              </label>
+              <label>
+                状態
+                <select value={formDraft.state} onChange={(event) => setFormDraft((current) => ({ ...current, state: event.target.value as EventRecord["state"] }))}>
+                  <option value="active">進行中</option>
+                  <option value="done">完了</option>
+                </select>
+              </label>
+              <section className="events-carpool-editor">
               <div className="events-carpool-editor-header">
                 <h4>配車</h4>
-                <p className="muted">乗車定員（運転手除く）を表示します。</p>
+                <p className="muted">乗車定員（運転手除く）と、行き / 帰りの可否を設定します。</p>
               </div>
               <div className="events-carpool-picker">
                 <select value={selectedVehicleKey} onChange={(event) => setSelectedVehicleKey(event.target.value)}>
@@ -853,39 +885,65 @@ export function EventsPage({
                 </button>
               </div>
               <div className="events-carpool-list">
-                {formDraft.carpoolVehicles.map((vehicle) => (
-                  <article key={`${vehicle.familyId}:${vehicle.vehicleIndex}`} className="events-carpool-row">
-                    <div>
-                      <p className="events-carpool-name">
-                        {toVehicleLabel(
-                          resolveFamilyNameFromIdentifier({
-                            identifier: vehicle.familyId,
-                            memberIndexes,
-                            familiesById,
-                            fallback: vehicle.familyNameSnapshot || "名称未設定",
-                          }) || vehicle.familyNameSnapshot || "名称未設定",
-                          vehicle.maker,
-                          vehicle.model,
-                        )}
-                      </p>
-                      <p className="events-carpool-capacity">
-                        乗車定員（運転手除く）: {toPassengerCapacity(vehicle.capacity)}人
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="link-icon-button"
-                      aria-label="削除"
-                      onClick={() => removeCarpoolVehicle(`${vehicle.familyId}:${vehicle.vehicleIndex}`)}
-                    >
-                      ×
-                    </button>
-                  </article>
-                ))}
+                {formDraft.carpoolVehicles.map((vehicle) => {
+                  const vehicleKey = `${vehicle.familyId}:${vehicle.vehicleIndex}`;
+                  return (
+                    <article key={vehicleKey} className="events-carpool-row">
+                      <div>
+                        <p className="events-carpool-name">
+                          {toVehicleLabel(
+                            resolveFamilyNameFromIdentifier({
+                              identifier: vehicle.familyId,
+                              memberIndexes,
+                              familiesById,
+                              fallback: vehicle.familyNameSnapshot || "名称未設定",
+                            }) || vehicle.familyNameSnapshot || "名称未設定",
+                            vehicle.maker,
+                            vehicle.model,
+                          )}
+                        </p>
+                        <p className="events-carpool-capacity">
+                          乗車定員（運転手除く）: {toPassengerCapacity(vehicle.capacity)}人
+                        </p>
+                      </div>
+                      <div className="events-carpool-actions">
+                        <label className="events-carpool-toggle">
+                          <input
+                            type="checkbox"
+                            checked={isOutboundAvailable(vehicle)}
+                            onChange={(event) =>
+                              updateCarpoolVehicleDirection(vehicleKey, "canOutbound", event.target.checked)
+                            }
+                          />
+                          <span>行き</span>
+                        </label>
+                        <label className="events-carpool-toggle">
+                          <input
+                            type="checkbox"
+                            checked={isReturnAvailable(vehicle)}
+                            onChange={(event) =>
+                              updateCarpoolVehicleDirection(vehicleKey, "canReturn", event.target.checked)
+                            }
+                          />
+                          <span>帰り</span>
+                        </label>
+                        <button
+                          type="button"
+                          className="link-icon-button"
+                          aria-label="削除"
+                          onClick={() => removeCarpoolVehicle(vehicleKey)}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
                 {formDraft.carpoolVehicles.length === 0 && <p className="muted">配車はまだ登録されていません。</p>}
               </div>
               <p className="events-carpool-total">合計人数: {sumPassengerCapacity(formDraft.carpoolVehicles)}人</p>
             </section>
+            </div>
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={closeEditModal}>
                 キャンセル

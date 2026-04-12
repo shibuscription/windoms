@@ -1247,6 +1247,22 @@ body {
   gap: 8px;
 }
 
+.events-editor-modal {
+  width: min(640px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.events-editor-modal-body {
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: 10px;
+  padding-right: 2px;
+}
+
 .events-linked-summary {
   justify-self: start;
   border: 0;
@@ -1413,6 +1429,12 @@ body {
   color: #475569;
 }
 
+.events-carpool-direction {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #64748b;
+}
+
 .events-carpool-total {
   font-size: 0.9rem;
   font-weight: 700;
@@ -1423,6 +1445,26 @@ body {
   width: min(520px, calc(100vw - 24px));
   display: grid;
   gap: 10px;
+}
+
+.events-carpool-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.events-carpool-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.84rem;
+  color: #334155;
+}
+
+.events-carpool-toggle input {
+  margin: 0;
 }
 
 .events-todo-item {

@@ -43,6 +43,9 @@ const toOptionalCapacity = (value: unknown): number | null => {
   return null;
 };
 
+const toBooleanWithDefault = (value: unknown, defaultValue: boolean): boolean =>
+  typeof value === "boolean" ? value : defaultValue;
+
 const toCarpoolVehicle = (value: unknown): EventCarpoolVehicle | null => {
   if (!value || typeof value !== "object") return null;
   const source = value as Record<string, unknown>;
@@ -60,6 +63,8 @@ const toCarpoolVehicle = (value: unknown): EventCarpoolVehicle | null => {
     maker: typeof source.maker === "string" ? source.maker : "",
     model: typeof source.model === "string" ? source.model : "",
     capacity: toOptionalCapacity(source.capacity),
+    canOutbound: toBooleanWithDefault(source.canOutbound, true),
+    canReturn: toBooleanWithDefault(source.canReturn, true),
   };
 };
 
@@ -97,6 +102,8 @@ const toPayload = (event: Omit<EventRecord, "id">) => ({
         maker: vehicle.maker.trim(),
         model: vehicle.model.trim(),
         capacity: toOptionalCapacity(vehicle.capacity),
+        canOutbound: vehicle.canOutbound !== false,
+        canReturn: vehicle.canReturn !== false,
       }))
     : [],
   updatedAt: serverTimestamp(),

@@ -119,6 +119,8 @@ export type EventCarpoolVehicle = {
   maker: string;
   model: string;
   capacity: number | null;
+  canOutbound?: boolean;
+  canReturn?: boolean;
 };
 
 export type EventRecord = {
