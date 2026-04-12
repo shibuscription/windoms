@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { LinkifiedText } from "../components/LinkifiedText";
 import { ReceiptImagePicker } from "../components/ReceiptImagePicker";
 import { ConfirmationDialog } from "../components/ConfirmationDialog";
+import { ImagePreviewModal } from "../components/ImagePreviewModal";
 import { useReceiptPreviews } from "../hooks/useReceiptPreviews";
 import { useAccountingStore } from "../accounting/useAccountingStore";
 import { groupedAccountingSubjects } from "../accounting/fixedSubjects";
@@ -146,6 +147,7 @@ export function PurchasesPage({
   const [completeDraft, setCompleteDraft] = useState<PurchaseCompleteDraft | null>(null);
   const [completeErrors, setCompleteErrors] = useState<PurchaseCompleteErrors>({});
   const [confirmDialog, setConfirmDialog] = useState<PurchaseConfirmDialogState>(null);
+  const [imagePreviewTarget, setImagePreviewTarget] = useState<{ src: string; alt: string } | null>(null);
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [members, setMembers] = useState<MemberRecord[]>([]);
@@ -521,7 +523,22 @@ export function PurchasesPage({
                   <div className="purchase-receipt-grid">
                     {detailTarget.purchaseResult.receiptFilesMeta.map((file, index) => (
                       <article key={`${detailTarget.id}-${file.name}-${index}`} className="purchase-receipt-card">
-                        {file.downloadUrl ? <img src={file.downloadUrl} alt={`${detailTarget.title}-${index + 1}`} className="purchase-receipt-image" /> : <div className="purchase-receipt-placeholder">{file.name}</div>}
+                        {file.downloadUrl ? (
+                          <button
+                            type="button"
+                            className="purchase-receipt-image-button"
+                            onClick={() =>
+                              setImagePreviewTarget({
+                                src: file.downloadUrl ?? "",
+                                alt: `${detailTarget.title}-${index + 1}`,
+                              })
+                            }
+                          >
+                            <img src={file.downloadUrl} alt={`${detailTarget.title}-${index + 1}`} className="purchase-receipt-image" />
+                          </button>
+                        ) : (
+                          <div className="purchase-receipt-placeholder">{file.name}</div>
+                        )}
                       </article>
                     ))}
                   </div>
@@ -651,6 +668,12 @@ export function PurchasesPage({
           onConfirm={runConfirmAction}
         />
       )}
+
+      <ImagePreviewModal
+        src={imagePreviewTarget?.src ?? null}
+        alt={imagePreviewTarget?.alt}
+        onClose={() => setImagePreviewTarget(null)}
+      />
     </section>
   );
 }

@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { LinkifiedText } from "../components/LinkifiedText";
 import { ReceiptImagePicker } from "../components/ReceiptImagePicker";
 import { ConfirmationDialog } from "../components/ConfirmationDialog";
+import { ImagePreviewModal } from "../components/ImagePreviewModal";
 import { useReceiptPreviews } from "../hooks/useReceiptPreviews";
 import type { DemoData, LunchRecord } from "../types";
 import { isValidDateKey, todayDateKey, weekdayTone } from "../utils/date";
@@ -172,6 +173,7 @@ export function LunchPage({
   const [detailTarget, setDetailTarget] = useState<LunchRecord | null>(null);
   const [editingTarget, setEditingTarget] = useState<LunchRecord | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<LunchRecord | null>(null);
+  const [imagePreviewTarget, setImagePreviewTarget] = useState<{ src: string; alt: string } | null>(null);
   const [submitError, setSubmitError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const {
@@ -487,7 +489,16 @@ export function LunchPage({
               onClick={() => setDetailTarget(record)}
             >
               {thumbnail ? (
-                <img src={thumbnail} alt={record.title} className="lunch-tile-image" />
+                <button
+                  type="button"
+                  className="lunch-tile-image-button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setImagePreviewTarget({ src: thumbnail, alt: record.title });
+                  }}
+                >
+                  <img src={thumbnail} alt={record.title} className="lunch-tile-image" />
+                </button>
               ) : (
                 <div className="lunch-tile-placeholder">🍱</div>
               )}
@@ -692,7 +703,18 @@ export function LunchPage({
               <div className="purchase-receipt-grid">
                 {detailTarget.imageUrls.map((imageUrl, index) => (
                   <article key={`${detailTarget.id}-${index}`} className="purchase-receipt-card">
-                    <img src={imageUrl} alt={`${detailTarget.title}-${index + 1}`} className="purchase-receipt-image" />
+                    <button
+                      type="button"
+                      className="purchase-receipt-image-button"
+                      onClick={() =>
+                        setImagePreviewTarget({
+                          src: imageUrl,
+                          alt: `${detailTarget.title}-${index + 1}`,
+                        })
+                      }
+                    >
+                      <img src={imageUrl} alt={`${detailTarget.title}-${index + 1}`} className="purchase-receipt-image" />
+                    </button>
                   </article>
                 ))}
               </div>
@@ -734,6 +756,12 @@ export function LunchPage({
           onConfirm={runDelete}
         />
       )}
+
+      <ImagePreviewModal
+        src={imagePreviewTarget?.src ?? null}
+        alt={imagePreviewTarget?.alt}
+        onClose={() => setImagePreviewTarget(null)}
+      />
     </section>
   );
 }

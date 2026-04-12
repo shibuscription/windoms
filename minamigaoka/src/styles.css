@@ -1790,6 +1790,15 @@ body {
   grid-template-rows: auto auto;
 }
 
+.lunch-tile-image-button {
+  display: block;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
 .lunch-tile-image {
   width: 100%;
   aspect-ratio: 1 / 1;
@@ -1893,6 +1902,35 @@ body {
 
 .modal-backdrop-front .modal-panel {
   z-index: 2210;
+}
+
+.attachment-preview-backdrop {
+  cursor: zoom-out;
+}
+
+.attachment-preview-modal {
+  width: min(96vw, 1100px);
+  max-width: 1100px;
+  max-height: min(92vh, calc(100dvh - 24px));
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.96);
+  display: grid;
+  place-items: center;
+}
+
+.attachment-preview-modal .modal-close {
+  color: #f8fafc;
+}
+
+.attachment-preview-image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: min(100%, calc(96vw - 56px));
+  max-height: min(calc(92vh - 56px), calc(100dvh - 80px));
+  object-fit: contain;
+  border-radius: 10px;
+  background: #fff;
 }
 
 .lunch-quo-add {
@@ -2142,12 +2180,22 @@ body {
   gap: 6px;
 }
 
+.purchase-receipt-image-button {
+  display: block;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
 .purchase-receipt-image {
   width: 100%;
   aspect-ratio: 4 / 3;
   object-fit: cover;
   border-radius: 8px;
   border: 1px solid #e5e7eb;
+  display: block;
 }
 
 .purchase-receipt-name {

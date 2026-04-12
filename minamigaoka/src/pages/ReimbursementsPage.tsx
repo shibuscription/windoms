@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import type { DemoData, Reimbursement, ReimbursementStatus } from "../types";
 import { LinkifiedText } from "../components/LinkifiedText";
 import { ReceiptImagePicker } from "../components/ReceiptImagePicker";
+import { ImagePreviewModal } from "../components/ImagePreviewModal";
 import { useReceiptPreviews } from "../hooks/useReceiptPreviews";
 import { ReceiptOcrCanceledError, readReceiptSuggestion } from "../utils/receiptOcr";
 import { appRuntimeConfig } from "../config/runtime";
@@ -146,6 +147,7 @@ export function ReimbursementsPage({
   const [paidAccountingMemo, setPaidAccountingMemo] = useState("");
   const [paidErrors, setPaidErrors] = useState<{ accountId?: string; categoryId?: string; memo?: string }>({});
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState>(null);
+  const [imagePreviewTarget, setImagePreviewTarget] = useState<{ src: string; alt: string } | null>(null);
   const [createTitle, setCreateTitle] = useState("");
   const [createAmount, setCreateAmount] = useState("");
   const [createPurchasedAt, setCreatePurchasedAt] = useState(toDateInputValue(new Date()));
@@ -1010,7 +1012,22 @@ export function ReimbursementsPage({
               <div className="purchase-receipt-grid">
                 {detailTarget.receiptFilesMeta.map((file, index) => (
                   <article key={`${detailTarget.id}-${file.name}-${index}`} className="purchase-receipt-card">
-                    {file.downloadUrl ? <img src={file.downloadUrl} alt={`${detailTarget.title}-${index + 1}`} className="purchase-receipt-image" /> : <div className="purchase-receipt-placeholder">{file.name}</div>}
+                    {file.downloadUrl ? (
+                      <button
+                        type="button"
+                        className="purchase-receipt-image-button"
+                        onClick={() =>
+                          setImagePreviewTarget({
+                            src: file.downloadUrl ?? "",
+                            alt: `${detailTarget.title}-${index + 1}`,
+                          })
+                        }
+                      >
+                        <img src={file.downloadUrl} alt={`${detailTarget.title}-${index + 1}`} className="purchase-receipt-image" />
+                      </button>
+                    ) : (
+                      <div className="purchase-receipt-placeholder">{file.name}</div>
+                    )}
                   </article>
                 ))}
               </div>
@@ -1160,6 +1177,12 @@ export function ReimbursementsPage({
             </section>
           </div>,
         )}
+
+      <ImagePreviewModal
+        src={imagePreviewTarget?.src ?? null}
+        alt={imagePreviewTarget?.alt}
+        onClose={() => setImagePreviewTarget(null)}
+      />
     </section>
   );
 }
