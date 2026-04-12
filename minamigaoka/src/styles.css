@@ -1441,6 +1441,11 @@ body {
   color: #0f172a;
 }
 
+.events-carpool-summary {
+  display: grid;
+  gap: 4px;
+}
+
 .events-carpool-modal {
   width: min(520px, calc(100vw - 24px));
   display: grid;

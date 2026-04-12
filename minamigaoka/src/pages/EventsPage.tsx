@@ -71,8 +71,14 @@ const toVehicleLabel = (familyName: string, maker: string, model: string): strin
 const toPassengerCapacity = (capacity: number | null | undefined): number =>
   Math.max(0, typeof capacity === "number" && Number.isFinite(capacity) ? capacity - 1 : 0);
 
-const sumPassengerCapacity = (vehicles: EventCarpoolVehicle[]): number =>
-  vehicles.reduce((total, vehicle) => total + toPassengerCapacity(vehicle.capacity), 0);
+const summarizeCarpoolCapacities = (vehicles: EventCarpoolVehicle[]) =>
+  vehicles.reduce(
+    (summary, vehicle) => ({
+      outbound: summary.outbound + (isOutboundAvailable(vehicle) ? toPassengerCapacity(vehicle.capacity) : 0),
+      return: summary.return + (isReturnAvailable(vehicle) ? toPassengerCapacity(vehicle.capacity) : 0),
+    }),
+    { outbound: 0, return: 0 },
+  );
 
 const isOutboundAvailable = (vehicle: EventCarpoolVehicle): boolean => vehicle.canOutbound !== false;
 
@@ -276,7 +282,8 @@ export function EventsPage({
   }, [authRole, data.todos, linkedMember, selectedEvent]);
 
   const selectedEventCarpoolVehicles = selectedEvent?.carpoolVehicles ?? [];
-  const selectedEventCarpoolCapacity = sumPassengerCapacity(selectedEventCarpoolVehicles);
+  const selectedEventCarpoolCapacitySummary = summarizeCarpoolCapacities(selectedEventCarpoolVehicles);
+  const formDraftCarpoolCapacitySummary = summarizeCarpoolCapacities(formDraft.carpoolVehicles);
 
   const showFeedback = (message: string) => {
     setFeedback(message);
@@ -679,7 +686,10 @@ export function EventsPage({
                 </article>
               ))}
             </div>
-            <p className="events-carpool-total">合計人数: {selectedEventCarpoolCapacity}人</p>
+            <div className="events-carpool-summary">
+              <p className="events-carpool-total">行き合計人数: {selectedEventCarpoolCapacitySummary.outbound}人</p>
+              <p className="events-carpool-total">帰り合計人数: {selectedEventCarpoolCapacitySummary.return}人</p>
+            </div>
             <div className="modal-actions">
               <button type="button" className="button button-small" onClick={() => setIsCarpoolModalOpen(false)}>
                 閉じる
@@ -941,7 +951,10 @@ export function EventsPage({
                 })}
                 {formDraft.carpoolVehicles.length === 0 && <p className="muted">配車はまだ登録されていません。</p>}
               </div>
-              <p className="events-carpool-total">合計人数: {sumPassengerCapacity(formDraft.carpoolVehicles)}人</p>
+              <div className="events-carpool-summary">
+                <p className="events-carpool-total">行き合計人数: {formDraftCarpoolCapacitySummary.outbound}人</p>
+                <p className="events-carpool-total">帰り合計人数: {formDraftCarpoolCapacitySummary.return}人</p>
+              </div>
             </section>
             </div>
             <div className="modal-actions">
