@@ -1,25 +1,37 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LinkifiedText } from "../components/LinkifiedText";
-import type { DemoData, RelatedType, Todo, TodoKind, TodoSharedScope } from "../types";
+import type {
+  DemoData,
+  RecurringTodoTemplate,
+  RelatedType,
+  Todo,
+  TodoKind,
+  TodoSharedScope,
+} from "../types";
 import type { MemberRecord } from "../members/types";
 import { subscribeMembers } from "../members/service";
 import { sortMembersForDisplay } from "../members/permissions";
 import {
   buildSessionChoices,
-  canMemberBeAssignedToSharedScope,
+  canMemberBeAssignedToSharedScopes,
   canViewSharedTodo,
   formatTodoDueDisplay,
+  getCreatableSharedScopesForViewer,
   getTodoTakeoverLabel,
-  getCreatableSharedScopesForRole,
-  getTodoKindOptionsForRole,
+  normalizeTodoSharedScopes,
   parseSessionRelatedId,
-  resolveTodoAudienceRole,
   resolveTodoRelatedSummary,
   sortTodos,
   sortTodosOpenFirst,
 } from "../utils/todoUtils";
 import { todayDateKey } from "../utils/date";
+import {
+  createRecurringTodoTemplate,
+  deleteRecurringTodoTemplate,
+  saveRecurringTodoTemplate,
+  subscribeRecurringTodoTemplates,
+} from "../todos/service";
 
 type TodosPageProps = {
   data: DemoData;
@@ -36,11 +48,12 @@ type AssigneeFilter = "all" | "unassigned" | "me";
 type RelatedFilter = "all" | "session" | "event" | "none";
 type RelatedInputType = "none" | RelatedType;
 type TodoTab = "shared" | "private";
-type TodoFormErrors = { title?: string; relatedId?: string };
+type TodoFormErrors = { title?: string; relatedId?: string; sharedScopes?: string };
+type RecurringTemplateErrors = { title?: string; dayOfMonth?: string; sharedScopes?: string };
 
 type TodoDraft = {
   kind: TodoKind;
-  sharedScope: TodoSharedScope;
+  sharedScopes: TodoSharedScope[];
   title: string;
   memo: string;
   completed: boolean;
@@ -50,15 +63,25 @@ type TodoDraft = {
   relatedId: string;
 };
 
+type RecurringTemplateDraft = {
+  kind: TodoKind;
+  sharedScopes: TodoSharedScope[];
+  title: string;
+  memo: string;
+  dayOfMonth: string;
+  isActive: boolean;
+};
+
 const sharedScopeLabels: Record<TodoSharedScope, string> = {
   parent: "保護者",
   officer: "役員",
   child: "子ども",
+  accounting: "会計担当者",
 };
 
-const createDraft = (kind: TodoKind = "shared", sharedScope: TodoSharedScope = "parent"): TodoDraft => ({
+const createDraft = (kind: TodoKind = "shared", sharedScopes: TodoSharedScope[] = ["parent"]): TodoDraft => ({
   kind,
-  sharedScope,
+  sharedScopes,
   title: "",
   memo: "",
   completed: false,
@@ -70,7 +93,7 @@ const createDraft = (kind: TodoKind = "shared", sharedScope: TodoSharedScope = "
 
 const draftFromTodo = (todo: Todo): TodoDraft => ({
   kind: todo.kind,
-  sharedScope: todo.sharedScope ?? "parent",
+  sharedScopes: normalizeTodoSharedScopes(todo),
   title: todo.title,
   memo: todo.memo ?? "",
   completed: todo.completed,
@@ -85,13 +108,38 @@ const normalizeDraftForKind = (draft: TodoDraft): TodoDraft =>
     ? {
         ...draft,
         assigneeUid: "",
+        sharedScopes: [],
       }
     : draft;
+
+const createRecurringTemplateDraft = (
+  kind: TodoKind = "shared",
+  sharedScopes: TodoSharedScope[] = ["parent"],
+): RecurringTemplateDraft => ({
+  kind,
+  sharedScopes,
+  title: "",
+  memo: "",
+  dayOfMonth: "1",
+  isActive: true,
+});
+
+const recurringTemplateDraftFromTemplate = (
+  template: RecurringTodoTemplate,
+): RecurringTemplateDraft => ({
+  kind: template.kind,
+  sharedScopes: normalizeTodoSharedScopes(template),
+  title: template.title,
+  memo: template.memo ?? "",
+  dayOfMonth: String(template.dayOfMonth),
+  isActive: template.isActive,
+});
 
 const applyDraft = (source: Todo, draft: TodoDraft): Todo => ({
   ...source,
   kind: draft.kind,
-  sharedScope: draft.kind === "shared" ? draft.sharedScope : undefined,
+  sharedScopes: draft.kind === "shared" ? draft.sharedScopes : [],
+  sharedScope: draft.kind === "shared" ? draft.sharedScopes[0] : undefined,
   title: draft.title.trim(),
   memo: draft.memo.trim() || undefined,
   completed: draft.completed,
@@ -133,7 +181,13 @@ export function TodosPage({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<TodoDraft>(createDraft());
   const [editErrors, setEditErrors] = useState<TodoFormErrors>({});
+  const [recurringTemplates, setRecurringTemplates] = useState<RecurringTodoTemplate[]>([]);
+  const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false);
+  const [recurringDraft, setRecurringDraft] = useState<RecurringTemplateDraft>(createRecurringTemplateDraft());
+  const [recurringErrors, setRecurringErrors] = useState<RecurringTemplateErrors>({});
+  const [editingRecurringId, setEditingRecurringId] = useState<string | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [deleteRecurringTargetId, setDeleteRecurringTargetId] = useState<string | null>(null);
   const [relatedDetailTodoId, setRelatedDetailTodoId] = useState<string | null>(null);
 
   const selfMemberKeys = useMemo(
@@ -145,21 +199,18 @@ export function TodosPage({
       ),
     [currentUid, linkedMember],
   );
-  const todoAudienceRole = useMemo(
-    () => resolveTodoAudienceRole(linkedMember, authRole),
+  const creatableSharedScopes = useMemo(
+    () => getCreatableSharedScopesForViewer(linkedMember, authRole),
     [authRole, linkedMember],
   );
-  const creatableSharedScopes = useMemo(
-    () => getCreatableSharedScopesForRole(todoAudienceRole),
-    [todoAudienceRole],
-  );
-  const todoKindOptions = useMemo(
-    () => getTodoKindOptionsForRole(todoAudienceRole),
-    [todoAudienceRole],
+  const todoKindOptions = useMemo<TodoKind[]>(
+    () => (creatableSharedScopes.length > 0 ? ["shared", "private"] : ["private"]),
+    [creatableSharedScopes],
   );
   const canCreateSharedTodos = creatableSharedScopes.length > 0;
   const defaultSharedScope = creatableSharedScopes[0] ?? "parent";
-  const showSharedScopeSelector = creatableSharedScopes.length > 1;
+  const defaultSharedScopes = creatableSharedScopes.length > 0 ? [defaultSharedScope] : [];
+  const canManageRecurringTemplates = linkedMember?.adminRole === "admin" || authRole === "admin";
   const createDefaultKind: TodoKind = todoKindOptions.includes(activeTab) ? activeTab : todoKindOptions[0];
   const userOptions = useMemo(
     () =>
@@ -177,17 +228,17 @@ export function TodosPage({
     () =>
       userOptions.filter((user) => {
         const member = members.find((item) => (item.authUid || item.id) === user.uid);
-        return member ? canMemberBeAssignedToSharedScope(member, createDraftState.sharedScope) : false;
+        return member ? canMemberBeAssignedToSharedScopes(member, createDraftState.sharedScopes) : false;
       }),
-    [createDraftState.sharedScope, members, userOptions],
+    [createDraftState.sharedScopes, members, userOptions],
   );
   const editAssigneeOptions = useMemo(
     () =>
       userOptions.filter((user) => {
         const member = members.find((item) => (item.authUid || item.id) === user.uid);
-        return member ? canMemberBeAssignedToSharedScope(member, editDraft.sharedScope) : false;
+        return member ? canMemberBeAssignedToSharedScopes(member, editDraft.sharedScopes) : false;
       }),
-    [editDraft.sharedScope, members, userOptions],
+    [editDraft.sharedScopes, members, userOptions],
   );
   const eventOptions = useMemo(
     () => {
@@ -213,14 +264,14 @@ export function TodosPage({
   const shouldShowFilterBody = !isMobileFilterMode || isMobileFilterOpen;
   const normalizeDraftForAudience = (draft: TodoDraft): TodoDraft => {
     const nextKind = todoKindOptions.includes(draft.kind) ? draft.kind : todoKindOptions[0];
-    const nextScope =
-      nextKind === "shared" && creatableSharedScopes.includes(draft.sharedScope)
-        ? draft.sharedScope
-        : defaultSharedScope;
+    const nextScopes =
+      nextKind === "shared"
+        ? draft.sharedScopes.filter((scope) => creatableSharedScopes.includes(scope))
+        : [];
     return normalizeDraftForKind({
       ...draft,
       kind: nextKind,
-      sharedScope: nextScope,
+      sharedScopes: nextScopes.length > 0 ? nextScopes : nextKind === "shared" ? defaultSharedScopes : [],
     });
   };
 
@@ -233,6 +284,13 @@ export function TodosPage({
   }, []);
 
   useEffect(() => subscribeMembers(setMembers), []);
+  useEffect(() => {
+    if (!canManageRecurringTemplates) {
+      setRecurringTemplates([]);
+      return;
+    }
+    return subscribeRecurringTodoTemplates(setRecurringTemplates);
+  }, [canManageRecurringTemplates]);
 
   useEffect(() => {
     const nextTab = todoKindOptions[0] === "shared" ? "shared" : "private";
@@ -241,13 +299,29 @@ export function TodosPage({
     }
     setCreateDraftState((prev) => normalizeDraftForAudience(prev));
     setEditDraft((prev) => normalizeDraftForAudience(prev));
-  }, [activeTab, creatableSharedScopes, defaultSharedScope, todoKindOptions]);
+  }, [activeTab, creatableSharedScopes, defaultSharedScopes, todoKindOptions]);
 
   const validateDraft = (draft: TodoDraft): TodoFormErrors => {
     const errors: TodoFormErrors = {};
     if (!draft.title.trim()) errors.title = "タイトルは必須です";
+    if (draft.kind === "shared" && draft.sharedScopes.length === 0) {
+      errors.sharedScopes = "共有対象を1件以上選択してください";
+    }
     if (draft.relatedType !== "none" && !draft.relatedId) {
       errors.relatedId = "紐付け先を選択してください";
+    }
+    return errors;
+  };
+
+  const validateRecurringDraft = (draft: RecurringTemplateDraft): RecurringTemplateErrors => {
+    const errors: RecurringTemplateErrors = {};
+    if (!draft.title.trim()) errors.title = "タイトルは必須です";
+    const dayOfMonth = Number(draft.dayOfMonth);
+    if (!Number.isInteger(dayOfMonth) || dayOfMonth < 1 || dayOfMonth > 31) {
+      errors.dayOfMonth = "毎月の日付は 1〜31 で入力してください";
+    }
+    if (draft.kind === "shared" && draft.sharedScopes.length === 0) {
+      errors.sharedScopes = "共有対象を1件以上選択してください";
     }
     return errors;
   };
@@ -353,15 +427,39 @@ export function TodosPage({
     </div>
   );
 
+  const renderSharedScopesEditor = (
+    value: TodoSharedScope[],
+    onToggle: (scope: TodoSharedScope) => void,
+    error?: string,
+  ) => (
+    <div className="todo-form-section">
+      <span className="todo-form-label">共有対象</span>
+      <div className="todo-shared-scope-list">
+        {creatableSharedScopes.map((scope) => (
+          <label key={scope} className="todo-shared-scope-option">
+            <input
+              type="checkbox"
+              checked={value.includes(scope)}
+              onChange={() => onToggle(scope)}
+            />
+            <span>{sharedScopeLabels[scope]}</span>
+          </label>
+        ))}
+      </div>
+      {error && <span className="field-error">{error}</span>}
+    </div>
+  );
+
   const handleCreateTodo = async () => {
     const normalizedDraft = normalizeDraftForAudience(createDraftState);
     const errors = validateDraft(normalizedDraft);
     setCreateErrors(errors);
-    if (errors.title || errors.relatedId) return;
+    if (errors.title || errors.relatedId || errors.sharedScopes) return;
     const now = new Date().toISOString();
     const next: Omit<Todo, "id"> = {
       kind: normalizedDraft.kind,
-      sharedScope: normalizedDraft.kind === "shared" ? normalizedDraft.sharedScope : undefined,
+      sharedScopes: normalizedDraft.kind === "shared" ? normalizedDraft.sharedScopes : [],
+      sharedScope: normalizedDraft.kind === "shared" ? normalizedDraft.sharedScopes[0] : undefined,
       title: normalizedDraft.title.trim(),
       memo: normalizedDraft.memo.trim() || undefined,
       completed: normalizedDraft.completed,
@@ -378,7 +476,7 @@ export function TodosPage({
             },
     };
     await createTodo(next);
-    setCreateDraftState(createDraft(todoKindOptions[0], defaultSharedScope));
+    setCreateDraftState(createDraft(todoKindOptions[0], defaultSharedScopes));
     setCreateErrors({});
     setIsAddModalOpen(false);
   };
@@ -396,7 +494,7 @@ export function TodosPage({
     const normalizedDraft = normalizeDraftForAudience(editDraft);
     const errors = validateDraft(normalizedDraft);
     setEditErrors(errors);
-    if (errors.title || errors.relatedId) return;
+    if (errors.title || errors.relatedId || errors.sharedScopes) return;
     const nextTodo = {
       ...applyDraft(base, normalizedDraft),
       createdByUid:
@@ -413,6 +511,62 @@ export function TodosPage({
   const runAssigneeAction = async (todo: Todo) => {
     if (todo.kind !== "shared") return;
     await saveTodo({ ...todo, assigneeUid: currentUid });
+  };
+
+  const normalizeRecurringDraft = (draft: RecurringTemplateDraft): RecurringTemplateDraft => {
+    const nextKind: TodoKind = draft.kind === "private" ? "private" : "shared";
+    const nextScopes =
+      nextKind === "shared"
+        ? draft.sharedScopes.filter((scope) => creatableSharedScopes.includes(scope))
+        : [];
+    return {
+      ...draft,
+      kind: nextKind,
+      sharedScopes: nextScopes.length > 0 ? nextScopes : nextKind === "shared" ? defaultSharedScopes : [],
+    };
+  };
+
+  const openCreateRecurringModal = () => {
+    setEditingRecurringId(null);
+    setRecurringDraft(createRecurringTemplateDraft("shared", defaultSharedScopes));
+    setRecurringErrors({});
+    setIsRecurringModalOpen(true);
+  };
+
+  const openEditRecurringModal = (template: RecurringTodoTemplate) => {
+    setEditingRecurringId(template.id);
+    setRecurringDraft(normalizeRecurringDraft(recurringTemplateDraftFromTemplate(template)));
+    setRecurringErrors({});
+    setIsRecurringModalOpen(true);
+  };
+
+  const saveRecurringTemplate = async () => {
+    const normalizedDraft = normalizeRecurringDraft(recurringDraft);
+    const errors = validateRecurringDraft(normalizedDraft);
+    setRecurringErrors(errors);
+    if (errors.title || errors.dayOfMonth || errors.sharedScopes) return;
+    const base = editingRecurringId
+      ? recurringTemplates.find((item) => item.id === editingRecurringId) ?? null
+      : null;
+    const payload: Omit<RecurringTodoTemplate, "id"> = {
+      kind: normalizedDraft.kind,
+      title: normalizedDraft.title.trim(),
+      memo: normalizedDraft.memo.trim() || undefined,
+      dayOfMonth: Number(normalizedDraft.dayOfMonth),
+      isActive: normalizedDraft.isActive,
+      createdAt: base?.createdAt ?? new Date().toISOString(),
+      createdByUid: base?.createdByUid ?? currentUid,
+      updatedAt: new Date().toISOString(),
+      sharedScopes: normalizedDraft.kind === "shared" ? normalizedDraft.sharedScopes : [],
+      sharedScope: normalizedDraft.kind === "shared" ? normalizedDraft.sharedScopes[0] : undefined,
+    };
+    if (editingRecurringId) {
+      await saveRecurringTodoTemplate({ id: editingRecurringId, ...payload });
+    } else {
+      await createRecurringTodoTemplate(payload);
+    }
+    setIsRecurringModalOpen(false);
+    setEditingRecurringId(null);
   };
 
   const renderTodoRow = (todo: Todo) => {
@@ -473,6 +627,9 @@ export function TodosPage({
   const deleteTarget = deleteTargetId
     ? data.todos.find((item) => item.id === deleteTargetId) ?? null
     : null;
+  const deleteRecurringTarget = deleteRecurringTargetId
+    ? recurringTemplates.find((item) => item.id === deleteRecurringTargetId) ?? null
+    : null;
   const relatedDetailTodo = relatedDetailTodoId
     ? data.todos.find((item) => item.id === relatedDetailTodoId) ?? null
     : null;
@@ -489,20 +646,72 @@ export function TodosPage({
     <section className="card todos-page">
       <div className="todos-header">
         <h1>TODO</h1>
-        <button
-          type="button"
-          className="button button-small"
-          aria-label="追加"
-          title="追加"
-          onClick={() => {
-            setCreateDraftState(createDraft(createDefaultKind, defaultSharedScope));
-            setCreateErrors({});
-            setIsAddModalOpen(true);
-          }}
-        >
-          ＋ 追加
-        </button>
+        <div className="todos-header-actions">
+          {canManageRecurringTemplates && (
+            <button type="button" className="button button-small button-secondary" onClick={openCreateRecurringModal}>
+              定例TODO追加
+            </button>
+          )}
+          <button
+            type="button"
+            className="button button-small"
+            aria-label="追加"
+            title="追加"
+            onClick={() => {
+              setCreateDraftState(createDraft(createDefaultKind, defaultSharedScopes));
+              setCreateErrors({});
+              setIsAddModalOpen(true);
+            }}
+          >
+            ＋ 追加
+          </button>
+        </div>
       </div>
+
+      {canManageRecurringTemplates && (
+        <section className="todos-section recurring-templates-section">
+          <div className="todos-filter-header">
+            <h2>定例TODOテンプレート</h2>
+          </div>
+          <div className="todos-list recurring-template-list">
+            {recurringTemplates.map((template) => (
+              <article key={template.id} className={`todo-row recurring-template-row ${template.isActive ? "" : "completed"}`}>
+                <div className="todo-main">
+                  <p className="todo-title">{template.title}</p>
+                  <p className="todo-meta">
+                    <span>{template.kind === "shared" ? "共有TODO" : "個人TODO"}</span>
+                    <span>毎月 {template.dayOfMonth} 日</span>
+                    <span>{template.isActive ? "有効" : "無効"}</span>
+                  </p>
+                  {template.kind === "shared" && (
+                    <p className="todo-related-text">
+                      共有対象: {normalizeTodoSharedScopes(template).map((scope) => sharedScopeLabels[scope]).join(" / ")}
+                    </p>
+                  )}
+                </div>
+                <div className="todo-actions">
+                  <button type="button" className="button button-small button-secondary" onClick={() => openEditRecurringModal(template)}>
+                    編集
+                  </button>
+                  <button
+                    type="button"
+                    className="button button-small button-secondary"
+                    onClick={() =>
+                      saveRecurringTodoTemplate({ ...template, isActive: !template.isActive, updatedAt: new Date().toISOString() })
+                    }
+                  >
+                    {template.isActive ? "無効化" : "有効化"}
+                  </button>
+                  <button type="button" className="button button-small events-danger-button" onClick={() => setDeleteRecurringTargetId(template.id)}>
+                    削除
+                  </button>
+                </div>
+              </article>
+            ))}
+            {recurringTemplates.length === 0 && <p className="muted">定例TODOテンプレートはありません。</p>}
+          </div>
+        </section>
+      )}
 
       {todoKindOptions.length > 1 && (
         <div className="events-tabs" role="tablist" aria-label="TODO種別">
@@ -609,7 +818,7 @@ export function TodosPage({
                   editDraft.kind,
                   (next) =>
                     setEditDraft((prev) =>
-                      normalizeDraftForAudience({ ...prev, kind: next, sharedScope: defaultSharedScope }),
+                      normalizeDraftForAudience({ ...prev, kind: next, sharedScopes: defaultSharedScopes }),
                     ),
                   "TODO種別",
                 )}
@@ -628,27 +837,19 @@ export function TodosPage({
                 onChange={(event) => setEditDraft((prev) => ({ ...prev, memo: event.target.value }))}
               />
             </label>
-            {editDraft.kind === "shared" && showSharedScopeSelector && (
-              <label>
-                共有範囲
-                <select
-                  value={editDraft.sharedScope}
-                  onChange={(event) =>
-                    setEditDraft((prev) => ({
-                      ...prev,
-                      sharedScope: event.target.value as TodoSharedScope,
-                      assigneeUid: "",
-                    }))
-                  }
-                >
-                  {creatableSharedScopes.map((scope) => (
-                    <option key={scope} value={scope}>
-                      {sharedScopeLabels[scope]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
+            {editDraft.kind === "shared" &&
+              renderSharedScopesEditor(
+                editDraft.sharedScopes,
+                (scope) =>
+                  setEditDraft((prev) => {
+                    const exists = prev.sharedScopes.includes(scope);
+                    const nextScopes = exists
+                      ? prev.sharedScopes.filter((item) => item !== scope)
+                      : [...prev.sharedScopes, scope];
+                    return normalizeDraftForAudience({ ...prev, sharedScopes: nextScopes, assigneeUid: "" });
+                  }),
+                editErrors.sharedScopes,
+              )}
             <div className={`todo-modal-grid ${editDraft.kind === "shared" ? "shared" : "private"}`}>
               <label>
                 期限
@@ -731,7 +932,7 @@ export function TodosPage({
                   createDraftState.kind,
                   (next) =>
                     setCreateDraftState((prev) =>
-                      normalizeDraftForAudience({ ...prev, kind: next, sharedScope: defaultSharedScope }),
+                      normalizeDraftForAudience({ ...prev, kind: next, sharedScopes: defaultSharedScopes }),
                     ),
                   "TODO種別",
                 )}
@@ -753,27 +954,19 @@ export function TodosPage({
                 onChange={(event) => setCreateDraftState((prev) => ({ ...prev, memo: event.target.value }))}
               />
             </label>
-            {createDraftState.kind === "shared" && showSharedScopeSelector && (
-              <label>
-                共有範囲
-                <select
-                  value={createDraftState.sharedScope}
-                  onChange={(event) =>
-                    setCreateDraftState((prev) => ({
-                      ...prev,
-                      sharedScope: event.target.value as TodoSharedScope,
-                      assigneeUid: "",
-                    }))
-                  }
-                >
-                  {creatableSharedScopes.map((scope) => (
-                    <option key={scope} value={scope}>
-                      {sharedScopeLabels[scope]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
+            {createDraftState.kind === "shared" &&
+              renderSharedScopesEditor(
+                createDraftState.sharedScopes,
+                (scope) =>
+                  setCreateDraftState((prev) => {
+                    const exists = prev.sharedScopes.includes(scope);
+                    const nextScopes = exists
+                      ? prev.sharedScopes.filter((item) => item !== scope)
+                      : [...prev.sharedScopes, scope];
+                    return normalizeDraftForAudience({ ...prev, sharedScopes: nextScopes, assigneeUid: "" });
+                  }),
+                createErrors.sharedScopes,
+              )}
             <div className={`todo-modal-grid ${createDraftState.kind === "shared" ? "shared" : "private"}`}>
               <label>
                 期限
@@ -908,6 +1101,85 @@ export function TodosPage({
         </div>
       )}
 
+      {isRecurringModalOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <section className="modal-panel todos-edit-modal" onClick={(event) => event.stopPropagation()}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsRecurringModalOpen(false)}>
+              ×
+            </button>
+            <h3>{editingRecurringId ? "定例TODOテンプレート編集" : "定例TODOテンプレート追加"}</h3>
+            {renderKindToggle(
+              recurringDraft.kind,
+              (next) =>
+                setRecurringDraft((prev) =>
+                  normalizeRecurringDraft({
+                    ...prev,
+                    kind: next,
+                    sharedScopes: next === "shared" ? defaultSharedScopes : [],
+                  }),
+                ),
+              "定例TODO種別",
+            )}
+            <label>
+              タイトル
+              <input
+                value={recurringDraft.title}
+                onChange={(event) => setRecurringDraft((prev) => ({ ...prev, title: event.target.value }))}
+              />
+              {recurringErrors.title && <span className="field-error">{recurringErrors.title}</span>}
+            </label>
+            <label>
+              メモ
+              <textarea
+                rows={4}
+                value={recurringDraft.memo}
+                onChange={(event) => setRecurringDraft((prev) => ({ ...prev, memo: event.target.value }))}
+              />
+            </label>
+            {recurringDraft.kind === "shared" &&
+              renderSharedScopesEditor(
+                recurringDraft.sharedScopes,
+                (scope) =>
+                  setRecurringDraft((prev) => {
+                    const exists = prev.sharedScopes.includes(scope);
+                    const nextScopes = exists
+                      ? prev.sharedScopes.filter((item) => item !== scope)
+                      : [...prev.sharedScopes, scope];
+                    return normalizeRecurringDraft({ ...prev, sharedScopes: nextScopes });
+                  }),
+                recurringErrors.sharedScopes,
+              )}
+            <label>
+              毎月の日付
+              <input
+                type="number"
+                min={1}
+                max={31}
+                value={recurringDraft.dayOfMonth}
+                onChange={(event) => setRecurringDraft((prev) => ({ ...prev, dayOfMonth: event.target.value }))}
+              />
+              {recurringErrors.dayOfMonth && <span className="field-error">{recurringErrors.dayOfMonth}</span>}
+            </label>
+            <label className="todo-completed-toggle">
+              <input
+                type="checkbox"
+                checked={recurringDraft.isActive}
+                onChange={(event) => setRecurringDraft((prev) => ({ ...prev, isActive: event.target.checked }))}
+              />
+              <span>有効にする</span>
+            </label>
+            <div className="modal-actions">
+              <button type="button" className="button button-secondary" onClick={() => setIsRecurringModalOpen(false)}>
+                キャンセル
+              </button>
+              <button type="button" className="button" onClick={() => void saveRecurringTemplate()}>
+                保存
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
       {deleteTarget && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
@@ -926,6 +1198,33 @@ export function TodosPage({
                 onClick={() => {
                   void deleteTodo(deleteTarget.id);
                   setDeleteTargetId(null);
+                }}
+              >
+                削除
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {deleteRecurringTarget && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setDeleteRecurringTargetId(null)}>
+              ×
+            </button>
+            <h3>定例TODOテンプレートを削除しますか？</h3>
+            <p className="modal-summary">{deleteRecurringTarget.title}</p>
+            <div className="modal-actions">
+              <button type="button" className="button button-secondary" onClick={() => setDeleteRecurringTargetId(null)}>
+                キャンセル
+              </button>
+              <button
+                type="button"
+                className="button events-danger-button"
+                onClick={() => {
+                  void deleteRecurringTodoTemplate(deleteRecurringTarget.id);
+                  setDeleteRecurringTargetId(null);
                 }}
               >
                 削除

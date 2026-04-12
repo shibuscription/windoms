@@ -1,6 +1,12 @@
 import type { MemberRecord } from "../members/types";
 import { getSessionDisplayTitle, sessionTypeLabel } from "../schedule/sessionMeta";
-import type { DemoData, Todo, TodoKind, TodoSharedScope } from "../types";
+import type {
+  DemoData,
+  RecurringTodoTemplate,
+  Todo,
+  TodoKind,
+  TodoSharedScope,
+} from "../types";
 import { formatDateYmd, isValidDateKey, todayDateKey } from "./date";
 
 const SESSION_REF_PREFIX = "session:";
@@ -127,6 +133,7 @@ export const buildSessionChoices = (
 };
 
 export type TodoAudienceRole = "child" | "parent" | "officer" | "admin" | "private-only";
+export type TodoAudienceKey = TodoSharedScope;
 
 const hasMemberType = (member: MemberRecord | null, type: "parent" | "child" | "teacher" | "obog"): boolean =>
   Boolean(member?.memberTypes?.includes(type));
@@ -153,10 +160,26 @@ export const resolveTodoAudienceRole = (
   return "parent";
 };
 
+export const normalizeTodoSharedScopes = (
+  value:
+    | Pick<Todo, "kind" | "sharedScopes" | "sharedScope">
+    | Pick<RecurringTodoTemplate, "kind" | "sharedScopes" | "sharedScope">,
+): TodoSharedScope[] => {
+  if (value.kind !== "shared") return [];
+  const normalized = Array.isArray(value.sharedScopes)
+    ? value.sharedScopes.filter(
+        (item): item is TodoSharedScope =>
+          item === "parent" || item === "officer" || item === "child" || item === "accounting",
+      )
+    : [];
+  if (normalized.length > 0) return Array.from(new Set(normalized));
+  return value.sharedScope ? [value.sharedScope] : [];
+};
+
 export const getVisibleSharedScopesForRole = (role: TodoAudienceRole): TodoSharedScope[] => {
   switch (role) {
     case "admin":
-      return ["parent", "officer", "child"];
+      return ["parent", "officer", "child", "accounting"];
     case "officer":
       return ["parent", "officer"];
     case "parent":
@@ -171,7 +194,7 @@ export const getVisibleSharedScopesForRole = (role: TodoAudienceRole): TodoShare
 export const getCreatableSharedScopesForRole = (role: TodoAudienceRole): TodoSharedScope[] => {
   switch (role) {
     case "admin":
-      return ["parent", "officer", "child"];
+      return ["parent", "officer", "child", "accounting"];
     case "officer":
       return ["parent", "officer"];
     case "parent":
@@ -181,6 +204,38 @@ export const getCreatableSharedScopesForRole = (role: TodoAudienceRole): TodoSha
     default:
       return [];
   }
+};
+
+export const getTodoAudienceScopesForViewer = (
+  linkedMember: MemberRecord | null,
+  fallbackRole?: "parent" | "admin" | null,
+): TodoSharedScope[] => {
+  const scopes = new Set<TodoSharedScope>(
+    getVisibleSharedScopesForRole(resolveTodoAudienceRole(linkedMember, fallbackRole)),
+  );
+  if (linkedMember?.staffPermissions?.includes("accounting")) {
+    scopes.add("accounting");
+  }
+  if (linkedMember?.adminRole === "admin" || linkedMember?.role === "admin" || fallbackRole === "admin") {
+    scopes.add("accounting");
+  }
+  return Array.from(scopes);
+};
+
+export const getCreatableSharedScopesForViewer = (
+  linkedMember: MemberRecord | null,
+  fallbackRole?: "parent" | "admin" | null,
+): TodoSharedScope[] => {
+  const roleScopes = new Set<TodoSharedScope>(
+    getCreatableSharedScopesForRole(resolveTodoAudienceRole(linkedMember, fallbackRole)),
+  );
+  if (linkedMember?.staffPermissions?.includes("accounting")) {
+    roleScopes.add("accounting");
+  }
+  if (linkedMember?.adminRole === "admin" || linkedMember?.role === "admin" || fallbackRole === "admin") {
+    roleScopes.add("accounting");
+  }
+  return Array.from(roleScopes);
 };
 
 export const getTodoKindOptionsForRole = (role: TodoAudienceRole): TodoKind[] =>
@@ -194,8 +249,9 @@ export const canViewSharedTodo = (
   linkedMember: MemberRecord | null,
   fallbackRole?: "parent" | "admin" | null,
 ): boolean => {
-  if (todo.kind !== "shared" || !todo.sharedScope) return false;
-  return getVisibleSharedScopesForRole(resolveTodoAudienceRole(linkedMember, fallbackRole)).includes(todo.sharedScope);
+  if (todo.kind !== "shared") return false;
+  const visibleScopes = new Set(getTodoAudienceScopesForViewer(linkedMember, fallbackRole));
+  return normalizeTodoSharedScopes(todo).some((scope) => visibleScopes.has(scope));
 };
 
 export const canViewTodoByScope = (
@@ -221,8 +277,14 @@ export const canMemberBeAssignedToSharedScope = (
 
   if (scope === "child") return isChild;
   if (scope === "parent") return isParent || isOfficer || isAdmin;
+  if (scope === "accounting") return member.staffPermissions.includes("accounting") || isAdmin;
   return isOfficer || isAdmin;
 };
+
+export const canMemberBeAssignedToSharedScopes = (
+  member: MemberRecord,
+  scopes: TodoSharedScope[],
+): boolean => scopes.some((scope) => canMemberBeAssignedToSharedScope(member, scope));
 
 export const getTodoTakeoverLabel = (
   todo: Todo,

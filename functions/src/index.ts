@@ -2,6 +2,7 @@ import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { setGlobalOptions } from "firebase-functions/v2";
 import * as logger from "firebase-functions/logger";
 import { randomBytes, randomInt } from "crypto";
@@ -27,6 +28,7 @@ const loginIdPattern = /^[a-z0-9_-]{4,20}$/;
 const dateKeyPattern = /^\d{4}-\d{2}-\d{2}$/;
 const timePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const calendarSessionTypes = new Set(["normal", "self", "event", "other"]);
+const todoSharedScopeValues = new Set(["parent", "officer", "child", "accounting"]);
 const toInternalAuthEmail = (loginId: string): string =>
   `${normalizeLoginId(loginId)}@${internalEmailDomain}`;
 const getLoginIdValidationMessage = (loginId: string): string =>
@@ -218,6 +220,51 @@ const normalizeOptionalBoolean = (value: unknown): boolean | null => {
   if (value === false) return false;
   return null;
 };
+
+const normalizeTodoKind = (value: unknown): "shared" | "private" =>
+  value === "private" ? "private" : "shared";
+
+const normalizeSharedTodoScopes = (value: Record<string, unknown>): string[] => {
+  const arrayScopes = Array.isArray(value.sharedScopes)
+    ? value.sharedScopes.filter(
+        (scope): scope is string => typeof scope === "string" && todoSharedScopeValues.has(scope),
+      )
+    : [];
+  if (arrayScopes.length > 0) {
+    return [...new Set(arrayScopes)];
+  }
+  const legacyScope =
+    typeof value.sharedScope === "string" && todoSharedScopeValues.has(value.sharedScope)
+      ? value.sharedScope
+      : "";
+  return legacyScope ? [legacyScope] : [];
+};
+
+const getJstDateParts = (base = new Date()) => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(base);
+  const getPart = (type: "year" | "month" | "day") => parts.find((part) => part.type === type)?.value ?? "";
+  const year = getPart("year");
+  const month = getPart("month");
+  const day = getPart("day");
+  return {
+    year,
+    month,
+    day,
+    dayOfMonth: Number(day),
+    dateKey: `${year}-${month}-${day}`,
+    yearMonth: `${year}-${month}`,
+    compactYearMonth: `${year}${month}`,
+  };
+};
+
+const recurringOccurrenceKey = (templateId: string, yearMonth: string) => `${templateId}:${yearMonth}`;
+const recurringTodoDocId = (templateId: string, compactYearMonth: string) =>
+  `recurring_${templateId}_${compactYearMonth}`;
 
 const toFamilyDisplayName = (familyName: string): string => {
   const value = familyName.trim();
@@ -1110,3 +1157,110 @@ export const deleteCalendarSession = onCall(async (request) => {
     sessionId: payload.sessionId,
   };
 });
+
+export const generateRecurringTodos = onSchedule(
+  {
+    schedule: "5 1 * * *",
+    timeZone: "Asia/Tokyo",
+  },
+  async () => {
+    const { dateKey, dayOfMonth, yearMonth, compactYearMonth } = getJstDateParts();
+    const templatesSnapshot = await firestore
+      .collection("recurringTodoTemplates")
+      .where("isActive", "==", true)
+      .get();
+
+    let createdCount = 0;
+    let skippedCount = 0;
+
+    for (const templateDoc of templatesSnapshot.docs) {
+      const value = templateDoc.data() as Record<string, unknown>;
+      const templateDayOfMonth =
+        typeof value.dayOfMonth === "number" && Number.isFinite(value.dayOfMonth)
+          ? value.dayOfMonth
+          : Number(normalizeOptionalString(value.dayOfMonth));
+      if (!Number.isInteger(templateDayOfMonth) || templateDayOfMonth !== dayOfMonth) {
+        skippedCount += 1;
+        continue;
+      }
+
+      const kind = normalizeTodoKind(value.kind);
+      const title = normalizeOptionalString(value.title);
+      const memo = normalizeOptionalString(value.memo);
+      const createdByUid = normalizeOptionalString(value.createdByUid);
+      const sharedScopes = normalizeSharedTodoScopes(value);
+
+      if (!title) {
+        logger.warn("generateRecurringTodos skipped template without title", {
+          templateId: templateDoc.id,
+          dateKey,
+        });
+        skippedCount += 1;
+        continue;
+      }
+
+      if (kind === "shared" && sharedScopes.length === 0) {
+        logger.warn("generateRecurringTodos skipped shared template without audiences", {
+          templateId: templateDoc.id,
+          dateKey,
+        });
+        skippedCount += 1;
+        continue;
+      }
+
+      if (kind === "private" && !createdByUid) {
+        logger.warn("generateRecurringTodos skipped private template without creator", {
+          templateId: templateDoc.id,
+          dateKey,
+        });
+        skippedCount += 1;
+        continue;
+      }
+
+      const occurrenceKey = recurringOccurrenceKey(templateDoc.id, yearMonth);
+      const todoRef = firestore.collection("todos").doc(recurringTodoDocId(templateDoc.id, compactYearMonth));
+      const createdAt = new Date().toISOString();
+
+      try {
+        await todoRef.create({
+          kind,
+          sharedScopes: kind === "shared" ? sharedScopes : [],
+          sharedScope: kind === "shared" ? sharedScopes[0] ?? null : null,
+          title,
+          memo: memo || null,
+          completed: false,
+          createdAt,
+          createdByUid: createdByUid || null,
+          assigneeUid: null,
+          dueDate: dateKey,
+          related: null,
+          sourceRecurringTodoId: templateDoc.id,
+          occurrenceKey,
+          updatedAt: new Date(),
+        });
+        createdCount += 1;
+      } catch (error) {
+        const code =
+          typeof error === "object" && error && "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
+        if (code === "already-exists" || code === "6") {
+          skippedCount += 1;
+          continue;
+        }
+        logger.error("generateRecurringTodos failed for template", {
+          templateId: templateDoc.id,
+          occurrenceKey,
+          code,
+          message: error instanceof Error ? error.message : "Unknown error",
+        });
+        throw error;
+      }
+    }
+
+    logger.info("generateRecurringTodos completed", {
+      dateKey,
+      createdCount,
+      skippedCount,
+      templateCount: templatesSnapshot.size,
+    });
+  },
+);

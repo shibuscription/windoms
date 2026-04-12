@@ -42,8 +42,7 @@ import { formatDateYmd, formatTimeNoLeadingZero, formatWeekdayJa, todayDateKey, 
 import {
   canViewSharedTodo,
   formatTodoDueDisplay,
-  getVisibleSharedScopesForRole,
-  resolveTodoAudienceRole,
+  getTodoAudienceScopesForViewer,
   resolveTodoRelatedSummary,
   sortTodos,
 } from "./utils/todoUtils";
@@ -1026,8 +1025,7 @@ export function App() {
       ),
     [currentUid, linkedMember],
   );
-  const todoAudienceRole = resolveTodoAudienceRole(linkedMember, authUser?.role);
-  const canViewSharedTodos = getVisibleSharedScopesForRole(todoAudienceRole).length > 0;
+  const canViewSharedTodos = getTodoAudienceScopesForViewer(linkedMember, authUser?.role).length > 0;
   const sharedInboxTodos = useMemo(
     () =>
       sortTodos(

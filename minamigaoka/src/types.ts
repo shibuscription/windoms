@@ -102,7 +102,7 @@ export type DayLog = {
 
 export type RelatedType = "event" | "session";
 export type TodoKind = "shared" | "private";
-export type TodoSharedScope = "parent" | "officer" | "child";
+export type TodoSharedScope = "parent" | "officer" | "child" | "accounting";
 
 export type RelatedRef = {
   type: RelatedType;
@@ -137,6 +137,7 @@ export type EventRecord = {
 export type Todo = {
   id: string;
   kind: TodoKind;
+  sharedScopes?: TodoSharedScope[];
   sharedScope?: TodoSharedScope;
   title: string;
   memo?: string;
@@ -146,6 +147,22 @@ export type Todo = {
   assigneeUid: string | null;
   dueDate?: string;
   related?: RelatedRef | null;
+  sourceRecurringTodoId?: string | null;
+  occurrenceKey?: string | null;
+};
+
+export type RecurringTodoTemplate = {
+  id: string;
+  kind: TodoKind;
+  title: string;
+  memo?: string;
+  dayOfMonth: number;
+  isActive: boolean;
+  createdAt: string;
+  createdByUid: string | null;
+  updatedAt?: string;
+  sharedScopes?: TodoSharedScope[];
+  sharedScope?: TodoSharedScope;
 };
 
 export type PurchaseRequestStatus = "OPEN" | "BOUGHT";
