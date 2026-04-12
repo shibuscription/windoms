@@ -1,4 +1,4 @@
-export type SessionType = "normal" | "self" | "event";
+export type SessionType = "normal" | "self" | "event" | "other";
 export type RsvpStatus = "yes" | "maybe" | "no" | "unknown";
 export type DutyRequirement = "duty" | "watch";
 

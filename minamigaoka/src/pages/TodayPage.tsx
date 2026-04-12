@@ -6,6 +6,13 @@ import { getBirthdayCelebrants } from "../members/birthday";
 import { isChildMember, sortMembersForDisplay } from "../members/permissions";
 import { subscribeMemberRelations, subscribeMembers } from "../members/service";
 import type { MemberRecord, MemberRelationRecord } from "../members/types";
+import {
+  getSessionAssigneeRoleLabel,
+  isAttendanceTargetSession,
+  isJournalTargetSession,
+  sessionTypeLabel,
+  showSessionAssignee,
+} from "../schedule/sessionMeta";
 import type {
   DemoData,
   DutyRequirement,
@@ -35,12 +42,6 @@ type AttendanceRow = {
   uid: string;
   displayName: string;
   status: RsvpStatus;
-};
-
-const typeLabel: Record<"normal" | "self" | "event", string> = {
-  normal: "通常練習",
-  self: "自主練",
-  event: "イベント",
 };
 
 const dutyLabel: Record<DutyRequirement, string> = {
@@ -240,7 +241,9 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
 
   const dayTransport = day?.attendanceTransport ?? {};
 
-  const hasSessions = sessions.length > 0;
+  const attendanceSessions = useMemo(() => sessions.filter(isAttendanceTargetSession), [sessions]);
+  const journalSessions = useMemo(() => sessions.filter(isJournalTargetSession), [sessions]);
+  const hasJournalSessions = journalSessions.length > 0;
   const calendarCells = useMemo(() => buildMonthCells(calendarMonth), [calendarMonth]);
   const calendarPath = `/calendar?ym=${toMonthKey(date)}&date=${date}`;
 
@@ -264,7 +267,7 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
   };
 
   const openDayLog = async () => {
-    if (!hasSessions) return;
+    if (!hasJournalSessions) return;
     await ensureDayLog(date);
     navigate(`/logs/${date}`);
   };
@@ -377,7 +380,7 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
               🎂
             </button>
           )}
-          {hasSessions && (
+          {hasJournalSessions && (
             <button type="button" className="button button-small" onClick={() => void openDayLog()}>
               日誌へ
             </button>
@@ -413,7 +416,7 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
             const counts = countAttendanceRows(attendanceRowsByOrder[session.order] ?? []);
             return (
                 <article key={`${session.order}-${index}`} className={`session-card ${session.type}`}>
-                  <span className={`session-type-badge ${session.type}`}>{typeLabel[session.type]}</span>
+                  <span className={`session-type-badge ${session.type}`}>{sessionTypeLabel[session.type]}</span>
                   <div className="session-time">
                     {formatTimeNoLeadingZero(session.startTime)} - {formatTimeNoLeadingZero(session.endTime)}
                   </div>
@@ -431,21 +434,41 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
                       )}
                     </div>
                   )}
-                <div className="kv-row">
-                  <span className="kv-key">{dutyLabel[session.dutyRequirement]}:</span>
-                  <span className="kv-val shift-role">{toFamilyName(session.assigneeNameSnapshot)}</span>
-                </div>
-                <div className="kv-row">
-                  <span className="kv-key">出欠:</span>
-                  <span className="kv-val">
-                    <button type="button" className="attendance-trigger" onClick={openAttendanceModal}>
-                      <span className="count-yes">◯{counts.yes}</span>
-                      <span className="count-maybe">△{counts.maybe}</span>
-                      <span className="count-no">×{counts.no}</span>
-                      <span className="count-unknown">ー{counts.unknown}</span>
-                    </button>
-                  </span>
-                </div>
+                {!(
+                  session.type === "event" &&
+                  session.eventName?.trim()
+                ) &&
+                  session.id &&
+                  eventIdBySessionId.get(session.id) && (
+                    <div className="calendar-day-sheet-event-link-row">
+                      <Link
+                        to={`/events/${eventIdBySessionId.get(session.id)}`}
+                        className="session-event-detail-link"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        イベント詳細
+                      </Link>
+                    </div>
+                  )}
+                {showSessionAssignee(session) && (
+                  <div className="kv-row">
+                    <span className="kv-key">{getSessionAssigneeRoleLabel(session) ?? dutyLabel[session.dutyRequirement]}:</span>
+                    <span className="kv-val shift-role">{toFamilyName(session.assigneeNameSnapshot)}</span>
+                  </div>
+                )}
+                {isAttendanceTargetSession(session) && (
+                  <div className="kv-row">
+                    <span className="kv-key">出欠:</span>
+                    <span className="kv-val">
+                      <button type="button" className="attendance-trigger" onClick={openAttendanceModal}>
+                        <span className="count-yes">◯{counts.yes}</span>
+                        <span className="count-maybe">△{counts.maybe}</span>
+                        <span className="count-no">×{counts.no}</span>
+                        <span className="count-unknown">ー{counts.unknown}</span>
+                      </button>
+                    </span>
+                  </div>
+                )}
                 {session.location && session.location !== dayDefaultLocation && (
                   <div className="kv-row">
                     <span className="kv-key">場所:</span>
@@ -461,7 +484,7 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
       {isAttendanceModalOpen && (
         <DayAttendanceModal
           date={date}
-          sessions={sessions}
+          sessions={attendanceSessions}
           dayTransport={dayTransport}
           members={members}
           relations={relations}

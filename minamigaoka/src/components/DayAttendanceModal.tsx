@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { saveDayAttendanceTransport, saveSessionRsvps } from "../journal/service";
 import { isChildMember, sortMembersForDisplay } from "../members/permissions";
 import type { MemberRecord, MemberRelationRecord } from "../members/types";
+import { sessionTypeLabel } from "../schedule/sessionMeta";
 import type {
   AttendanceTransportMethod,
   AttendanceTransportRecord,
@@ -40,12 +41,6 @@ type DayAttendanceModalProps = {
   todos: Todo[];
   saveTodo: (todo: Todo) => Promise<void>;
   onClose: () => void;
-};
-
-const typeLabel: Record<SessionDoc["type"], string> = {
-  normal: "通常練習",
-  self: "自主練",
-  event: "イベント",
 };
 
 const statusSymbol: Record<RsvpStatus, string> = {
@@ -320,7 +315,7 @@ export function DayAttendanceModal({
                   className={`today-attendance-session-summary ${session.type}`}
                 >
                   <span className={`session-type-badge today-attendance-session-summary-badge ${session.type}`}>
-                    {typeLabel[session.type]}
+                    {sessionTypeLabel[session.type]}
                   </span>
                   <div className="today-attendance-session-summary-main">
                     <div className="today-attendance-session-summary-time">
@@ -338,7 +333,7 @@ export function DayAttendanceModal({
                       type="button"
                       className="today-attendance-session-todo-trigger"
                       onClick={() => setSelectedTodoSession(session)}
-                      aria-label={`${typeLabel[session.type]} の関連TODOを開く`}
+                      aria-label={`${sessionTypeLabel[session.type]} の関連TODOを開く`}
                       title="関連TODO"
                     >
                       ✅
@@ -474,7 +469,7 @@ export function DayAttendanceModal({
               {formatDateYmd(date)}（{formatWeekdayJa(date)}）
             </p>
             <h3>
-              {typeLabel[selectedTodoSession.type]}{" "}
+              {sessionTypeLabel[selectedTodoSession.type]}{" "}
               {formatTimeNoLeadingZero(selectedTodoSession.startTime)} - {formatTimeNoLeadingZero(selectedTodoSession.endTime)}
             </h3>
             <div className="related-todos-list">
@@ -540,7 +535,7 @@ export function DayAttendanceModal({
                   <section key={session.id ?? `${session.order}-${session.startTime}`} className="today-attendance-edit-section">
                     <div className="today-attendance-edit-session-row">
                       <div className="today-attendance-edit-header">
-                        <strong>{typeLabel[session.type]}</strong>
+                        <strong>{sessionTypeLabel[session.type]}</strong>
                         <span>
                           {formatTimeNoLeadingZero(session.startTime)} - {formatTimeNoLeadingZero(session.endTime)}
                         </span>

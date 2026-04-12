@@ -4,6 +4,7 @@ import type { Activity, DayLog, DemoData, DemoRsvp, RsvpStatus, SessionDoc } fro
 import { isChildMember, sortMembersForDisplay } from "../members/permissions";
 import { subscribeFamilies, subscribeMembers } from "../members/service";
 import type { FamilyRecord, MemberRecord } from "../members/types";
+import { isJournalTargetSession } from "../schedule/sessionMeta";
 import { buildScoreSearchHaystack, normalizeScoreSearchText, tokenizeScoreSearch } from "../scores/search";
 import { formatDateYmd, formatTimeNoLeadingZero, formatWeekdayJa, weekdayTone } from "../utils/date";
 
@@ -593,7 +594,7 @@ export function LogPage({
   const [saveState, setSaveState] = useState<"saving" | "saved" | "error">("saved");
   const day = data.scheduleDays[date];
   const sessions = useMemo(
-    () => [...(day?.sessions ?? [])].sort((a, b) => a.order - b.order),
+    () => [...(day?.sessions ?? [])].filter(isJournalTargetSession).sort((a, b) => a.order - b.order),
     [day],
   );
 

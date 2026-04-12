@@ -1,14 +1,9 @@
 import type { MemberRecord } from "../members/types";
+import { getSessionDisplayTitle, sessionTypeLabel } from "../schedule/sessionMeta";
 import type { DemoData, Todo, TodoKind, TodoSharedScope } from "../types";
 import { formatDateYmd, isValidDateKey, todayDateKey } from "./date";
 
 const SESSION_REF_PREFIX = "session:";
-
-const typeLabel: Record<"normal" | "self" | "event", string> = {
-  normal: "通常練習",
-  self: "自主練",
-  event: "イベント",
-};
 
 const toDateLabel = (dateKey: string): string => dateKey.replace(/-/g, "/");
 
@@ -105,11 +100,7 @@ export const resolveTodoRelatedSummary = (
   if (!parsed) return { label: "📅 予定（不明）", to: null };
   const day = data.scheduleDays[parsed.dateKey];
   const session = day?.sessions.find((item) => item.order === parsed.order);
-  const sessionName = session
-    ? session.type === "event"
-      ? session.eventName ?? typeLabel.event
-      : typeLabel[session.type]
-    : "予定";
+  const sessionName = session ? getSessionDisplayTitle(session) : "予定";
   return {
     label: `📅 ${toDateLabel(parsed.dateKey)} ${sessionName}`,
     to: `/today?date=${parsed.dateKey}`,
@@ -122,8 +113,7 @@ export const buildSessionChoices = (
   const rows: Array<{ id: string; dateKey: string; order: number; label: string }> = [];
   Object.entries(data.scheduleDays).forEach(([dateKey, day]) => {
     day.sessions.forEach((session) => {
-      const name =
-        session.type === "event" ? session.eventName ?? typeLabel.event : typeLabel[session.type];
+      const name = getSessionDisplayTitle(session) || sessionTypeLabel[session.type];
       rows.push({
         id: makeSessionRelatedId(dateKey, session.order),
         dateKey,

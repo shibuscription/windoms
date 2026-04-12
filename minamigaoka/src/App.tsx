@@ -28,6 +28,7 @@ import { AccountingPeriods } from "./pages/Accounting/AccountingPeriods";
 import { AccountingReport } from "./pages/Accounting/AccountingReport";
 import { AccountLedger } from "./pages/Accounting/AccountLedger";
 import { SystemNotificationsPage } from "./pages/SystemNotificationsPage";
+import { isDisplayOnlySessionType } from "./schedule/sessionMeta";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import type {
   DayLog,
@@ -1081,6 +1082,7 @@ export function App() {
       .flatMap(([dateKey, day]) =>
         (day.sessions ?? [])
           .filter((session) => {
+            if (isDisplayOnlySessionType(session.type)) return false;
             if (session.dutyRequirement !== "duty") return false;
             if (familyId && session.assigneeFamilyId === familyId) return true;
             return familyName !== "" && toFamilyName(session.assigneeNameSnapshot) === familyName;

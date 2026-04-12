@@ -4,12 +4,13 @@ import { LinkifiedText } from "../components/LinkifiedText";
 import { buildFamilyMap, buildMemberIndexes, resolveFamilyNameFromIdentifier } from "../members/familyNameResolver";
 import { subscribeFamilies, subscribeMembers } from "../members/service";
 import type { FamilyRecord, MemberRecord } from "../members/types";
+import { getSessionAssigneeRoleLabel, sessionTypeLabel } from "../schedule/sessionMeta";
 import type { DemoData, EventCarpoolVehicle, EventKind, EventRecord, SessionDoc, Todo } from "../types";
 import { canViewTodoByScope, getTodoTakeoverLabel, sortTodosOpenFirst } from "../utils/todoUtils";
 import { todayDateKey } from "../utils/date";
 
 type DemoMenuRole = "child" | "parent" | "admin";
-type SessionType = "normal" | "self" | "event";
+type SessionType = "normal" | "self" | "event" | "other";
 
 type LinkedSession = {
   id: string;
@@ -45,12 +46,6 @@ type CarpoolVehicleOption = {
 const canManageEvents = (menuRole: DemoMenuRole): boolean => menuRole === "admin";
 
 const toDateLabel = (dateKey: string): string => dateKey.replace(/-/g, "/");
-const typeLabel: Record<SessionType, string> = {
-  normal: "通常練習",
-  self: "自主練",
-  event: "イベント",
-};
-const assigneeRoleLabel = (type: SessionType): string => (type === "self" ? "見守り" : "当番");
 const clubYearFromDateKey = (dateKey: string): number => {
   const year = Number(dateKey.slice(0, 4));
   const month = Number(dateKey.slice(5, 7));
@@ -150,7 +145,7 @@ export function EventsPage({
     const rows: LinkedSession[] = [];
     Object.entries(data.scheduleDays).forEach(([date, day]) => {
       day.sessions
-        .filter((session) => session.type === "event")
+        .filter((session) => session.type === "event" || session.type === "other")
         .forEach((session) => {
           rows.push(toLinkedSession(date, session));
         });
@@ -687,16 +682,18 @@ export function EventsPage({
             <div className="calendar-day-sheet-list">
               {linkedSessions.map((session) => (
                 <article key={session.id} className={`session-card ${session.type}`}>
-                  <span className={`session-type-badge ${session.type}`}>{session.type === "event" ? "イベント" : typeLabel[session.type]}</span>
+                  <span className={`session-type-badge ${session.type}`}>{sessionTypeLabel[session.type]}</span>
                   <div className="calendar-day-sheet-main session-card-body">
                     <p className="calendar-day-sheet-time session-time">
                       {toDateLabel(session.date)} {session.startTime}-{session.endTime}
                     </p>
                     {session.type === "event" && session.eventName && <p className="calendar-day-sheet-meta">{session.eventName}</p>}
-                    <p className="calendar-day-sheet-label kv-row">
-                      <span className="kv-key">{assigneeRoleLabel(session.type)}：</span>
-                      <span className="kv-val shift-role">{session.dutyName ?? "-"}</span>
-                    </p>
+                    {getSessionAssigneeRoleLabel(session) && (
+                      <p className="calendar-day-sheet-label kv-row">
+                        <span className="kv-key">{getSessionAssigneeRoleLabel(session)}：</span>
+                        <span className="kv-val shift-role">{session.dutyName ?? "-"}</span>
+                      </p>
+                    )}
                     {session.location && (
                       <p className="calendar-day-sheet-meta kv-row">
                         <span className="kv-key">場所：</span>
@@ -734,12 +731,12 @@ export function EventsPage({
             <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={() => setIsSessionBindModalOpen(false)}>
               ×
             </button>
-              <h3>イベント予定を選択</h3>
+              <h3>関連予定を選択</h3>
               <p className="modal-context">{selectedEvent.title}</p>
               <div className="calendar-day-sheet-list">
               {bindableEventSessions.map((session) => (
-                <article key={`bind-${session.id}`} className="session-card event">
-                  <span className="session-type-badge event">イベント</span>
+                <article key={`bind-${session.id}`} className={`session-card ${session.type}`}>
+                  <span className={`session-type-badge ${session.type}`}>{sessionTypeLabel[session.type]}</span>
                   <div className="calendar-day-sheet-main session-card-body">
                     <p className="calendar-day-sheet-time session-time">
                       {toDateLabel(session.date)} {session.startTime}-{session.endTime}
@@ -763,7 +760,7 @@ export function EventsPage({
                   </div>
                 </article>
               ))}
-              {bindableEventSessions.length === 0 && <p className="muted">紐付け可能なイベント予定はありません。</p>}
+              {bindableEventSessions.length === 0 && <p className="muted">紐付け可能な予定はありません。</p>}
             </div>
             <div className="modal-actions">
               <button type="button" className="button button-small" onClick={() => setIsSessionBindModalOpen(false)}>

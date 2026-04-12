@@ -4450,6 +4450,11 @@ body {
   border-left-color: #db2777;
 }
 
+.calendar-event.other {
+  border-left-color: #6b7280;
+  background: rgba(226, 232, 240, 0.8);
+}
+
 .calendar-event-time {
   flex: 0 0 auto;
 }
@@ -4672,6 +4677,11 @@ body {
   background: #fdf2f8;
 }
 
+.session-card.other {
+  border-left-color: #6b7280;
+  background: #f5f6f8;
+}
+
 .session-time {
   font-size: 1.05rem;
   font-weight: 700;
@@ -4754,6 +4764,10 @@ body {
 
 .session-type-badge.event {
   background: #db2777;
+}
+
+.session-type-badge.other {
+  background: #6b7280;
 }
 
 .session-card-actions-top {

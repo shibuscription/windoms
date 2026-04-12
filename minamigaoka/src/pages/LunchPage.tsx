@@ -19,6 +19,7 @@ import {
   resolveMemberByIdentifier,
   trimFamilySuffix as trimFamilySuffixFromMembers,
 } from "../members/familyNameResolver";
+import { isDisplayOnlySessionType } from "../schedule/sessionMeta";
 import { toDemoFamilyName } from "../utils/demoName";
 
 type LunchPageProps = {
@@ -284,6 +285,7 @@ export function LunchPage({
         day.sessions
           .filter(
             (session) =>
+              !isDisplayOnlySessionType(session.type) &&
               (session.dutyRequirement === "duty" || session.dutyRequirement === "watch") &&
               session.startTime >= "12:00" &&
               (weekdayTone(dateKey) === "sat" || weekdayTone(dateKey) === "sun"),
@@ -344,6 +346,7 @@ export function LunchPage({
     const day = data.scheduleDays[dateKey];
     const session = day?.sessions.find(
       (item) =>
+        !isDisplayOnlySessionType(item.type) &&
         (item.dutyRequirement === "duty" || item.dutyRequirement === "watch") &&
         item.startTime >= "12:00" &&
         (weekdayTone(dateKey) === "sat" || weekdayTone(dateKey) === "sun"),

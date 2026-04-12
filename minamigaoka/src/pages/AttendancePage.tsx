@@ -13,6 +13,7 @@ import {
 import { isChildMember, sortMembersForDisplay } from "../members/permissions";
 import { subscribeMemberRelations, subscribeMembers } from "../members/service";
 import type { MemberRecord, MemberRelationRecord } from "../members/types";
+import { isAttendanceTargetSession, sessionTypeLabel } from "../schedule/sessionMeta";
 import type { DemoData, RsvpStatus, SessionDoc } from "../types";
 import {
   formatDateYmd,
@@ -101,12 +102,6 @@ const statusButtonMeta: Array<{ status: RsvpStatus; symbol: string; label: strin
   { status: "no", symbol: TEXT.statusNo, label: TEXT.statusNoLabel },
 ];
 
-const sessionTypeLabel: Record<SessionDoc["type"], string> = {
-  normal: "\u901a\u5e38\u7df4\u7fd2",
-  self: "\u81ea\u4e3b\u7df4",
-  event: "\u30a4\u30d9\u30f3\u30c8",
-};
-
 const makeSessionKey = (item: AttendanceSessionItem): string =>
   item.session.id ? `${item.date}:${item.session.id}` : `${item.date}:${item.session.order}`;
 
@@ -135,7 +130,7 @@ const getAttendanceMemberNameLines = (member: MemberRecord): [string, string?] =
 const buildMonthSessions = (data: DemoData, monthKey: string): AttendanceSessionItem[] => {
   const items = Object.entries(data.scheduleDays).flatMap(([date, day]) => {
     if (getMonthKeyFromDateKey(date) !== monthKey) return [];
-    return day.sessions.map((session) => ({
+    return day.sessions.filter(isAttendanceTargetSession).map((session) => ({
       key: session.id ? `${date}:${session.id}` : `${date}:${session.order}`,
       date,
       session,

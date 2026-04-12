@@ -26,7 +26,7 @@ const normalizeLoginId = (value: string): string => value.trim().toLowerCase();
 const loginIdPattern = /^[a-z0-9_-]{4,20}$/;
 const dateKeyPattern = /^\d{4}-\d{2}-\d{2}$/;
 const timePattern = /^([01]\d|2[0-3]):([0-5]\d)$/;
-const calendarSessionTypes = new Set(["normal", "self", "event"]);
+const calendarSessionTypes = new Set(["normal", "self", "event", "other"]);
 const toInternalAuthEmail = (loginId: string): string =>
   `${normalizeLoginId(loginId)}@${internalEmailDomain}`;
 const getLoginIdValidationMessage = (loginId: string): string =>
@@ -121,7 +121,8 @@ const getOrCreateCalendarIcsToken = async (): Promise<string> => {
 };
 
 const getCalendarSessionTitle = (session: Record<string, unknown>): string => {
-  const type = session.type === "self" || session.type === "event" ? session.type : "normal";
+  const type =
+    session.type === "self" || session.type === "event" || session.type === "other" ? session.type : "normal";
   const assigneeName =
     typeof session.assigneeNameSnapshot === "string" ? session.assigneeNameSnapshot.trim() : "";
   const eventName = typeof session.eventName === "string" ? session.eventName.trim() : "";
@@ -131,6 +132,9 @@ const getCalendarSessionTitle = (session: Record<string, unknown>): string => {
   }
   if (type === "event") {
     return assigneeName ? `【吹奏楽】 ${eventName} ${assigneeName}` : `【吹奏楽】 ${eventName}`;
+  }
+  if (type === "other") {
+    return "【吹奏楽】 その他";
   }
   return assigneeName ? `【吹奏楽】 ${assigneeName}` : "【吹奏楽】 通常練習";
 };
@@ -306,7 +310,7 @@ type CalendarSessionPayload = {
   sessionId: string;
   startTime: string;
   endTime: string;
-  type: "normal" | "self" | "event";
+  type: "normal" | "self" | "event" | "other";
   eventName: string;
   location: string;
   assigneeFamilyId: string;
@@ -326,7 +330,11 @@ const parseCalendarSessionPayload = (
   const startTime = normalizeOptionalString(data.startTime);
   const endTime = normalizeOptionalString(data.endTime);
   const typeValue = normalizeOptionalString(data.type);
-  const type = (calendarSessionTypes.has(typeValue) ? typeValue : "normal") as "normal" | "self" | "event";
+  const type = (calendarSessionTypes.has(typeValue) ? typeValue : "normal") as
+    | "normal"
+    | "self"
+    | "event"
+    | "other";
   const eventName = normalizeOptionalString(data.eventName);
   const location = normalizeOptionalString(data.location);
   const assigneeFamilyId = normalizeOptionalString(data.assigneeFamilyId);
@@ -982,12 +990,12 @@ export const createCalendarSession = onCall(async (request) => {
     endTime: payload.endTime,
     type: payload.type,
     eventName: payload.type === "event" ? payload.eventName : "",
-    dutyRequirement: payload.type === "self" ? "watch" : "duty",
-    requiresShift: payload.type !== "self",
+    dutyRequirement: payload.type === "self" || payload.type === "other" ? "watch" : "duty",
+    requiresShift: payload.type !== "self" && payload.type !== "other",
     location: payload.location,
-    assigneeFamilyId: payload.assigneeFamilyId,
+    assigneeFamilyId: payload.type === "other" ? "" : payload.assigneeFamilyId,
     assignees: [],
-    assigneeNameSnapshot,
+    assigneeNameSnapshot: payload.type === "other" ? "" : assigneeNameSnapshot,
     note: payload.note,
     mainInstructorPlanned: payload.mainInstructorPlanned,
     updatedAt: new Date(),
@@ -1033,11 +1041,11 @@ export const updateCalendarSession = onCall(async (request) => {
     endTime: payload.endTime,
     type: payload.type,
     eventName: payload.type === "event" ? payload.eventName : "",
-    dutyRequirement: payload.type === "self" ? "watch" : "duty",
-    requiresShift: payload.type !== "self",
+    dutyRequirement: payload.type === "self" || payload.type === "other" ? "watch" : "duty",
+    requiresShift: payload.type !== "self" && payload.type !== "other",
     location: payload.location,
-    assigneeFamilyId: payload.assigneeFamilyId,
-    assigneeNameSnapshot,
+    assigneeFamilyId: payload.type === "other" ? "" : payload.assigneeFamilyId,
+    assigneeNameSnapshot: payload.type === "other" ? "" : assigneeNameSnapshot,
     note: payload.note,
     mainInstructorPlanned: payload.mainInstructorPlanned,
     updatedAt: new Date(),

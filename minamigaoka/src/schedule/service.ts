@@ -10,7 +10,7 @@ import type {
   SessionDoc,
 } from "../types";
 
-type EditableSessionType = "normal" | "self" | "event";
+type EditableSessionType = "normal" | "self" | "event" | "other";
 
 export type SaveCalendarSessionInput = {
   originalDate?: string;
@@ -57,7 +57,7 @@ const ensureFunctions = () => {
 };
 
 const normalizeSessionType = (value: unknown): EditableSessionType => {
-  if (value === "self" || value === "event") return value;
+  if (value === "self" || value === "event" || value === "other") return value;
   return "normal";
 };
 
@@ -68,7 +68,8 @@ const normalizeOptionalBoolean = (value: unknown): boolean | null => {
 };
 
 const toSessionDoc = (id: string, value: Record<string, unknown>): SessionDoc => {
-  const type = value.type === "self" || value.type === "event" ? value.type : "normal";
+  const type =
+    value.type === "self" || value.type === "event" || value.type === "other" ? value.type : "normal";
   const dutyRequirement = value.dutyRequirement === "watch" ? "watch" : "duty";
   return {
     id,

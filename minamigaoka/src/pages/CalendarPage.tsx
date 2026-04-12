@@ -5,6 +5,14 @@ import { DayAttendanceModal } from "../components/DayAttendanceModal";
 import { getBirthdayCelebrants } from "../members/birthday";
 import { sortFamiliesByDisplayOrder } from "../members/familyOrder";
 import {
+  getSessionAssigneeRoleLabel,
+  getSessionDisplayTitle,
+  isAttendanceTargetSession,
+  isJournalTargetSession,
+  sessionTypeLabel,
+  showSessionAssignee,
+} from "../schedule/sessionMeta";
+import {
   createCalendarSession,
   deleteCalendarSession,
   getCalendarIcsSubscriptionUrl,
@@ -33,7 +41,7 @@ type CalendarPageProps = {
   saveTodo: (todo: Todo) => Promise<void>;
 };
 
-type EditableSessionType = "normal" | "self" | "event";
+type EditableSessionType = "normal" | "self" | "event" | "other";
 
 type DaySelection = {
   date: string;
@@ -70,16 +78,11 @@ type AttendanceRow = {
 
 const weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"] as const;
 
-const typeLabel: Record<SessionDoc["type"], string> = {
-  normal: "通常練習",
-  self: "自主練",
-  event: "イベント",
-};
-
 const editableTypeOptions: Array<{ value: EditableSessionType; label: string }> = [
   { value: "normal", label: "通常練習" },
   { value: "self", label: "自主練" },
   { value: "event", label: "イベント" },
+  { value: "other", label: "その他" },
 ];
 
 const BASE_TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
@@ -87,9 +90,6 @@ const BASE_TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
   const minutes = index % 2 === 0 ? "00" : "30";
   return `${String(hours).padStart(2, "0")}:${minutes}`;
 });
-
-const assigneeRoleLabel = (session: SessionDoc): string =>
-  session.type === "self" ? "見守り" : "当番";
 
 const toFamilyName = (name?: string): string => {
   const value = (name ?? "").trim();
@@ -248,7 +248,7 @@ const buildCreateSessionForm = (date: string, sessions: SessionDoc[]): SessionFo
 };
 
 const isEditableSession = (session: SessionDoc): session is SessionDoc & { type: EditableSessionType } =>
-  session.type === "normal" || session.type === "self" || session.type === "event";
+  session.type === "normal" || session.type === "self" || session.type === "event" || session.type === "other";
 
 const toSessionForm = (date: string, session: SessionDoc, families: FamilyRecord[]): SessionFormState => ({
   date,
@@ -259,7 +259,9 @@ const toSessionForm = (date: string, session: SessionDoc, families: FamilyRecord
   eventName: session.eventName ?? "",
   location: session.location ?? "",
   assigneeFamilyId:
-    session.assigneeFamilyId ?? resolveFamilyIdFromSnapshot(families, session.assigneeNameSnapshot),
+    session.type === "other"
+      ? ""
+      : session.assigneeFamilyId ?? resolveFamilyIdFromSnapshot(families, session.assigneeNameSnapshot),
   note: session.note ?? "",
   mainInstructorPlanned: toMainInstructorPlanField(resolveLegacyMainInstructorPlanned(session)),
 });
@@ -294,9 +296,6 @@ const getNextValidEndTime = (startTime: string, currentEndTime?: string): string
   }
   return getNextEndTime(startTime);
 };
-
-const getSessionDisplayTitle = (session: SessionDoc): string =>
-  session.type === "event" && session.eventName?.trim() ? session.eventName.trim() : typeLabel[session.type];
 
 export function CalendarPage({
   data,
@@ -487,6 +486,14 @@ export function CalendarPage({
     () => (birthdayModalDate ? getBirthdayCelebrants(members, birthdayModalDate) : []),
     [birthdayModalDate, members],
   );
+  const selectedDayAttendanceSessions = useMemo(
+    () => selectedDay?.sessions.filter(isAttendanceTargetSession) ?? [],
+    [selectedDay?.sessions],
+  );
+  const selectedDayJournalSessions = useMemo(
+    () => selectedDay?.sessions.filter(isJournalTargetSession) ?? [],
+    [selectedDay?.sessions],
+  );
 
   const timeOptions = useMemo(
     () => buildTimeOptions(sessionForm.startTime, sessionForm.endTime),
@@ -564,7 +571,7 @@ export function CalendarPage({
   };
 
   const openDayLogFromSheet = async () => {
-    if (!selectedDay || selectedDay.sessions.length === 0) return;
+    if (!selectedDay || selectedDayJournalSessions.length === 0) return;
     await ensureDayLog(selectedDay.date);
     navigate(`/logs/${selectedDay.date}`);
   };
@@ -645,6 +652,7 @@ export function CalendarPage({
         ...current,
         [key]: value,
         ...(key === "type" && value !== "event" ? { eventName: "" } : {}),
+        ...(key === "type" && value === "other" ? { assigneeFamilyId: "" } : {}),
       };
 
       if (key === "startTime" && typeof value === "string") {
@@ -680,7 +688,7 @@ export function CalendarPage({
         type: sessionForm.type,
         eventName: sessionForm.eventName,
         location: sessionForm.location,
-        assigneeFamilyId: sessionForm.assigneeFamilyId,
+        assigneeFamilyId: sessionForm.type === "other" ? "" : sessionForm.assigneeFamilyId,
         note: sessionForm.note,
         mainInstructorPlanned: fromMainInstructorPlanField(sessionForm.mainInstructorPlanned),
       };
@@ -853,10 +861,12 @@ export function CalendarPage({
                           {getSessionDisplayTitle(session)}
                         </span>
                       </span>
-                      <span className="calendar-event-duty">
-                        <span className="calendar-event-duty-label">{assigneeRoleLabel(session)}:</span>{" "}
-                        <span className="calendar-event-duty-name">{toFamilyName(session.assigneeNameSnapshot)}</span>
-                      </span>
+                      {showSessionAssignee(session) && (
+                        <span className="calendar-event-duty">
+                          <span className="calendar-event-duty-label">{getSessionAssigneeRoleLabel(session)}:</span>{" "}
+                          <span className="calendar-event-duty-name">{toFamilyName(session.assigneeNameSnapshot)}</span>
+                        </span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -886,7 +896,7 @@ export function CalendarPage({
                 <button type="button" className="button button-small" onClick={goToTodayFromSheet}>
                   Todayへ
                 </button>
-                {selectedDay.sessions.length > 0 && (
+                {selectedDayJournalSessions.length > 0 && (
                   <button
                     type="button"
                     className="button button-small button-secondary"
@@ -920,7 +930,7 @@ export function CalendarPage({
                     className={`session-card ${session.type}`}
                   >
                     <span className={`session-type-badge ${session.type}`}>
-                      {typeLabel[session.type]}
+                      {sessionTypeLabel[session.type]}
                     </span>
                     {editable && (
                       <div className="session-card-actions-top">
@@ -951,10 +961,12 @@ export function CalendarPage({
                         {session.type === "event" && session.eventName?.trim() && (
                           <p className="calendar-day-sheet-meta">{session.eventName}</p>
                         )}
-                      <p className="calendar-day-sheet-label kv-row">
-                        <span className="kv-key">{assigneeRoleLabel(session)}:</span>
-                        <span className="kv-val shift-role">{toFamilyName(session.assigneeNameSnapshot)}</span>
-                      </p>
+                      {showSessionAssignee(session) && (
+                        <p className="calendar-day-sheet-label kv-row">
+                          <span className="kv-key">{getSessionAssigneeRoleLabel(session)}:</span>
+                          <span className="kv-val shift-role">{toFamilyName(session.assigneeNameSnapshot)}</span>
+                        </p>
+                      )}
                       {session.location && (
                         <p className="calendar-day-sheet-meta kv-row">
                           <span className="kv-key">場所:</span>
@@ -967,21 +979,23 @@ export function CalendarPage({
                           <span className="kv-val">{session.note}</span>
                         </p>
                       )}
-                        <p className="calendar-day-sheet-meta kv-row">
-                          <span className="kv-key">出欠:</span>
-                          <span className="kv-val">
-                            <button
-                              type="button"
-                            className="attendance-trigger"
-                            onClick={() => setIsAttendanceModalOpen(true)}
-                          >
-                            <span className="count-yes">○{counts.yes}</span>
-                            <span className="count-maybe">△{counts.maybe}</span>
-                            <span className="count-no">×{counts.no}</span>
-                            <span className="count-unknown">ー{counts.unknown}</span>
-                            </button>
-                          </span>
-                        </p>
+                        {isAttendanceTargetSession(session) && (
+                          <p className="calendar-day-sheet-meta kv-row">
+                            <span className="kv-key">出欠:</span>
+                            <span className="kv-val">
+                              <button
+                                type="button"
+                                className="attendance-trigger"
+                                onClick={() => setIsAttendanceModalOpen(true)}
+                              >
+                                <span className="count-yes">○{counts.yes}</span>
+                                <span className="count-maybe">△{counts.maybe}</span>
+                                <span className="count-no">×{counts.no}</span>
+                                <span className="count-unknown">ー{counts.unknown}</span>
+                              </button>
+                            </span>
+                          </p>
+                        )}
                         {session.id && eventIdBySessionId.get(session.id) && (
                           <div className="calendar-day-sheet-event-link-row">
                             <Link
@@ -1155,22 +1169,24 @@ export function CalendarPage({
               </select>
             </label>
 
-            <label>
-              {sessionForm.type === "self" ? "見守り担当" : "当番担当"}
-              <select
-                value={sessionForm.assigneeFamilyId}
-                onChange={(event) =>
-                  handleSessionFieldChange("assigneeFamilyId", event.target.value)
-                }
-              >
-                <option value="">未割当</option>
-                {familyOptions.map((family) => (
-                  <option key={family.id} value={family.id}>
-                    {family.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {sessionForm.type !== "other" && (
+              <label>
+                {sessionForm.type === "self" ? "見守り担当" : "当番担当"}
+                <select
+                  value={sessionForm.assigneeFamilyId}
+                  onChange={(event) =>
+                    handleSessionFieldChange("assigneeFamilyId", event.target.value)
+                  }
+                >
+                  <option value="">未割当</option>
+                  {familyOptions.map((family) => (
+                    <option key={family.id} value={family.id}>
+                      {family.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
 
             <label>
               メモ
@@ -1255,7 +1271,7 @@ export function CalendarPage({
       {isAttendanceModalOpen && selectedDay && (
         <DayAttendanceModal
           date={selectedDay.date}
-          sessions={selectedDay.sessions}
+          sessions={selectedDayAttendanceSessions}
           dayTransport={data.scheduleDays[selectedDay.date]?.attendanceTransport ?? {}}
           members={members}
           relations={relations}
