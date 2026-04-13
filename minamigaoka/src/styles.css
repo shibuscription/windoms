@@ -2799,7 +2799,15 @@ body {
 }
 
 .recurring-template-count {
+  position: static;
   flex: 0 0 auto;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 6px;
+  line-height: 1.35rem;
+  box-shadow: none;
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .recurring-template-toggle-icon {
