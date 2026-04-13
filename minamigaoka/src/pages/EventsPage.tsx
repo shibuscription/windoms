@@ -139,6 +139,8 @@ export function EventsPage({
   const [families, setFamilies] = useState<FamilyRecord[]>([]);
   const [members, setMembers] = useState<MemberRecord[]>([]);
   const [selectedVehicleKey, setSelectedVehicleKey] = useState("");
+  const [isLinkedSessionsOpen, setIsLinkedSessionsOpen] = useState(false);
+  const [isCarpoolOpen, setIsCarpoolOpen] = useState(false);
   const { eventId } = useParams<{ eventId?: string }>();
   const navigate = useNavigate();
   const today = todayDateKey();
@@ -259,6 +261,11 @@ export function EventsPage({
       setSelectedDoneYear(doneYears[0]);
     }
   }, [defaultClubYear, doneYears, selectedDoneYear]);
+
+  useEffect(() => {
+    setIsLinkedSessionsOpen(false);
+    setIsCarpoolOpen(false);
+  }, [selectedEvent?.id]);
 
   const filteredDoneEvents = useMemo(
     () => doneEvents.filter((item) => clubYearFromDateKey(item.eventSortDate) === selectedDoneYear),
@@ -607,28 +614,6 @@ export function EventsPage({
             </div>
 
             <section className="events-detail-section">
-              <h3>基本情報</h3>
-              <div className="events-detail-meta">
-                <p className="events-detail-meta-row">
-                  <span className="events-detail-meta-label">日付</span>
-                  <span>{toDateLabel(selectedEvent.eventSortDate)}</span>
-                </p>
-                <p className="events-detail-meta-row">
-                  <span className="events-detail-meta-label">タイトル</span>
-                  <span>{selectedEvent.title}</span>
-                </p>
-                <p className="events-detail-meta-row">
-                  <span className="events-detail-meta-label">種別</span>
-                  <span>{selectedEvent.kind}</span>
-                </p>
-                <p className="events-detail-meta-row">
-                  <span className="events-detail-meta-label">状態</span>
-                  <span>{selectedEvent.state === "done" ? "完了" : "進行中"}</span>
-                </p>
-              </div>
-            </section>
-
-            <section className="events-detail-section">
               <h3>メモ / 説明</h3>
               {selectedEvent.memo?.trim() ? (
                 <p className="todo-memo-full">
@@ -691,97 +676,125 @@ export function EventsPage({
             </section>
 
             <section className="events-detail-section">
-              <div className="events-section-header">
-                <h3>紐付け予定</h3>
-                {isManager && (
-                  <button
-                    type="button"
-                    className="button button-small"
-                    aria-label="追加"
-                    title="追加"
-                    onClick={() => setIsSessionBindModalOpen(true)}
-                  >
-                    ＋ 追加
-                  </button>
-                )}
-              </div>
-              <div className="calendar-day-sheet-list">
-                {linkedSessions.map((session) => (
-                  <article key={session.id} className={`session-card ${session.type}`}>
-                    <span className={`session-type-badge ${session.type}`}>{sessionTypeLabel[session.type]}</span>
-                    <div className="calendar-day-sheet-main session-card-body">
-                      <p className="calendar-day-sheet-time session-time">
-                        {toDateLabel(session.date)} {session.startTime}-{session.endTime}
-                      </p>
-                      {(session.type === "event" || session.type === "other") && session.eventName && (
-                        <p className="calendar-day-sheet-meta">{session.eventName}</p>
-                      )}
-                      {getSessionAssigneeRoleLabel(session) && (
-                        <p className="calendar-day-sheet-label kv-row">
-                          <span className="kv-key">{getSessionAssigneeRoleLabel(session)}：</span>
-                          <span className="kv-val shift-role">{session.dutyName ?? "-"}</span>
-                        </p>
-                      )}
-                      {session.location && (
-                        <p className="calendar-day-sheet-meta kv-row">
-                          <span className="kv-key">場所：</span>
-                          <span className="kv-val">{session.location}</span>
-                        </p>
-                      )}
-                      {isManager && (
-                        <div className="events-linked-session-actions">
-                          <button
-                            type="button"
-                            className="events-unlink-button"
-                            onClick={() => setUnlinkTargetSessionId(session.id)}
-                          >
-                            解除
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </article>
-                ))}
-                {linkedSessions.length === 0 && <p className="muted">紐付け予定はありません。</p>}
-              </div>
-            </section>
-
-            <section className="events-detail-section">
-              <h3>配車</h3>
-              {selectedEventCarpoolVehicles.length > 0 ? (
+              <button
+                type="button"
+                className="events-collapsible-toggle"
+                aria-expanded={isLinkedSessionsOpen}
+                onClick={() => setIsLinkedSessionsOpen((current) => !current)}
+              >
+                <span className="events-collapsible-heading">紐付け予定</span>
+                <span className="events-collapsible-meta">{linkedSessions.length}件</span>
+                <span className={`events-collapsible-icon ${isLinkedSessionsOpen ? "open" : ""}`} aria-hidden="true">
+                  ▾
+                </span>
+              </button>
+              {isLinkedSessionsOpen && (
                 <>
-                  <div className="events-carpool-list">
-                    {selectedEventCarpoolVehicles.map((vehicle) => (
-                      <article key={`${vehicle.familyId}:${vehicle.vehicleIndex}`} className="events-carpool-row">
-                        <div>
-                          <p className="events-carpool-name">
-                            {toVehicleLabel(
-                              resolveFamilyNameFromIdentifier({
-                                identifier: vehicle.familyId,
-                                memberIndexes,
-                                familiesById,
-                                fallback: vehicle.familyNameSnapshot || "名称未設定",
-                              }) || vehicle.familyNameSnapshot || "名称未設定",
-                              vehicle.maker,
-                              vehicle.model,
-                            )}
+                  {isManager && (
+                    <div className="events-section-header">
+                      <span className="muted">紐付け予定を追加・解除できます。</span>
+                      <button
+                        type="button"
+                        className="button button-small"
+                        aria-label="追加"
+                        title="追加"
+                        onClick={() => setIsSessionBindModalOpen(true)}
+                      >
+                        ＋ 追加
+                      </button>
+                    </div>
+                  )}
+                  <div className="calendar-day-sheet-list">
+                    {linkedSessions.map((session) => (
+                      <article key={session.id} className={`session-card ${session.type}`}>
+                        <span className={`session-type-badge ${session.type}`}>{sessionTypeLabel[session.type]}</span>
+                        <div className="calendar-day-sheet-main session-card-body">
+                          <p className="calendar-day-sheet-time session-time">
+                            {toDateLabel(session.date)} {session.startTime}-{session.endTime}
                           </p>
-                          <p className="events-carpool-capacity">
-                            乗車定員（運転手除く）: {toPassengerCapacity(vehicle.capacity)}人
-                          </p>
-                          <p className="events-carpool-direction">対応: {toCarpoolDirectionLabel(vehicle)}</p>
+                          {(session.type === "event" || session.type === "other") && session.eventName && (
+                            <p className="calendar-day-sheet-meta">{session.eventName}</p>
+                          )}
+                          {getSessionAssigneeRoleLabel(session) && (
+                            <p className="calendar-day-sheet-label kv-row">
+                              <span className="kv-key">{getSessionAssigneeRoleLabel(session)}：</span>
+                              <span className="kv-val shift-role">{session.dutyName ?? "-"}</span>
+                            </p>
+                          )}
+                          {session.location && (
+                            <p className="calendar-day-sheet-meta kv-row">
+                              <span className="kv-key">場所：</span>
+                              <span className="kv-val">{session.location}</span>
+                            </p>
+                          )}
+                          {isManager && (
+                            <div className="events-linked-session-actions">
+                              <button
+                                type="button"
+                                className="events-unlink-button"
+                                onClick={() => setUnlinkTargetSessionId(session.id)}
+                              >
+                                解除
+                              </button>
+                            </div>
+                          )}
                         </div>
                       </article>
                     ))}
-                  </div>
-                  <div className="events-carpool-summary">
-                    <p className="events-carpool-total">行き合計人数: {selectedEventCarpoolCapacitySummary.outbound}人</p>
-                    <p className="events-carpool-total">帰り合計人数: {selectedEventCarpoolCapacitySummary.return}人</p>
+                    {linkedSessions.length === 0 && <p className="muted">紐付け予定はありません。</p>}
                   </div>
                 </>
-              ) : (
-                <p className="muted">配車はありません。</p>
               )}
+            </section>
+
+            <section className="events-detail-section">
+              <button
+                type="button"
+                className="events-collapsible-toggle"
+                aria-expanded={isCarpoolOpen}
+                onClick={() => setIsCarpoolOpen((current) => !current)}
+              >
+                <span className="events-collapsible-heading">配車</span>
+                <span className="events-collapsible-meta">{selectedEventCarpoolVehicles.length}台</span>
+                <span className={`events-collapsible-icon ${isCarpoolOpen ? "open" : ""}`} aria-hidden="true">
+                  ▾
+                </span>
+              </button>
+              {isCarpoolOpen &&
+                (selectedEventCarpoolVehicles.length > 0 ? (
+                  <>
+                    <div className="events-carpool-list">
+                      {selectedEventCarpoolVehicles.map((vehicle) => (
+                        <article key={`${vehicle.familyId}:${vehicle.vehicleIndex}`} className="events-carpool-row">
+                          <div>
+                            <p className="events-carpool-name">
+                              {toVehicleLabel(
+                                resolveFamilyNameFromIdentifier({
+                                  identifier: vehicle.familyId,
+                                  memberIndexes,
+                                  familiesById,
+                                  fallback: vehicle.familyNameSnapshot || "名称未設定",
+                                }) || vehicle.familyNameSnapshot || "名称未設定",
+                                vehicle.maker,
+                                vehicle.model,
+                              )}
+                            </p>
+                            <p className="events-carpool-capacity">
+                              乗車定員（運転手除く）: {toPassengerCapacity(vehicle.capacity)}人
+                            </p>
+                            <p className="events-carpool-direction">対応: {toCarpoolDirectionLabel(vehicle)}</p>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                    <div className="events-carpool-summary">
+                      <p className="events-carpool-total">行き合計人数: {selectedEventCarpoolCapacitySummary.outbound}人</p>
+                      <p className="events-carpool-total">帰り合計人数: {selectedEventCarpoolCapacitySummary.return}人</p>
+                    </div>
+                  </>
+                ) : (
+                  <p className="muted">配車はありません。</p>
+                ))}
             </section>
           </article>
         </div>
