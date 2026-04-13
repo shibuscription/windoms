@@ -1224,6 +1224,15 @@ body {
   width: min(560px, calc(100vw - 24px));
 }
 
+.events-content {
+  display: grid;
+  gap: 16px;
+}
+
+.events-content.has-detail {
+  align-items: start;
+}
+
 .events-linked-header {
   display: flex;
   align-items: center;
@@ -1294,6 +1303,80 @@ body {
   margin-top: 2px;
 }
 
+.events-detail-page {
+  border: 1px solid #d6dde8;
+  border-radius: 16px;
+  background: #fff;
+  padding: 16px;
+  display: grid;
+  gap: 16px;
+  align-self: start;
+}
+
+.events-detail-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.events-detail-page-heading {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.events-detail-page-heading h2 {
+  margin: 0;
+  font-size: 1.45rem;
+  color: #0f172a;
+}
+
+.events-detail-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.events-detail-section {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.events-detail-section h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.events-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.events-detail-meta {
+  display: grid;
+  gap: 8px;
+}
+
+.events-detail-meta-row {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.events-detail-meta-label {
+  color: #64748b;
+  font-size: 0.88rem;
+}
+
 .events-complete-button {
   background: #15803d;
   color: #fff;
@@ -1315,6 +1398,11 @@ body {
 .event-card {
   position: relative;
   padding-top: 10px;
+}
+
+.event-card.active {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 1px #bfdbfe;
 }
 
 .event-card-actions {
@@ -1470,6 +1558,38 @@ body {
 
 .events-carpool-toggle input {
   margin: 0;
+}
+
+@media (min-width: 980px) {
+  .events-content.has-detail {
+    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  }
+
+  .events-content.has-detail .events-list {
+    position: sticky;
+    top: 84px;
+  }
+}
+
+@media (max-width: 767px) {
+  .events-detail-page {
+    padding: 14px;
+  }
+
+  .events-detail-page-header,
+  .events-section-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .events-detail-page-actions {
+    justify-content: flex-start;
+  }
+
+  .events-detail-meta-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
 }
 
 .events-todo-item {
@@ -2865,6 +2985,7 @@ body {
   gap: 8px;
 }
 
+.related-todos-block h3,
 .related-todos-block h4 {
   margin: 0;
   font-size: 0.92rem;
