@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall, onRequest } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { setGlobalOptions } from "firebase-functions/v2";
@@ -238,6 +239,157 @@ const normalizeSharedTodoScopes = (value: Record<string, unknown>): string[] => 
       ? value.sharedScope
       : "";
   return legacyScope ? [legacyScope] : [];
+};
+
+const buildAutoNotificationDocId = (sourceModule: string, sourceRecordId: string): string =>
+  `auto_${sourceModule}_${sourceRecordId}`;
+
+const toJstCurrencyLabel = (value: unknown): string => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return `${value.toLocaleString("ja-JP")}円`;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return `${parsed.toLocaleString("ja-JP")}円`;
+    }
+  }
+  return "未設定";
+};
+
+const getMemberDisplayNameFromData = (value: Record<string, unknown> | undefined): string => {
+  if (!value) return "";
+  const displayName = normalizeOptionalString(value.displayName);
+  if (displayName) return displayName;
+  const name = normalizeOptionalString(value.name);
+  if (name) return name;
+  const familyName = normalizeOptionalString(value.familyName);
+  const givenName = normalizeOptionalString(value.givenName);
+  return `${familyName}${givenName}`.trim();
+};
+
+const resolveMemberDisplayNameByIdentifier = async (identifier: string): Promise<string> => {
+  const normalizedIdentifier = normalizeOptionalString(identifier);
+  if (!normalizedIdentifier) return "";
+
+  const directSnapshot = await firestore.collection("members").doc(normalizedIdentifier).get();
+  if (directSnapshot.exists) {
+    const directName = getMemberDisplayNameFromData(directSnapshot.data() as Record<string, unknown> | undefined);
+    if (directName) return directName;
+  }
+
+  const authUidSnapshot = await firestore
+    .collection("members")
+    .where("authUid", "==", normalizedIdentifier)
+    .limit(1)
+    .get();
+  const authUidName = getMemberDisplayNameFromData(
+    authUidSnapshot.docs[0]?.data() as Record<string, unknown> | undefined,
+  );
+  if (authUidName) return authUidName;
+
+  const loginIdSnapshot = await firestore
+    .collection("members")
+    .where("loginId", "==", normalizeLoginId(normalizedIdentifier))
+    .limit(1)
+    .get();
+  return getMemberDisplayNameFromData(
+    loginIdSnapshot.docs[0]?.data() as Record<string, unknown> | undefined,
+  );
+};
+
+const loadAccountingNotificationRecipients = async (): Promise<string[]> => {
+  const membersSnapshot = await firestore.collection("members").get();
+  return Array.from(
+    new Set(
+      membersSnapshot.docs
+        .map((doc) => doc.data() as Record<string, unknown>)
+        .filter((value) => {
+          const authUid = normalizeOptionalString(value.authUid);
+          const memberStatus = normalizeOptionalString(value.memberStatus || value.status);
+          const adminRole = normalizeOptionalString(value.adminRole);
+          const role = normalizeOptionalString(value.role);
+          const rawStaffPermissions = Array.isArray(value.staffPermissions)
+            ? value.staffPermissions.filter((item): item is string => typeof item === "string")
+            : [];
+          return (
+            authUid &&
+            memberStatus !== "inactive" &&
+            (role === "admin" || adminRole === "admin" || rawStaffPermissions.includes("accounting"))
+          );
+        })
+        .map((value) => normalizeOptionalString(value.authUid))
+        .filter(Boolean),
+    ),
+  );
+};
+
+type AutoNotificationInput = {
+  sourceModule: string;
+  sourceEvent: string;
+  sourceRecordId: string;
+  title: string;
+  body: string;
+  senderUid?: string;
+  senderName?: string;
+};
+
+const writeAutoNotifications = async (input: AutoNotificationInput): Promise<void> => {
+  const recipientUids = await loadAccountingNotificationRecipients();
+  if (recipientUids.length === 0) {
+    logger.info("auto notification skipped because no recipients were found", {
+      sourceModule: input.sourceModule,
+      sourceEvent: input.sourceEvent,
+      sourceRecordId: input.sourceRecordId,
+    });
+    return;
+  }
+
+  const notificationId = buildAutoNotificationDocId(input.sourceModule, input.sourceRecordId);
+  const historyRef = firestore.collection("notificationHistory").doc(notificationId);
+  const batch = firestore.batch();
+
+  batch.set(historyRef, {
+    kind: "auto",
+    sourceModule: input.sourceModule,
+    sourceEvent: input.sourceEvent,
+    title: input.title,
+    body: input.body,
+    targetType: "individual",
+    targetSummary: "管理者・会計担当者",
+    targetUserIds: recipientUids,
+    recipientCount: recipientUids.length,
+    createdAt: new Date(),
+    createdByUid: input.senderUid?.trim() ?? "",
+    createdByName: input.senderName?.trim() ?? "",
+    isCancelable: false,
+    sourceRecordId: input.sourceRecordId,
+    canceledAt: null,
+    canceledByUid: "",
+    canceledByName: "",
+  });
+
+  recipientUids.forEach((uid) => {
+    batch.set(firestore.collection("users").doc(uid).collection("notifications").doc(notificationId), {
+      type: "system",
+      title: input.title,
+      body: input.body,
+      isRead: false,
+      readAt: null,
+      status: "active",
+      resolvedAt: null,
+      createdAt: new Date(),
+      sourceModule: input.sourceModule,
+      sourceEvent: input.sourceEvent,
+      sourceRecordId: input.sourceRecordId,
+      linkType: "none",
+      linkUrl: "",
+      senderUid: input.senderUid?.trim() ?? "",
+      senderName: input.senderName?.trim() ?? "",
+    });
+  });
+
+  await batch.commit();
 };
 
 const getJstDateParts = (base = new Date()) => {
@@ -1170,6 +1322,68 @@ export const deleteCalendarSession = onCall(async (request) => {
     sessionId: payload.sessionId,
   };
 });
+
+export const notifyPurchaseRequestCreated = onDocumentCreated(
+  {
+    document: "purchaseRequests/{purchaseRequestId}",
+    region: functionsRegion,
+  },
+  async (event) => {
+    const snapshot = event.data;
+    if (!snapshot) return;
+
+    const value = snapshot.data() as Record<string, unknown>;
+    const title = normalizeOptionalString(value.title);
+    const createdBy = normalizeOptionalString(value.createdBy);
+    const senderName = (await resolveMemberDisplayNameByIdentifier(createdBy)) || createdBy || "不明";
+
+    await writeAutoNotifications({
+      sourceModule: "purchaseRequests",
+      sourceEvent: "purchase_request_created",
+      sourceRecordId: snapshot.id,
+      title: "購入依頼が追加されました",
+      body: [
+        `件名: ${title || "（未設定）"}`,
+        `依頼者: ${senderName || "不明"}`,
+        `金額: ${toJstCurrencyLabel(value.estimatedAmount)}`,
+      ].join("\n"),
+      senderUid: createdBy,
+      senderName,
+    });
+  },
+);
+
+export const notifyReimbursementCreated = onDocumentCreated(
+  {
+    document: "reimbursements/{reimbursementId}",
+    region: functionsRegion,
+  },
+  async (event) => {
+    const snapshot = event.data;
+    if (!snapshot) return;
+
+    const value = snapshot.data() as Record<string, unknown>;
+    const title = normalizeOptionalString(value.title);
+    const buyer = normalizeOptionalString(value.buyer);
+    const senderName = (await resolveMemberDisplayNameByIdentifier(buyer)) || buyer || "不明";
+    const source = normalizeOptionalString(value.source);
+
+    await writeAutoNotifications({
+      sourceModule: "reimbursements",
+      sourceEvent: "reimbursement_created",
+      sourceRecordId: snapshot.id,
+      title: "立替が追加されました",
+      body: [
+        `件名: ${title || "（未設定）"}`,
+        `購入者: ${senderName || "不明"}`,
+        `金額: ${toJstCurrencyLabel(value.amount)}`,
+        ...(source === "lunch" ? ["由来: お弁当"] : []),
+      ].join("\n"),
+      senderUid: buyer,
+      senderName,
+    });
+  },
+);
 
 export const generateRecurringTodos = onSchedule(
   {
