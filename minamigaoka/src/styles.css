@@ -1555,13 +1555,6 @@ body {
   margin: 0;
 }
 
-@media (min-width: 980px) {
-  .events-detail-standalone {
-    max-width: 960px;
-    margin: 0 auto;
-  }
-}
-
 @media (max-width: 767px) {
   .events-detail-page {
     padding: 14px;
