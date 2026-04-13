@@ -266,6 +266,19 @@ const recurringOccurrenceKey = (templateId: string, yearMonth: string) => `${tem
 const recurringTodoDocId = (templateId: string, compactYearMonth: string) =>
   `recurring_${templateId}_${compactYearMonth}`;
 
+const getRecurringExecutionDayOfMonth = (year: string, month: string, dayOfMonth: number): number => {
+  const numericYear = Number(year);
+  const numericMonth = Number(month);
+  if (!Number.isInteger(numericYear) || !Number.isInteger(numericMonth)) {
+    return dayOfMonth;
+  }
+  const lastDay = new Date(Date.UTC(numericYear, numericMonth, 0)).getUTCDate();
+  if (!Number.isInteger(lastDay) || lastDay < 1) {
+    return dayOfMonth;
+  }
+  return Math.min(Math.max(dayOfMonth, 1), lastDay);
+};
+
 const toFamilyDisplayName = (familyName: string): string => {
   const value = familyName.trim();
   if (!value) return "";
@@ -1164,7 +1177,7 @@ export const generateRecurringTodos = onSchedule(
     timeZone: "Asia/Tokyo",
   },
   async () => {
-    const { dateKey, dayOfMonth, yearMonth, compactYearMonth } = getJstDateParts();
+    const { year, month, dateKey, dayOfMonth, yearMonth, compactYearMonth } = getJstDateParts();
     const templatesSnapshot = await firestore
       .collection("recurringTodoTemplates")
       .where("isActive", "==", true)
@@ -1179,7 +1192,12 @@ export const generateRecurringTodos = onSchedule(
         typeof value.dayOfMonth === "number" && Number.isFinite(value.dayOfMonth)
           ? value.dayOfMonth
           : Number(normalizeOptionalString(value.dayOfMonth));
-      if (!Number.isInteger(templateDayOfMonth) || templateDayOfMonth !== dayOfMonth) {
+      if (!Number.isInteger(templateDayOfMonth)) {
+        skippedCount += 1;
+        continue;
+      }
+      const executionDayOfMonth = getRecurringExecutionDayOfMonth(year, month, templateDayOfMonth);
+      if (executionDayOfMonth !== dayOfMonth) {
         skippedCount += 1;
         continue;
       }

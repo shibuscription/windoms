@@ -2772,12 +2772,32 @@ body {
   gap: 10px;
 }
 
+.recurring-template-header {
+  align-items: flex-start;
+}
+
 .recurring-template-list {
   gap: 8px;
 }
 
+.recurring-template-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.recurring-template-row .todo-main {
+  gap: 6px;
+}
+
 .recurring-template-row .todo-actions {
+  align-items: flex-start;
   flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 220px;
+}
+
+.recurring-template-row .todo-actions > .button.button-small {
+  white-space: nowrap;
 }
 
 .todos-related-modal {

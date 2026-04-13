@@ -72,6 +72,14 @@ type RecurringTemplateDraft = {
   isActive: boolean;
 };
 
+const recurringDayOptions = Array.from({ length: 31 }, (_, index) => {
+  const day = index + 1;
+  return {
+    value: String(day),
+    label: `${day}日`,
+  };
+});
+
 const sharedScopeLabels: Record<TodoSharedScope, string> = {
   parent: "保護者",
   officer: "役員",
@@ -123,6 +131,9 @@ const createRecurringTemplateDraft = (
   dayOfMonth: "1",
   isActive: true,
 });
+
+const formatRecurringDayLabel = (dayOfMonth: number): string =>
+  dayOfMonth >= 29 ? `毎月 ${dayOfMonth}日（ない月は末日）` : `毎月 ${dayOfMonth}日`;
 
 const recurringTemplateDraftFromTemplate = (
   template: RecurringTodoTemplate,
@@ -318,7 +329,7 @@ export function TodosPage({
     if (!draft.title.trim()) errors.title = "タイトルは必須です";
     const dayOfMonth = Number(draft.dayOfMonth);
     if (!Number.isInteger(dayOfMonth) || dayOfMonth < 1 || dayOfMonth > 31) {
-      errors.dayOfMonth = "毎月の日付は 1〜31 で入力してください";
+      errors.dayOfMonth = "毎月の日付を選択してください";
     }
     if (draft.kind === "shared" && draft.sharedScopes.length === 0) {
       errors.sharedScopes = "共有対象を1件以上選択してください";
@@ -647,11 +658,6 @@ export function TodosPage({
       <div className="todos-header">
         <h1>TODO</h1>
         <div className="todos-header-actions">
-          {canManageRecurringTemplates && (
-            <button type="button" className="button button-small button-secondary" onClick={openCreateRecurringModal}>
-              定例TODO追加
-            </button>
-          )}
           <button
             type="button"
             className="button button-small"
@@ -670,8 +676,11 @@ export function TodosPage({
 
       {canManageRecurringTemplates && (
         <section className="todos-section recurring-templates-section">
-          <div className="todos-filter-header">
+          <div className="todos-filter-header recurring-template-header">
             <h2>定例TODOテンプレート</h2>
+            <button type="button" className="button button-small button-secondary" onClick={openCreateRecurringModal}>
+              定例TODO追加
+            </button>
           </div>
           <div className="todos-list recurring-template-list">
             {recurringTemplates.map((template) => (
@@ -680,7 +689,7 @@ export function TodosPage({
                   <p className="todo-title">{template.title}</p>
                   <p className="todo-meta">
                     <span>{template.kind === "shared" ? "共有TODO" : "個人TODO"}</span>
-                    <span>毎月 {template.dayOfMonth} 日</span>
+                    <span>{formatRecurringDayLabel(template.dayOfMonth)}</span>
                     <span>{template.isActive ? "有効" : "無効"}</span>
                   </p>
                   {template.kind === "shared" && (
@@ -1149,20 +1158,24 @@ export function TodosPage({
                   }),
                 recurringErrors.sharedScopes,
               )}
-            <label>
-              毎月の日付
-              <input
-                type="number"
-                min={1}
-                max={31}
-                value={recurringDraft.dayOfMonth}
-                onChange={(event) => setRecurringDraft((prev) => ({ ...prev, dayOfMonth: event.target.value }))}
-              />
-              {recurringErrors.dayOfMonth && <span className="field-error">{recurringErrors.dayOfMonth}</span>}
-            </label>
-            <label className="todo-completed-toggle">
-              <input
-                type="checkbox"
+              <label>
+                毎月の日付
+                <select
+                  value={recurringDraft.dayOfMonth}
+                  onChange={(event) => setRecurringDraft((prev) => ({ ...prev, dayOfMonth: event.target.value }))}
+                >
+                  {recurringDayOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                {recurringErrors.dayOfMonth && <span className="field-error">{recurringErrors.dayOfMonth}</span>}
+              </label>
+              <p className="modal-summary">29日〜31日は、その月に存在しない場合は末日に補完して生成します。</p>
+              <label className="todo-completed-toggle">
+                <input
+                  type="checkbox"
                 checked={recurringDraft.isActive}
                 onChange={(event) => setRecurringDraft((prev) => ({ ...prev, isActive: event.target.checked }))}
               />
