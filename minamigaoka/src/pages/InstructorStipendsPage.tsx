@@ -5,7 +5,12 @@ import {
 } from "../accounting/fiscalYear";
 import { comparePeriodAccounts } from "../accounting/sort";
 import { useAccountingStore } from "../accounting/useAccountingStore";
-import { subscribeInstructorStipends, createInstructorStipendPayment, buildInstructorStipendMemo } from "../instructorStipends/service";
+import {
+  buildInstructorStipendMemo,
+  createInstructorStipendPayment,
+  subscribeInstructorStipends,
+  updateInstructorStipendPayment,
+} from "../instructorStipends/service";
 import { subscribeMembers } from "../members/service";
 import { sortMembersForDisplay } from "../members/permissions";
 import type { MemberRecord } from "../members/types";
@@ -18,8 +23,6 @@ type InstructorStipendsPageProps = {
 };
 
 type StipendCellState = "unpaid" | "paid";
-
-const formatMoney = (value: number): string => `${value.toLocaleString("ja-JP")}円`;
 
 const fiscalMonthEntries = (fiscalYear: number): Array<{ monthKey: string; label: string }> =>
   accountingFiscalMonthLabels().map((item, index) => ({
@@ -36,9 +39,10 @@ const todayDateKey = (): string => {
 };
 
 const stateIcon = (state: StipendCellState): string => (state === "paid" ? "済" : "未");
-const stateLabel = (state: StipendCellState): string => (state === "paid" ? "支払済" : "未払い");
+const stateLabel = (state: StipendCellState): string =>
+  state === "paid" ? "支払済" : "未払い";
 
-const monthLabelForMemo = (monthKey: string): string => {
+const monthLabelForDisplay = (monthKey: string): string => {
   const [year, month] = monthKey.split("-");
   return `${Number(year)}年${Number(month)}月`;
 };
@@ -126,6 +130,11 @@ export function InstructorStipendsPage({
     () => [...(currentPeriod?.accounts ?? [])].sort(comparePeriodAccounts),
     [currentPeriod],
   );
+  const accountLabelById = useMemo(
+    () =>
+      new Map(availableAccounts.map((account) => [account.accountId, account.label] as const)),
+    [availableAccounts],
+  );
   const defaultAccountId = useMemo(
     () =>
       availableAccounts.find((account) =>
@@ -153,6 +162,12 @@ export function InstructorStipendsPage({
     modalTeacherId && modalMonthKey
       ? recordMap.get(`${modalTeacherId}_${modalMonthKey}`) ?? null
       : null;
+  const modalAccountLabel =
+    (modalRecord?.accountingAccountId
+      ? accountLabelById.get(modalRecord.accountingAccountId)
+      : undefined) ??
+    modalRecord?.accountingAccountId ??
+    "-";
 
   useEffect(() => {
     if (!modalTeacher || !modalMonthKey) return;
@@ -170,7 +185,6 @@ export function InstructorStipendsPage({
   };
 
   const closeModal = () => {
-    if (isSubmitting) return;
     setModalTeacherId(null);
     setModalMonthKey(null);
     setFieldErrors({});
@@ -178,7 +192,7 @@ export function InstructorStipendsPage({
   };
 
   const handleSubmit = async () => {
-    if (!modalTeacher || !modalMonthKey || modalRecord) return;
+    if (!modalTeacher || !modalMonthKey) return;
 
     const nextErrors: { accountId?: string; amount?: string; paidOn?: string } = {};
     const normalizedAmount = Number(amount);
@@ -195,21 +209,34 @@ export function InstructorStipendsPage({
     setIsSubmitting(true);
     setModalError("");
     try {
-      await createInstructorStipendPayment({
-        teacherMemberId: modalTeacher.id,
-        teacherNameSnapshot: modalTeacher.name,
-        fiscalYear,
-        monthKey: modalMonthKey,
-        amount: normalizedAmount,
-        paidOn,
-        paidByUid: currentUid,
-        accountId,
-        memo,
-      });
+      if (modalRecord) {
+        await updateInstructorStipendPayment({
+          teacherMemberId: modalTeacher.id,
+          teacherNameSnapshot: modalTeacher.name,
+          fiscalYear,
+          monthKey: modalMonthKey,
+          amount: normalizedAmount,
+          paidOn,
+          accountId,
+          memo,
+        });
+      } else {
+        await createInstructorStipendPayment({
+          teacherMemberId: modalTeacher.id,
+          teacherNameSnapshot: modalTeacher.name,
+          fiscalYear,
+          monthKey: modalMonthKey,
+          amount: normalizedAmount,
+          paidOn,
+          paidByUid: currentUid,
+          accountId,
+          memo,
+        });
+      }
       closeModal();
     } catch (error) {
       setModalError(
-        error instanceof Error ? error.message : "講師謝礼の記録に失敗しました。",
+        error instanceof Error ? error.message : "講師謝礼の保存に失敗しました。",
       );
     } finally {
       setIsSubmitting(false);
@@ -231,7 +258,7 @@ export function InstructorStipendsPage({
         <div>
           <h1>講師謝礼</h1>
           <p className="muted">
-            先生ごとの月次謝礼について、年度内の支払い状況を一覧と支払い記録で管理します。
+            先生ごとの月次謝礼について、年度内の支払状況を一覧し、支払い記録を登録します。
           </p>
         </div>
         <div className="fees-year-switcher">
@@ -316,118 +343,111 @@ export function InstructorStipendsPage({
             </button>
             <div className="fees-modal-header">
               <h2>
-                {modalTeacher.name} / {monthLabelForMemo(modalMonthKey)}分講師謝礼
+                {modalTeacher.name} / {monthLabelForDisplay(modalMonthKey)}分講師謝礼
               </h2>
-              <p className="muted">{fiscalYear}年度の支払い記録</p>
+              <p className="muted">
+                {modalRecord ? "支払記録を編集します" : "年度内の支払い記録を登録します"}
+              </p>
             </div>
 
             <div className="fees-modal-body">
-              {modalRecord ? (
+              {modalRecord && (
                 <div className="fees-action-card">
                   <strong>支払済み</strong>
-                  <p className="muted">この月の講師謝礼は記録済みです。</p>
-                  <p>金額: {formatMoney(modalRecord.amount)}</p>
-                  <p>支払日: {modalRecord.paidOn}</p>
-                  <p>出金元口座: {modalRecord.accountingAccountId || "-"}</p>
-                  <p>摘要: {modalRecord.accountingMemo || "-"}</p>
+                  <p className="muted">出金元口座: {modalAccountLabel}</p>
                   <p className="muted">
-                    会計連携状態:{" "}
-                    {modalRecord.accountingLinked || modalRecord.accountingEntryId
-                      ? "会計連携済み"
-                      : "会計連携なし"}
+                    編集しても会計へは再起票せず、既存の会計レコードも自動更新しません。
                   </p>
                 </div>
-              ) : (
-                <>
-                  <label className="field-label" htmlFor="stipend-account-select">
-                    出金元口座
-                  </label>
-                  <select
-                    id="stipend-account-select"
-                    className="field-input"
-                    value={accountId}
-                    onChange={(event) => {
-                      setAccountId(event.target.value);
-                      setFieldErrors((prev) => ({ ...prev, accountId: undefined }));
-                    }}
-                    disabled={isSubmitting}
-                  >
-                    <option value="">選択してください</option>
-                    {availableAccounts.map((account) => (
-                      <option key={account.accountId} value={account.accountId}>
-                        {account.label}
-                      </option>
-                    ))}
-                  </select>
-                  {fieldErrors.accountId && (
-                    <p className="field-error">{fieldErrors.accountId}</p>
-                  )}
+              )}
 
-                  <label className="field-label" htmlFor="stipend-amount-input">
-                    金額
-                  </label>
-                  <input
-                    id="stipend-amount-input"
-                    className="field-input"
-                    inputMode="numeric"
-                    value={amount}
-                    onChange={(event) => {
-                      setAmount(event.target.value);
-                      setFieldErrors((prev) => ({ ...prev, amount: undefined }));
-                    }}
-                    disabled={isSubmitting}
-                  />
-                  {fieldErrors.amount && <p className="field-error">{fieldErrors.amount}</p>}
+              <label className="field-label" htmlFor="stipend-account-select">
+                出金元口座
+              </label>
+              <select
+                id="stipend-account-select"
+                className="field-input"
+                value={accountId}
+                onChange={(event) => {
+                  setAccountId(event.target.value);
+                  setFieldErrors((prev) => ({ ...prev, accountId: undefined }));
+                }}
+                disabled={isSubmitting}
+              >
+                <option value="">選択してください</option>
+                {availableAccounts.map((account) => (
+                  <option key={account.accountId} value={account.accountId}>
+                    {account.label}
+                  </option>
+                ))}
+              </select>
+              {fieldErrors.accountId && <p className="field-error">{fieldErrors.accountId}</p>}
 
-                  <label className="field-label" htmlFor="stipend-paid-on-input">
-                    支払日
-                  </label>
-                  <input
-                    id="stipend-paid-on-input"
-                    className="field-input"
-                    type="date"
-                    value={paidOn}
-                    onChange={(event) => {
-                      setPaidOn(event.target.value);
-                      setFieldErrors((prev) => ({ ...prev, paidOn: undefined }));
-                    }}
-                    disabled={isSubmitting}
-                  />
-                  {fieldErrors.paidOn && <p className="field-error">{fieldErrors.paidOn}</p>}
+              <label className="field-label" htmlFor="stipend-amount-input">
+                金額
+              </label>
+              <input
+                id="stipend-amount-input"
+                className="field-input"
+                inputMode="numeric"
+                value={amount}
+                onChange={(event) => {
+                  setAmount(event.target.value);
+                  setFieldErrors((prev) => ({ ...prev, amount: undefined }));
+                }}
+                disabled={isSubmitting}
+              />
+              {fieldErrors.amount && <p className="field-error">{fieldErrors.amount}</p>}
 
-                  <label className="field-label" htmlFor="stipend-memo-input">
-                    摘要
-                  </label>
-                  <input
-                    id="stipend-memo-input"
-                    className="field-input"
-                    value={memo}
-                    onChange={(event) => setMemo(event.target.value)}
-                    disabled={isSubmitting}
-                  />
+              <label className="field-label" htmlFor="stipend-paid-on-input">
+                支払日
+              </label>
+              <input
+                id="stipend-paid-on-input"
+                className="field-input"
+                type="date"
+                value={paidOn}
+                onChange={(event) => {
+                  setPaidOn(event.target.value);
+                  setFieldErrors((prev) => ({ ...prev, paidOn: undefined }));
+                }}
+                disabled={isSubmitting}
+              />
+              {fieldErrors.paidOn && <p className="field-error">{fieldErrors.paidOn}</p>}
 
-                  {!currentPeriod && (
-                    <p className="field-error">
-                      現在の会計期がないため、講師謝礼を会計へ起票できません。先に会計期を開始してください。
-                    </p>
-                  )}
-                </>
+              <label className="field-label" htmlFor="stipend-memo-input">
+                摘要
+              </label>
+              <input
+                id="stipend-memo-input"
+                className="field-input"
+                value={memo}
+                onChange={(event) => setMemo(event.target.value)}
+                disabled={isSubmitting}
+              />
+
+              {!currentPeriod && !modalRecord && (
+                <p className="field-error">
+                  現在の会計期がありません。講師謝礼を会計へ連携するには、先に会計期を開始してください。
+                </p>
               )}
             </div>
 
             <div className="fees-modal-footer">
               {modalError && <p className="field-error">{modalError}</p>}
               <div className="modal-actions">
-                {!modalRecord && (
-                  <button
-                    type="button"
-                    className="button"
-                    onClick={handleSubmit}
-                    disabled={isSubmitting || !currentPeriod}
-                  >
-                    {isSubmitting ? "記録中..." : "支払いを記録する"}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="button"
+                  onClick={handleSubmit}
+                  disabled={isSubmitting || (!currentPeriod && !modalRecord)}
+                >
+                  {isSubmitting
+                    ? "保存中..."
+                    : modalRecord
+                      ? "変更を保存"
+                      : "支払いを記録する"}
+                </button>
                 <button
                   type="button"
                   className="button button-secondary"

@@ -7,6 +7,7 @@ import {
   serverTimestamp,
   Timestamp,
   setDoc,
+  updateDoc,
 } from "firebase/firestore";
 import { db, hasFirebaseAppConfig } from "../config/firebase";
 import {
@@ -19,7 +20,9 @@ const instructorStipendsCollection = db ? collection(db, "instructorStipends") :
 
 const ensureDb = () => {
   if (!db || !hasFirebaseAppConfig || !instructorStipendsCollection) {
-    throw new Error("Firebase 設定が未設定のため、講師謝礼データを Firestore で扱えません。");
+    throw new Error(
+      "Firebase 設定が未設定のため、講師謝礼データを Firestore で扱えません。",
+    );
   }
 };
 
@@ -46,6 +49,9 @@ const toBoolean = (value: unknown): boolean | undefined => {
 };
 
 const isMonthKey = (value: string): boolean => /^\d{4}-\d{2}$/.test(value);
+
+const buildRecordTitle = (teacherNameSnapshot: string, monthKey: string): string =>
+  `${teacherNameSnapshot} ${monthKey.replace("-", "/")}分講師謝礼`;
 
 const toInstructorStipendRecord = (
   id: string,
@@ -76,9 +82,7 @@ const toInstructorStipendRecord = (
     teacherNameSnapshot,
     fiscalYear: Number(fiscalYearRaw),
     monthKey,
-    title:
-      toOptionalString(value.title) ??
-      `${teacherNameSnapshot} ${monthKey.replace("-", "/")}分講師謝礼`,
+    title: toOptionalString(value.title) ?? buildRecordTitle(teacherNameSnapshot, monthKey),
     amount: toNonNegativeNumber(value.amount),
     paidOn,
     paidByUid,
@@ -149,7 +153,7 @@ export const createInstructorStipendPayment = async (input: {
 }): Promise<void> => {
   ensureDb();
   if (!input.teacherMemberId) {
-    throw new Error("対象先生を特定できません。");
+    throw new Error("対象先生を選択してください。");
   }
   if (!isMonthKey(input.monthKey)) {
     throw new Error("対象月の形式が不正です。");
@@ -168,7 +172,7 @@ export const createInstructorStipendPayment = async (input: {
   const recordRef = doc(instructorStipendsCollection!, recordId);
   const existing = await getDoc(recordRef);
   if (existing.exists()) {
-    throw new Error("この先生の対象月分講師謝礼は、すでに支払済みです。");
+    throw new Error("この先生の対象月分は、すでに支払済みです。");
   }
 
   const accountingMemo = input.memo?.trim() || buildInstructorStipendMemo(input.monthKey);
@@ -190,7 +194,7 @@ export const createInstructorStipendPayment = async (input: {
     teacherNameSnapshot: input.teacherNameSnapshot,
     fiscalYear: input.fiscalYear,
     monthKey: input.monthKey,
-    title: `${input.teacherNameSnapshot} ${input.monthKey.replace("-", "/")}分講師謝礼`,
+    title: buildRecordTitle(input.teacherNameSnapshot, input.monthKey),
     amount: input.amount,
     paidOn: input.paidOn,
     paidByUid: input.paidByUid,
@@ -203,6 +207,54 @@ export const createInstructorStipendPayment = async (input: {
     accountingCategoryId: "EXPENSE_INSTRUCTOR_HONORARIUM",
     accountingMemo,
     createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+};
+
+export const updateInstructorStipendPayment = async (input: {
+  teacherMemberId: string;
+  teacherNameSnapshot: string;
+  fiscalYear: number;
+  monthKey: string;
+  amount: number;
+  paidOn: string;
+  accountId: string;
+  memo?: string;
+}): Promise<void> => {
+  ensureDb();
+  if (!input.teacherMemberId) {
+    throw new Error("対象先生を選択してください。");
+  }
+  if (!isMonthKey(input.monthKey)) {
+    throw new Error("対象月の形式が不正です。");
+  }
+  if (!input.accountId) {
+    throw new Error("出金元口座を選択してください。");
+  }
+  if (!(Number.isFinite(input.amount) && input.amount > 0)) {
+    throw new Error("金額は1円以上で入力してください。");
+  }
+  if (!input.paidOn) {
+    throw new Error("支払日を入力してください。");
+  }
+
+  const recordId = `${input.teacherMemberId}_${input.monthKey}`;
+  const recordRef = doc(instructorStipendsCollection!, recordId);
+  const existing = await getDoc(recordRef);
+  if (!existing.exists()) {
+    throw new Error("対象月の講師謝礼が見つかりません。");
+  }
+
+  const accountingMemo = input.memo?.trim() || buildInstructorStipendMemo(input.monthKey);
+  await updateDoc(recordRef, {
+    teacherNameSnapshot: input.teacherNameSnapshot,
+    fiscalYear: input.fiscalYear,
+    monthKey: input.monthKey,
+    title: buildRecordTitle(input.teacherNameSnapshot, input.monthKey),
+    amount: input.amount,
+    paidOn: input.paidOn,
+    accountingAccountId: input.accountId,
+    accountingMemo,
     updatedAt: serverTimestamp(),
   });
 };
