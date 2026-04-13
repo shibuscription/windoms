@@ -11,6 +11,7 @@ import { WatchPage } from "./pages/WatchPage";
 import { ShiftSurveyPage } from "./pages/ShiftSurveyPage";
 import { LunchPage } from "./pages/LunchPage";
 import { FeesPage } from "./pages/FeesPage";
+import { InstructorStipendsPage } from "./pages/InstructorStipendsPage";
 import { LinksPage } from "./pages/LinksPage";
 import { MemberDirectoryPage } from "./pages/MemberDirectoryPage";
 import { MembersManagementPage } from "./pages/MembersPage";
@@ -340,6 +341,13 @@ const menuSections = (
           icon: "◉",
           to: "/dues",
           isActive: (location) => location.pathname.startsWith("/dues"),
+        },
+        {
+          id: "instructor-stipends",
+          label: "講師謝礼",
+          icon: "謝",
+          to: "/instructor-stipends",
+          isActive: (location) => location.pathname.startsWith("/instructor-stipends"),
         },
         {
           id: "accounting",
@@ -1491,6 +1499,20 @@ export function App() {
             }
           />
           <Route path="/dues" element={<FeesPage currentUid={currentUid} isAdmin={isAdmin} />} />
+          <Route
+            path="/instructor-stipends"
+            element={
+              canManageAccounting ? (
+                <InstructorStipendsPage
+                  currentUid={currentUid}
+                  isAdmin={isAdmin}
+                  canManageAccounting={canManageAccounting}
+                />
+              ) : (
+                <Navigate to="/today" replace />
+              )
+            }
+          />
           <Route
             path="/events"
             element={

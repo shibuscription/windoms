@@ -153,7 +153,11 @@ const toAttachments = (value: unknown): AccountingAttachment[] =>
     : [];
 
 const toTransactionSource = (value: unknown): AccountingTransaction["source"] =>
-  value === "reimbursement" || value === "purchase" || value === "lunch" || value === "membershipFee"
+  value === "reimbursement" ||
+  value === "purchase" ||
+  value === "lunch" ||
+  value === "membershipFee" ||
+  value === "instructorStipend"
     ? value
     : "manual";
 

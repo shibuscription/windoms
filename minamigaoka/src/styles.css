@@ -9063,6 +9063,19 @@ textarea {
   background: #f8fafc;
 }
 
+.stipend-cell-button {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.stipend-cell-button:hover,
+.stipend-cell-button:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
+}
+
 @media (max-width: 767px) {
   .fees-year-switcher {
     width: 100%;

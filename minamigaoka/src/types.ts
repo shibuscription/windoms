@@ -167,7 +167,12 @@ export type RecurringTodoTemplate = {
 
 export type PurchaseRequestStatus = "OPEN" | "BOUGHT";
 export type PaymentMethod = "reimbursement" | "direct_accounting";
-export type AccountingSourceType = "purchaseRequest" | "reimbursement" | "lunch" | "membershipFee";
+export type AccountingSourceType =
+  | "purchaseRequest"
+  | "reimbursement"
+  | "lunch"
+  | "membershipFee"
+  | "instructorStipend";
 export type ReceiptFileMeta = {
   name: string;
   size: number;
@@ -287,6 +292,20 @@ export type MembershipFeeRecord = {
   receivedOn?: string;
   createdByUid: string;
   receivedByUid?: string;
+  createdAt: string;
+  updatedAt: string;
+} & AccountingBridgeFields;
+
+export type InstructorStipendRecord = {
+  id: string;
+  teacherMemberId: string;
+  teacherNameSnapshot: string;
+  fiscalYear: number;
+  monthKey: string;
+  title: string;
+  amount: number;
+  paidOn: string;
+  paidByUid: string;
   createdAt: string;
   updatedAt: string;
 } & AccountingBridgeFields;
