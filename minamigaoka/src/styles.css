@@ -2773,7 +2773,39 @@ body {
 }
 
 .recurring-template-header {
-  align-items: flex-start;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.recurring-template-toggle {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.recurring-template-toggle-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #12324a;
+}
+
+.recurring-template-count {
+  flex: 0 0 auto;
+}
+
+.recurring-template-toggle-icon {
+  flex: 0 0 auto;
+  font-size: 0.95rem;
+  color: #486581;
 }
 
 .recurring-template-list {
@@ -2798,6 +2830,17 @@ body {
 
 .recurring-template-row .todo-actions > .button.button-small {
   white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .recurring-template-header {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .recurring-template-toggle {
+    width: 100%;
+  }
 }
 
 .todos-related-modal {

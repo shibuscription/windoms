@@ -193,6 +193,7 @@ export function TodosPage({
   const [editDraft, setEditDraft] = useState<TodoDraft>(createDraft());
   const [editErrors, setEditErrors] = useState<TodoFormErrors>({});
   const [recurringTemplates, setRecurringTemplates] = useState<RecurringTodoTemplate[]>([]);
+  const [isRecurringTemplatesOpen, setIsRecurringTemplatesOpen] = useState(false);
   const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false);
   const [recurringDraft, setRecurringDraft] = useState<RecurringTemplateDraft>(createRecurringTemplateDraft());
   const [recurringErrors, setRecurringErrors] = useState<RecurringTemplateErrors>({});
@@ -677,48 +678,63 @@ export function TodosPage({
       {canManageRecurringTemplates && (
         <section className="todos-section recurring-templates-section">
           <div className="todos-filter-header recurring-template-header">
-            <h2>定例TODOテンプレート</h2>
-            <button type="button" className="button button-small button-secondary" onClick={openCreateRecurringModal}>
-              定例TODO追加
+            <button
+              type="button"
+              className="recurring-template-toggle"
+              aria-expanded={isRecurringTemplatesOpen}
+              onClick={() => setIsRecurringTemplatesOpen((open) => !open)}
+            >
+              <span className="recurring-template-toggle-title">定例TODOテンプレート</span>
+              <span className="todo-tab-badge recurring-template-count">{recurringTemplates.length}</span>
+              <span className="recurring-template-toggle-icon" aria-hidden="true">
+                {isRecurringTemplatesOpen ? "▾" : "▸"}
+              </span>
             </button>
+            {isRecurringTemplatesOpen && (
+              <button type="button" className="button button-small button-secondary" onClick={openCreateRecurringModal}>
+                定例TODO追加
+              </button>
+            )}
           </div>
-          <div className="todos-list recurring-template-list">
-            {recurringTemplates.map((template) => (
-              <article key={template.id} className={`todo-row recurring-template-row ${template.isActive ? "" : "completed"}`}>
-                <div className="todo-main">
-                  <p className="todo-title">{template.title}</p>
-                  <p className="todo-meta">
-                    <span>{template.kind === "shared" ? "共有TODO" : "個人TODO"}</span>
-                    <span>{formatRecurringDayLabel(template.dayOfMonth)}</span>
-                    <span>{template.isActive ? "有効" : "無効"}</span>
-                  </p>
-                  {template.kind === "shared" && (
-                    <p className="todo-related-text">
-                      共有対象: {normalizeTodoSharedScopes(template).map((scope) => sharedScopeLabels[scope]).join(" / ")}
+          {isRecurringTemplatesOpen && (
+            <div className="todos-list recurring-template-list">
+              {recurringTemplates.map((template) => (
+                <article key={template.id} className={`todo-row recurring-template-row ${template.isActive ? "" : "completed"}`}>
+                  <div className="todo-main">
+                    <p className="todo-title">{template.title}</p>
+                    <p className="todo-meta">
+                      <span>{template.kind === "shared" ? "共有TODO" : "個人TODO"}</span>
+                      <span>{formatRecurringDayLabel(template.dayOfMonth)}</span>
+                      <span>{template.isActive ? "有効" : "無効"}</span>
                     </p>
-                  )}
-                </div>
-                <div className="todo-actions">
-                  <button type="button" className="button button-small button-secondary" onClick={() => openEditRecurringModal(template)}>
-                    編集
-                  </button>
-                  <button
-                    type="button"
-                    className="button button-small button-secondary"
-                    onClick={() =>
-                      saveRecurringTodoTemplate({ ...template, isActive: !template.isActive, updatedAt: new Date().toISOString() })
-                    }
-                  >
-                    {template.isActive ? "無効化" : "有効化"}
-                  </button>
-                  <button type="button" className="button button-small events-danger-button" onClick={() => setDeleteRecurringTargetId(template.id)}>
-                    削除
-                  </button>
-                </div>
-              </article>
-            ))}
-            {recurringTemplates.length === 0 && <p className="muted">定例TODOテンプレートはありません。</p>}
-          </div>
+                    {template.kind === "shared" && (
+                      <p className="todo-related-text">
+                        共有対象: {normalizeTodoSharedScopes(template).map((scope) => sharedScopeLabels[scope]).join(" / ")}
+                      </p>
+                    )}
+                  </div>
+                  <div className="todo-actions">
+                    <button type="button" className="button button-small button-secondary" onClick={() => openEditRecurringModal(template)}>
+                      編集
+                    </button>
+                    <button
+                      type="button"
+                      className="button button-small button-secondary"
+                      onClick={() =>
+                        saveRecurringTodoTemplate({ ...template, isActive: !template.isActive, updatedAt: new Date().toISOString() })
+                      }
+                    >
+                      {template.isActive ? "無効化" : "有効化"}
+                    </button>
+                    <button type="button" className="button button-small events-danger-button" onClick={() => setDeleteRecurringTargetId(template.id)}>
+                      削除
+                    </button>
+                  </div>
+                </article>
+              ))}
+              {recurringTemplates.length === 0 && <p className="muted">定例TODOテンプレートはありません。</p>}
+            </div>
+          )}
         </section>
       )}
 
