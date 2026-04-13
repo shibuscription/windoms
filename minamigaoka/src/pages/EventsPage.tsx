@@ -491,88 +491,92 @@ export function EventsPage({
 
       {feedback && <p className="links-feedback">{feedback}</p>}
 
-      <div className="events-tabs" role="tablist" aria-label="イベント種別">
-        <button type="button" className={`members-tab ${activeTab === "active" ? "active" : ""}`} onClick={() => setActiveTab("active")}>
-          進行中
-        </button>
-        <button type="button" className={`members-tab ${activeTab === "done" ? "active" : ""}`} onClick={() => setActiveTab("done")}>
-          完了
-        </button>
-      </div>
+      {!selectedEvent && (
+        <>
+          <div className="events-tabs" role="tablist" aria-label="イベント種別">
+            <button type="button" className={`members-tab ${activeTab === "active" ? "active" : ""}`} onClick={() => setActiveTab("active")}>
+              進行中
+            </button>
+            <button type="button" className={`members-tab ${activeTab === "done" ? "active" : ""}`} onClick={() => setActiveTab("done")}>
+              完了
+            </button>
+          </div>
 
-      {activeTab === "done" && (
-        <label className="events-year-filter">
-          <span>年度</span>
-          <select value={selectedDoneYear} onChange={(event) => setSelectedDoneYear(Number(event.target.value))}>
-            {(doneYears.length > 0 ? doneYears : [defaultClubYear]).map((year) => (
-              <option key={year} value={year}>
-                {clubYearLabel(year)}
-              </option>
+          {activeTab === "done" && (
+            <label className="events-year-filter">
+              <span>年度</span>
+              <select value={selectedDoneYear} onChange={(event) => setSelectedDoneYear(Number(event.target.value))}>
+                {(doneYears.length > 0 ? doneYears : [defaultClubYear]).map((year) => (
+                  <option key={year} value={year}>
+                    {clubYearLabel(year)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          <div className="events-list">
+            {visibleEvents.map((item) => (
+              <article
+                key={item.id}
+                className="event-card"
+                role="button"
+                tabIndex={0}
+                onClick={() => navigate(`/events/${item.id}`)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    navigate(`/events/${item.id}`);
+                  }
+                }}
+              >
+                <div className="event-card-main">
+                  <div className="event-card-top">
+                    <span className="event-date">{toDateLabel(item.eventSortDate)}</span>
+                    <span className="event-card-badges">
+                      <span className={`event-status ${item.state}`}>{item.state === "done" ? "完了" : "進行中"}</span>
+                      <span className="event-kind">{item.kind}</span>
+                    </span>
+                  </div>
+                  <strong>{item.title}</strong>
+                </div>
+                {isManager && (
+                  <div className="event-card-actions">
+                    <button
+                      type="button"
+                      className="link-icon-button"
+                      aria-label="編集"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openEditModal(item);
+                      }}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      type="button"
+                      className="link-icon-button"
+                      aria-label="削除"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setDeleteTargetId(item.id);
+                      }}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                )}
+              </article>
             ))}
-          </select>
-        </label>
+            {visibleEvents.length === 0 && <p className="muted">該当するイベントはありません。</p>}
+          </div>
+        </>
       )}
 
-      <div className={`events-content ${selectedEvent ? "has-detail" : ""}`}>
-        <div className="events-list">
-          {visibleEvents.map((item) => (
-            <article
-              key={item.id}
-              className={`event-card ${selectedEvent?.id === item.id ? "active" : ""}`}
-              role="button"
-              tabIndex={0}
-              onClick={() => navigate(`/events/${item.id}`)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  navigate(`/events/${item.id}`);
-                }
-              }}
-            >
-              <div className="event-card-main">
-                <div className="event-card-top">
-                  <span className="event-date">{toDateLabel(item.eventSortDate)}</span>
-                  <span className="event-card-badges">
-                    <span className={`event-status ${item.state}`}>{item.state === "done" ? "完了" : "進行中"}</span>
-                    <span className="event-kind">{item.kind}</span>
-                  </span>
-                </div>
-                <strong>{item.title}</strong>
-              </div>
-              {isManager && (
-                <div className="event-card-actions">
-                  <button
-                    type="button"
-                    className="link-icon-button"
-                    aria-label="編集"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      openEditModal(item);
-                    }}
-                    onKeyDown={(event) => event.stopPropagation()}
-                  >
-                    ✏️
-                  </button>
-                  <button
-                    type="button"
-                    className="link-icon-button"
-                    aria-label="削除"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setDeleteTargetId(item.id);
-                    }}
-                    onKeyDown={(event) => event.stopPropagation()}
-                  >
-                    🗑️
-                  </button>
-                </div>
-              )}
-            </article>
-          ))}
-          {visibleEvents.length === 0 && <p className="muted">該当するイベントはありません。</p>}
-        </div>
-
-        {selectedEvent && (
+      {selectedEvent && (
+        <div className="events-detail-standalone">
           <article className="events-detail-page" aria-label="イベント詳細">
             <div className="events-detail-page-header">
               <div className="events-detail-page-heading">
@@ -780,8 +784,8 @@ export function EventsPage({
               )}
             </section>
           </article>
-        )}
-      </div>
+        </div>
+      )}
 
       {selectedEvent && isSessionBindModalOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">

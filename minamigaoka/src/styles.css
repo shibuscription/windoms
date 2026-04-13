@@ -1224,13 +1224,8 @@ body {
   width: min(560px, calc(100vw - 24px));
 }
 
-.events-content {
+.events-detail-standalone {
   display: grid;
-  gap: 16px;
-}
-
-.events-content.has-detail {
-  align-items: start;
 }
 
 .events-linked-header {
@@ -1561,13 +1556,9 @@ body {
 }
 
 @media (min-width: 980px) {
-  .events-content.has-detail {
-    grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
-  }
-
-  .events-content.has-detail .events-list {
-    position: sticky;
-    top: 84px;
+  .events-detail-standalone {
+    max-width: 960px;
+    margin: 0 auto;
   }
 }
 
