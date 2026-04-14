@@ -4,6 +4,7 @@ import { BirthdayCelebrationModal } from "../components/BirthdayCelebrationModal
 import { DayAttendanceModal } from "../components/DayAttendanceModal";
 import { DayNoticeEditorModal, DayNoticeViewModal } from "../components/DayNoticeModals";
 import { ConfirmationDialog } from "../components/ConfirmationDialog";
+import { useHorizontalSwipe } from "../hooks/useHorizontalSwipe";
 import { getBirthdayCelebrants } from "../members/birthday";
 import { isChildMember, sortMembersForDisplay } from "../members/permissions";
 import { subscribeMemberRelations, subscribeMembers } from "../members/service";
@@ -258,6 +259,18 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
     setSearchParams({ date: next });
   };
 
+  const todaySwipeHandlers = useHorizontalSwipe({
+    enabled:
+      !isAttendanceModalOpen &&
+      !isCalendarOpen &&
+      !isNoticeModalOpen &&
+      !isNoticeEditorOpen &&
+      !isDeleteNoticeConfirmOpen &&
+      !birthdayModalDate,
+    onSwipeLeft: () => moveDate(1),
+    onSwipeRight: () => moveDate(-1),
+  });
+
   const selectDate = (nextDate: string) => {
     if (!isValidDateKey(nextDate)) return;
     setIsCalendarOpen(false);
@@ -351,7 +364,7 @@ export function TodayPage({ data, ensureDayLog, currentUid, linkedMember, authRo
   }
 
   return (
-      <section className="card">
+      <section className="card swipe-region" {...todaySwipeHandlers}>
       <div className="today-header today-date-view">
         <div className="today-top-row">
           <button type="button" className="date-nav-button today-prev-day-button" onClick={() => moveDate(-1)}>

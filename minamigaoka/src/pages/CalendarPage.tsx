@@ -4,6 +4,7 @@ import { BirthdayCelebrationModal } from "../components/BirthdayCelebrationModal
 import { DayAttendanceModal } from "../components/DayAttendanceModal";
 import { DayNoticeEditorModal, DayNoticeViewModal } from "../components/DayNoticeModals";
 import { ConfirmationDialog } from "../components/ConfirmationDialog";
+import { useHorizontalSwipe } from "../hooks/useHorizontalSwipe";
 import { getBirthdayCelebrants } from "../members/birthday";
 import { sortFamiliesByDisplayOrder } from "../members/familyOrder";
 import {
@@ -31,6 +32,7 @@ import {
   formatTimeNoLeadingZero,
   formatWeekdayJa,
   isValidDateKey,
+  shiftDateKey,
   todayDateKey,
 } from "../utils/date";
 
@@ -552,6 +554,14 @@ export function CalendarPage({
     syncSearchParams(toMonthKey(today), today);
   };
 
+  const moveSelectedDay = (days: number) => {
+    if (!selectedDay) return;
+    const nextDate = shiftDateKey(selectedDay.date, days);
+    const nextSessions = sortSessions(data.scheduleDays[nextDate]?.sessions ?? []);
+    syncSearchParams(toMonthKey(nextDate), nextDate);
+    setSelectedDay({ date: nextDate, sessions: nextSessions });
+  };
+
   const handleMonthCalendarWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     if (window.matchMedia("(max-width: 767px)").matches) return;
     if (isModalOpen) return;
@@ -573,6 +583,40 @@ export function CalendarPage({
 
     goNextMonth();
   };
+
+  const isMonthSwipeBlocked =
+    isMonthPickerOpen ||
+    Boolean(selectedDay) ||
+    isAttendanceModalOpen ||
+    isDayNoticeModalOpen ||
+    isDayNoticeEditorOpen ||
+    isDeleteDayNoticeConfirmOpen ||
+    isSessionModalOpen ||
+    isIcsModalOpen ||
+    Boolean(birthdayModalDate) ||
+    Boolean(dialog);
+
+  const monthSwipeHandlers = useHorizontalSwipe({
+    enabled: !isMonthSwipeBlocked,
+    onSwipeLeft: goNextMonth,
+    onSwipeRight: goPrevMonth,
+  });
+
+  const isDaySheetSwipeBlocked =
+    !selectedDay ||
+    isAttendanceModalOpen ||
+    isDayNoticeModalOpen ||
+    isDayNoticeEditorOpen ||
+    isDeleteDayNoticeConfirmOpen ||
+    isSessionModalOpen ||
+    Boolean(birthdayModalDate) ||
+    Boolean(dialog);
+
+  const daySheetSwipeHandlers = useHorizontalSwipe({
+    enabled: !isDaySheetSwipeBlocked,
+    onSwipeLeft: () => moveSelectedDay(1),
+    onSwipeRight: () => moveSelectedDay(-1),
+  });
 
   const toggleMonthPicker = () => {
     setMonthPickerYear(Number(monthKey.slice(0, 4)));
@@ -892,7 +936,11 @@ export function CalendarPage({
         </div>
       </div>
       {icsToast && <p className="inline-toast">{icsToast}</p>}
-        <div className="calendar-mobile-bleed" onWheel={handleMonthCalendarWheel}>
+        <div
+          className="calendar-mobile-bleed swipe-region"
+          onWheel={handleMonthCalendarWheel}
+          {...monthSwipeHandlers}
+        >
           <div className="month-calendar-weekdays">
           {weekdayLabels.map((label) => (
             <span key={`calendar-weekday-${label}`}>{label}</span>
@@ -964,7 +1012,11 @@ export function CalendarPage({
 
       {selectedDay && (
         <div className="calendar-sheet-backdrop" onClick={closeSheet}>
-          <section className="calendar-day-sheet" onClick={(event) => event.stopPropagation()}>
+          <section
+            className="calendar-day-sheet swipe-region"
+            onClick={(event) => event.stopPropagation()}
+            {...daySheetSwipeHandlers}
+          >
             <button
               type="button"
               className="calendar-session-sheet-close"

@@ -4710,6 +4710,10 @@ body {
   overflow-x: visible;
 }
 
+.swipe-region {
+  touch-action: pan-y;
+}
+
 .month-calendar-day {
   position: relative;
   min-height: 112px;
