@@ -231,8 +231,10 @@ export function ReimbursementsPage({
 
   const visibleByRole = useMemo(
     () =>
-      data.reimbursements.filter((item) => (isAdmin ? true : matchesCurrentUser(item.buyer))),
-    [currentUid, currentUserMember, data.reimbursements, isAdmin, memberIndexes],
+      data.reimbursements.filter((item) =>
+        canManageAccounting ? true : matchesCurrentUser(item.buyer),
+      ),
+    [canManageAccounting, currentUid, currentUserMember, data.reimbursements, memberIndexes],
   );
 
   const rows = useMemo(() => {
@@ -709,10 +711,10 @@ export function ReimbursementsPage({
       <div className="reimbursements-list">
         {rows.map(({ item, uiStatus }) => {
           const isBuyer = matchesCurrentUser(item.buyer);
-          const canMarkPaid = uiStatus === "unpaid" && isAdmin;
+          const canMarkPaid = uiStatus === "unpaid" && canManageAccounting;
           const canMarkReceived = uiStatus === "paid" && isBuyer;
-          const canEdit = isAdmin || (uiStatus === "unpaid" && isBuyer);
-          const canDelete = isAdmin || (uiStatus === "unpaid" && isBuyer);
+          const canEdit = canManageAccounting || (uiStatus === "unpaid" && isBuyer);
+          const canDelete = canManageAccounting || (uiStatus === "unpaid" && isBuyer);
           const normalizedMemo = normalizeReimbursementMemo(item.memo);
           return (
             <article
@@ -1078,12 +1080,12 @@ export function ReimbursementsPage({
               </div>
             )}
             <div className="modal-actions">
-              {(isAdmin || (resolveUiStatus(detailTarget) === "unpaid" && matchesCurrentUser(detailTarget.buyer))) && (
+              {(canManageAccounting || (resolveUiStatus(detailTarget) === "unpaid" && matchesCurrentUser(detailTarget.buyer))) && (
                 <button type="button" className="button button-secondary" onClick={() => openCreateModal(detailTarget)}>
                   編集
                 </button>
               )}
-              {resolveUiStatus(detailTarget) === "unpaid" && isAdmin && (
+              {resolveUiStatus(detailTarget) === "unpaid" && canManageAccounting && (
                 <button type="button" className="button" onClick={() => openMarkPaidModal(detailTarget)}>
                   支払済にする
                 </button>
@@ -1093,7 +1095,7 @@ export function ReimbursementsPage({
                   領収済にする
                 </button>
               )}
-              {(isAdmin || (resolveUiStatus(detailTarget) === "unpaid" && matchesCurrentUser(detailTarget.buyer))) && (
+              {(canManageAccounting || (resolveUiStatus(detailTarget) === "unpaid" && matchesCurrentUser(detailTarget.buyer))) && (
                 <button type="button" className="button events-danger-button" onClick={() => setConfirmDialog({ mode: "delete", reimbursement: detailTarget })}>
                   削除
                 </button>
