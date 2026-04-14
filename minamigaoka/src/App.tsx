@@ -77,6 +77,16 @@ import {
 } from "./modules/menuVisibility";
 import { subscribeModuleVisibilitySettings } from "./modules/moduleVisibilityService";
 import {
+  buildVisibilityPreviewMember,
+  getVisibilityPreviewLabel,
+  getVisibilityPreviewSubtitle,
+  isVisibilityPreviewActive,
+  readVisibilityPreviewTarget,
+  saveVisibilityPreviewTarget,
+  type VisibilityPreviewTarget,
+  visibilityPreviewOptions,
+} from "./preview/visibilityPreview";
+import {
   createEvent as createFirestoreEvent,
   deleteEvent as deleteFirestoreEvent,
   saveEvent as saveFirestoreEvent,
@@ -477,6 +487,9 @@ export function App() {
   const [moduleVisibilitySettings, setModuleVisibilitySettings] = useState<ModuleVisibilitySettings>(() =>
     sanitizeModuleVisibilitySettings(undefined),
   );
+  const [visibilityPreviewTarget, setVisibilityPreviewTarget] = useState<VisibilityPreviewTarget>(() =>
+    readVisibilityPreviewTarget(),
+  );
   const [isScoresLoading, setIsScoresLoading] = useState(true);
   const [scoresLoadError, setScoresLoadError] = useState("");
   const [isInstrumentsLoading, setIsInstrumentsLoading] = useState(hasFirebaseAppConfig);
@@ -505,13 +518,28 @@ export function App() {
   const activityPlanMonthKey = getActivityPlanTargetMonthKey(today);
   const currentUid = authUser?.appUid ?? "";
   const currentNotificationUid = authUser?.user.uid ?? "";
-  const currentRole = linkedMember ? toMenuRole(linkedMember.role) : authUser?.role ?? "parent";
-  const currentOperatorRole: "admin" | "parent" = currentRole === "admin" ? "admin" : "parent";
+  const actualRole = linkedMember ? toMenuRole(linkedMember.role) : authUser?.role ?? "parent";
   const isAdmin = linkedMember?.role === "admin" || (!linkedMember && authUser?.role === "admin");
   const canManageAccounting =
     isAdmin || linkedMember?.staffPermissions.includes("accounting") === true;
-  const canManageCalendarSessions =
-    isAdmin || canManageCalendarSessionsByMember(linkedMember);
+  const effectivePreviewTarget = isAdmin ? visibilityPreviewTarget : "actual";
+  const visibilityPreviewMember = useMemo(
+    () =>
+      buildVisibilityPreviewMember(
+        effectivePreviewTarget,
+        linkedMember,
+        (authUser?.role ?? "parent") as MemberRole,
+      ),
+    [effectivePreviewTarget, linkedMember, authUser?.role],
+  );
+  const currentRole = visibilityPreviewMember ? toMenuRole(visibilityPreviewMember.role) : actualRole;
+  const currentOperatorRole: "admin" | "parent" = currentRole === "admin" ? "admin" : "parent";
+  const uiIsAdmin = visibilityPreviewMember?.adminRole === "admin" || visibilityPreviewMember?.role === "admin";
+  const uiCanManageAccounting =
+    uiIsAdmin || visibilityPreviewMember?.staffPermissions.includes("accounting") === true;
+  const uiCanManageCalendarSessions =
+    uiIsAdmin || canManageCalendarSessionsByMember(visibilityPreviewMember);
+  const isVisibilityPreviewMode = isAdmin && isVisibilityPreviewActive(effectivePreviewTarget);
   const accountPrimaryName = linkedMember?.name?.trim() || authUser?.loginId || "ログイン中ユーザー";
   const accountLoginId = authUser?.loginId ?? "-";
   const accountMemberTypesLabel = linkedMember
@@ -531,20 +559,25 @@ export function App() {
   const activityPlanStatus = readActivityPlanStatus(activityPlanMonthKey);
   const unansweredCount = readDemoUnansweredCount(activityPlanMonthKey);
   const activityPlanBadgeText =
-    isAdmin && activityPlanStatus === "SURVEY_OPEN" && unansweredCount > 0
+    uiIsAdmin && activityPlanStatus === "SURVEY_OPEN" && unansweredCount > 0
       ? `未回答 ${unansweredCount}`
       : undefined;
-  const hasShiftSurveyTodo = isAdmin && activityPlanStatus === "SURVEY_OPEN" && unansweredCount > 0;
+  const hasShiftSurveyTodo = uiIsAdmin && activityPlanStatus === "SURVEY_OPEN" && unansweredCount > 0;
   const shiftSurveyPath = `/shift-survey?month=${activityPlanMonthKey}`;
   const visibleMenuSections = useMemo(
-    () => menuSections(activityPlanBadgeText, linkedMember, moduleVisibilitySettings),
-    [activityPlanBadgeText, linkedMember, moduleVisibilitySettings],
+    () => menuSections(activityPlanBadgeText, visibilityPreviewMember, moduleVisibilitySettings),
+    [activityPlanBadgeText, visibilityPreviewMember, moduleVisibilitySettings],
   );
   const currentPageLabel = resolvePageLabel(location.pathname, location.search) ?? siteConfig.productName;
   const canUseNativeShare =
     typeof navigator !== "undefined" && typeof navigator.share === "function";
 
   useEffect(() => subscribeModuleVisibilitySettings(setModuleVisibilitySettings), []);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    saveVisibilityPreviewTarget(visibilityPreviewTarget);
+  }, [isAdmin, visibilityPreviewTarget]);
 
   useEffect(() => {
     if (!hasFirebaseAppConfig || !currentNotificationUid) {
@@ -1430,7 +1463,11 @@ export function App() {
           </button>
         </div>
       </header>
-      <main className={`page-wrap${usesWidePageLayout ? " page-wrap-wide" : ""}`}>
+      <main
+        className={`page-wrap${usesWidePageLayout ? " page-wrap-wide" : ""}${
+          isVisibilityPreviewMode ? " page-wrap-with-preview-bar" : ""
+        }`}
+      >
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route
@@ -1451,7 +1488,7 @@ export function App() {
             element={
                 <CalendarPage
                   data={context.data}
-                  canManageSessions={canManageCalendarSessions}
+                  canManageSessions={uiCanManageCalendarSessions}
                   ensureDayLog={context.ensureDayLog}
                   currentUid={currentUid}
                   linkedMember={linkedMember}
@@ -1489,7 +1526,7 @@ export function App() {
                 data={data}
                 currentUid={currentUid}
                 demoRole={currentOperatorRole}
-                canManageAccounting={canManageAccounting}
+                canManageAccounting={uiCanManageAccounting}
                 isLoading={isLunchRecordsLoading}
                 loadError={lunchRecordsLoadError}
                 createLunchRecord={createFirestoreLunchRecord}
@@ -1498,15 +1535,15 @@ export function App() {
               />
             }
           />
-          <Route path="/dues" element={<FeesPage currentUid={currentUid} isAdmin={isAdmin} />} />
+          <Route path="/dues" element={<FeesPage currentUid={currentUid} isAdmin={uiIsAdmin} />} />
           <Route
             path="/instructor-stipends"
             element={
               canManageAccounting ? (
                 <InstructorStipendsPage
                   currentUid={currentUid}
-                  isAdmin={isAdmin}
-                  canManageAccounting={canManageAccounting}
+                  isAdmin={uiIsAdmin}
+                  canManageAccounting={uiCanManageAccounting}
                 />
               ) : (
                 <Navigate to="/today" replace />
@@ -1559,15 +1596,15 @@ export function App() {
               />
             }
           />
-          <Route path="/docs" element={<DocsListPage isAdmin={isAdmin} />} />
+          <Route path="/docs" element={<DocsListPage isAdmin={uiIsAdmin} />} />
           <Route
             path="/docs/new"
-            element={isAdmin ? <DocsEditorPage mode="new" isAdmin={isAdmin} /> : <Navigate to="/docs" replace />}
+            element={isAdmin ? <DocsEditorPage mode="new" isAdmin={uiIsAdmin} /> : <Navigate to="/docs" replace />}
           />
-          <Route path="/docs/:id" element={<DocsDetailPage isAdmin={isAdmin} />} />
+          <Route path="/docs/:id" element={<DocsDetailPage isAdmin={uiIsAdmin} />} />
           <Route
             path="/docs/:id/edit"
-            element={isAdmin ? <DocsEditorPage mode="edit" isAdmin={isAdmin} /> : <Navigate to="/docs" replace />}
+            element={isAdmin ? <DocsEditorPage mode="edit" isAdmin={uiIsAdmin} /> : <Navigate to="/docs" replace />}
           />
           <Route
             path="/purchases"
@@ -1576,7 +1613,7 @@ export function App() {
                 data={data}
                 currentUid={currentUid}
                 demoRole={currentOperatorRole}
-                canManageAccounting={canManageAccounting}
+                canManageAccounting={uiCanManageAccounting}
                 isLoading={isPurchaseRequestsLoading}
                 loadError={purchaseRequestsLoadError}
                 createPurchaseRequest={createFirestorePurchaseRequest}
@@ -1593,7 +1630,7 @@ export function App() {
                 data={data}
                 currentUid={currentUid}
                 demoRole={currentOperatorRole}
-                canManageAccounting={canManageAccounting}
+                canManageAccounting={uiCanManageAccounting}
                 isLoading={isReimbursementsLoading}
                 loadError={reimbursementsLoadError}
                 createReimbursement={createFirestoreReimbursement}
@@ -1608,7 +1645,7 @@ export function App() {
             element={
               <InstrumentsPage
                 data={data}
-                isAdmin={isAdmin}
+                isAdmin={uiIsAdmin}
                 isLoading={isInstrumentsLoading}
                 loadError={instrumentsLoadError}
                 createInstrument={createFirestoreInstrument}
@@ -1624,7 +1661,7 @@ export function App() {
                 data={data}
                 updateScores={updateScores}
                 saveScore={saveFirestoreScore}
-                isAdmin={isAdmin}
+                isAdmin={uiIsAdmin}
                 isLoading={isScoresLoading}
                 loadError={scoresLoadError}
               />
@@ -1632,7 +1669,16 @@ export function App() {
           />
           <Route path="/links" element={<LinksPage menuRole={currentRole} />} />
           <Route path="/members" element={<MemberDirectoryPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route
+            path="/settings"
+            element={
+              <SettingsPage
+                isAdmin={isAdmin}
+                visibilityPreviewTarget={effectivePreviewTarget}
+                onChangeVisibilityPreviewTarget={setVisibilityPreviewTarget}
+              />
+            }
+          />
           <Route
             path="/settings/members"
             element={isAdmin ? <MembersManagementPage /> : <Navigate to="/today" replace />}
@@ -1654,10 +1700,13 @@ export function App() {
               )
             }
           />
-          <Route path="/accounting" element={<AccountingHome isAdmin={isAdmin} />} />
+          <Route
+            path="/accounting"
+            element={<AccountingHome isAdmin={uiIsAdmin} canManageAccounting={uiCanManageAccounting} />}
+          />
           <Route
             path="/accounting/ledger"
-            element={<AccountLedger isAdmin={isAdmin} canManageAccounting={canManageAccounting} />}
+            element={<AccountLedger isAdmin={uiIsAdmin} canManageAccounting={uiCanManageAccounting} />}
           />
           <Route path="/accounting/report" element={<AccountingReport />} />
           <Route
@@ -1684,6 +1733,41 @@ export function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
+      {isVisibilityPreviewMode && (
+        <div className="visibility-preview-bar" role="region" aria-label="表示プレビュー">
+          <span className="visibility-preview-label">
+            表示プレビュー中: {getVisibilityPreviewLabel(effectivePreviewTarget)}
+          </span>
+          <span className="visibility-preview-subtitle">
+            見え方のみ切り替え中
+            {getVisibilityPreviewSubtitle(visibilityPreviewMember)
+              ? ` / ${getVisibilityPreviewSubtitle(visibilityPreviewMember)}`
+              : ""}
+          </span>
+          <div className="visibility-preview-actions">
+            <select
+              value={effectivePreviewTarget}
+              onChange={(event) =>
+                setVisibilityPreviewTarget(event.target.value as VisibilityPreviewTarget)
+              }
+              aria-label="プレビュー対象"
+            >
+              {visibilityPreviewOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="button button-small button-secondary"
+              onClick={() => setVisibilityPreviewTarget("actual")}
+            >
+              解除
+            </button>
+          </div>
+        </div>
+      )}
       {isMenuOpen && (
         <div className="menu-overlay" onClick={() => setIsMenuOpen(false)}>
           <div className="menu-panel" onClick={(event) => event.stopPropagation()}>

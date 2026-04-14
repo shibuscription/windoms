@@ -9,9 +9,10 @@ import { TransactionForm } from "./TransactionForm";
 
 type AccountingHomeProps = {
   isAdmin: boolean;
+  canManageAccounting: boolean;
 };
 
-export function AccountingHome({ isAdmin }: AccountingHomeProps) {
+export function AccountingHome({ isAdmin, canManageAccounting }: AccountingHomeProps) {
   const { store, currentPeriod, addTransaction, loading, error } = useAccountingStore();
   const [mode, setMode] = useState<TransactionType | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -33,7 +34,7 @@ export function AccountingHome({ isAdmin }: AccountingHomeProps) {
         <div className="empty-state">
           <p>現在の会計期はまだ設定されていません。</p>
           <p className="muted">現在期として扱う `editing` の会計期を1件用意すると、ここに内容を表示できます。</p>
-          {isAdmin && (
+          {canManageAccounting && (
             <div className="accounting-small-links">
               <Link to="/accounting/periods" className="button button-small button-secondary">
                 期管理へ
@@ -62,7 +63,7 @@ export function AccountingHome({ isAdmin }: AccountingHomeProps) {
       {error && <p className="field-error">{error}</p>}
       {submitError && <p className="field-error">{submitError}</p>}
 
-      {isAdmin && (
+      {canManageAccounting && (
         <>
           <div className="accounting-action-row accounting-action-row-fixed">
             <button
@@ -172,7 +173,7 @@ export function AccountingHome({ isAdmin }: AccountingHomeProps) {
         )}
       </div>
 
-      {isAdmin && mode && (
+      {canManageAccounting && mode && (
         <TransactionForm
           mode={mode}
           period={currentPeriod}

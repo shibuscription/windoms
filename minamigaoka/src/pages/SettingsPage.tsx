@@ -5,6 +5,11 @@ import {
   updatePassword,
 } from "firebase/auth";
 import { auth } from "../config/firebase";
+import {
+  getVisibilityPreviewLabel,
+  type VisibilityPreviewTarget,
+  visibilityPreviewOptions,
+} from "../preview/visibilityPreview";
 
 type PasswordFormErrors = {
   currentPassword?: string;
@@ -29,7 +34,17 @@ const toPasswordErrorMessage = (code: string): string => {
   return "パスワード変更に失敗しました。時間をおいてもう一度お試しください。";
 };
 
-export function SettingsPage() {
+type SettingsPageProps = {
+  isAdmin: boolean;
+  visibilityPreviewTarget: VisibilityPreviewTarget;
+  onChangeVisibilityPreviewTarget: (target: VisibilityPreviewTarget) => void;
+};
+
+export function SettingsPage({
+  isAdmin,
+  visibilityPreviewTarget,
+  onChangeVisibilityPreviewTarget,
+}: SettingsPageProps) {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -142,6 +157,45 @@ export function SettingsPage() {
           </button>
         </div>
       </section>
+
+      {isAdmin && (
+        <section className="settings-section">
+          <div className="settings-section-head">
+            <h2>表示プレビュー</h2>
+          </div>
+          <p className="muted">
+            ロールや担当区分ごとの見え方を確認できます。これは表示確認用であり、保存権限や危険操作の最終判定は実際のログイン権限のままです。
+          </p>
+          <label className="field-block">
+            プレビュー対象
+            <select
+              value={visibilityPreviewTarget}
+              onChange={(event) =>
+                onChangeVisibilityPreviewTarget(event.target.value as VisibilityPreviewTarget)
+              }
+            >
+              {visibilityPreviewOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {visibilityPreviewTarget !== "actual" && (
+            <p className="muted">現在は「{getVisibilityPreviewLabel(visibilityPreviewTarget)}」として見え方を確認しています。</p>
+          )}
+          <div className="settings-actions">
+            <button
+              type="button"
+              className="button button-secondary"
+              onClick={() => onChangeVisibilityPreviewTarget("actual")}
+              disabled={visibilityPreviewTarget === "actual"}
+            >
+              解除
+            </button>
+          </div>
+        </section>
+      )}
     </section>
   );
 }

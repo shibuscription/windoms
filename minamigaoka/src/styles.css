@@ -656,6 +656,50 @@ body {
   max-width: 1240px;
 }
 
+.page-wrap-with-preview-bar {
+  padding-bottom: 88px;
+}
+
+.visibility-preview-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  width: min(960px, calc(100% - 24px));
+  padding: 10px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #f8fafc;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.24);
+}
+
+.visibility-preview-label {
+  font-weight: 700;
+}
+
+.visibility-preview-subtitle {
+  color: #cbd5e1;
+  font-size: 0.92rem;
+}
+
+.visibility-preview-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.visibility-preview-actions select {
+  min-width: 180px;
+}
+
 .card {
   background: #fff;
   border: 1px solid #dde1e7;
@@ -7086,6 +7130,35 @@ textarea {
 }
 
 @media (max-width: 768px) {
+  .page-wrap-with-preview-bar {
+    padding-bottom: 104px;
+  }
+
+  .visibility-preview-bar {
+    left: 12px;
+    right: 12px;
+    bottom: 10px;
+    transform: none;
+    width: auto;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .visibility-preview-subtitle {
+    width: 100%;
+    font-size: 0.84rem;
+  }
+
+  .visibility-preview-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .visibility-preview-actions select {
+    flex: 1 1 180px;
+    min-width: 0;
+  }
+
   .calendar-mobile-bleed {
     margin-left: -10px;
     margin-right: -10px;
@@ -7625,6 +7698,10 @@ textarea {
 .settings-actions {
   display: flex;
   justify-content: flex-end;
+}
+
+.settings-actions .button + .button {
+  margin-left: 8px;
 }
 
 .system-notification-textarea {
