@@ -12,6 +12,7 @@ import { groupedAccountingSubjects } from "../accounting/fixedSubjects";
 import { comparePeriodAccounts } from "../accounting/sort";
 import { subscribeFamilies, subscribeMembers } from "../members/service";
 import type { FamilyRecord, MemberRecord } from "../members/types";
+import { sortMembersForDisplay } from "../members/permissions";
 import {
   buildFamilyMap,
   buildMemberIndexes,
@@ -278,7 +279,7 @@ export function ReimbursementsPage({
 
   const buyerOptions = useMemo(
     () =>
-      [...members]
+      sortMembersForDisplay([...members], "all")
         .map((member) => {
           const displayName = member.displayName || member.name || member.loginId || member.id;
           const loginSuffix = member.loginId ? ` (${member.loginId})` : "";
@@ -286,8 +287,7 @@ export function ReimbursementsPage({
             value: member.id,
             label: `${displayName}${loginSuffix}`,
           };
-        })
-        .sort((left, right) => left.label.localeCompare(right.label, "ja")),
+        }),
     [members],
   );
 

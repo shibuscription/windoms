@@ -31,6 +31,7 @@ import {
   normalizeAdminRole,
   normalizeMemberStatus,
   normalizeMemberTypes,
+  sortMembersForDisplay,
   normalizeStaffPermissions,
 } from "./permissions";
 import type {
@@ -271,15 +272,10 @@ export const subscribeFamilies = (callback: (rows: FamilyRecord[]) => void): (()
 export const subscribeMembers = (callback: (rows: MemberRecord[]) => void): (() => void) => {
   ensureDb();
   return onSnapshot(membersCollection!, (snapshot) => {
-    const rows = snapshot.docs
-      .map((item) => toMemberRecord(item.id, item.data() as Record<string, unknown>))
-      .sort((left, right) => {
-        const leftKey = (left.nameKana || left.familyNameKana || left.displayName || left.name || left.id).trim();
-        const rightKey = (right.nameKana || right.familyNameKana || right.displayName || right.name || right.id).trim();
-        const byKey = leftKey.localeCompare(rightKey, "ja");
-        if (byKey !== 0) return byKey;
-        return left.id.localeCompare(right.id, "ja");
-      });
+    const rows = sortMembersForDisplay(
+      snapshot.docs.map((item) => toMemberRecord(item.id, item.data() as Record<string, unknown>)),
+      "all",
+    );
     callback(rows);
     void backfillLegacyMemberNameFields(rows);
   });
