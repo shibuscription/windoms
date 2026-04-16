@@ -158,8 +158,14 @@ export function ReimbursementsPage({
   const [createTitle, setCreateTitle] = useState("");
   const [createAmount, setCreateAmount] = useState("");
   const [createPurchasedAt, setCreatePurchasedAt] = useState(toDateInputValue(new Date()));
+  const [createBuyer, setCreateBuyer] = useState("");
   const [createMemo, setCreateMemo] = useState("");
-  const [createErrors, setCreateErrors] = useState<{ title?: string; amount?: string; purchasedAt?: string }>({});
+  const [createErrors, setCreateErrors] = useState<{
+    title?: string;
+    amount?: string;
+    purchasedAt?: string;
+    buyer?: string;
+  }>({});
   const [isReadingReceipt, setIsReadingReceipt] = useState(false);
   const [ocrToastMessage, setOcrToastMessage] = useState("");
   const [ocrDebug, setOcrDebug] = useState<ReceiptOcrDebugView | null>(null);
@@ -270,11 +276,32 @@ export function ReimbursementsPage({
     });
   }, [data.reimbursements, familiesById, memberIndexes]);
 
+  const buyerOptions = useMemo(
+    () =>
+      [...members]
+        .map((member) => {
+          const displayName = member.displayName || member.name || member.loginId || member.id;
+          const loginSuffix = member.loginId ? ` (${member.loginId})` : "";
+          return {
+            value: member.id,
+            label: `${displayName}${loginSuffix}`,
+          };
+        })
+        .sort((left, right) => left.label.localeCompare(right.label, "ja")),
+    [members],
+  );
+
+  const hasBuyerOption = useMemo(
+    () => buyerOptions.some((option) => option.value === createBuyer),
+    [buyerOptions, createBuyer],
+  );
+
   const openCreateModal = (target?: Reimbursement) => {
     setEditingTarget(target ?? null);
     setCreateTitle(target?.title ?? "");
     setCreateAmount(target ? String(target.amount) : "");
     setCreatePurchasedAt(toDateInputValue(new Date(target?.purchasedAt ?? new Date())));
+    setCreateBuyer(target?.buyer ?? currentUid);
     setCreateMemo(normalizeReimbursementMemo(target?.memo) ?? "");
     clearCreateReceiptPreviews();
     setCreateErrors({});
@@ -301,6 +328,7 @@ export function ReimbursementsPage({
     setOcrPhaseLabel("画像を準備中");
     setOcrProgress(0);
     setSubmitError("");
+    setCreateBuyer(currentUid);
     ocrRunIdRef.current += 1;
     lastOcrTargetReceiptIdRef.current = null;
     clearCreateReceiptPreviews();
@@ -536,7 +564,7 @@ export function ReimbursementsPage({
   }, [createReceiptPreviews, isCreateModalOpen, isReadingReceipt]);
 
   const submitCreate = async () => {
-    const nextErrors: { title?: string; amount?: string; purchasedAt?: string } = {};
+    const nextErrors: { title?: string; amount?: string; purchasedAt?: string; buyer?: string } = {};
     const amountNumber = Number(createAmount);
     if (!createTitle.trim()) nextErrors.title = "タイトルは必須です";
     if (!createAmount.trim() || !Number.isFinite(amountNumber) || amountNumber < 0) {
@@ -544,6 +572,9 @@ export function ReimbursementsPage({
     }
     if (!createPurchasedAt.trim() || Number.isNaN(Date.parse(createPurchasedAt))) {
       nextErrors.purchasedAt = "購入日は必須です";
+    }
+    if (editingTarget && canManageAccounting && !createBuyer.trim()) {
+      nextErrors.buyer = "購入者を選択してください";
     }
     if (Object.keys(nextErrors).length > 0) {
       setCreateErrors(nextErrors);
@@ -560,6 +591,10 @@ export function ReimbursementsPage({
           title: createTitle.trim(),
           amount: amountNumber,
           purchasedAt: purchasedAtIso,
+          buyer:
+            canManageAccounting && createBuyer.trim()
+              ? createBuyer.trim()
+              : editingTarget.buyer,
           memo: createMemo.trim() || undefined,
         });
       } else {
@@ -999,6 +1034,29 @@ export function ReimbursementsPage({
               />
               {createErrors.purchasedAt && <span className="field-error">{createErrors.purchasedAt}</span>}
             </label>
+            {editingTarget && canManageAccounting && (
+              <label>
+                購入者
+                <select
+                  value={createBuyer}
+                  onChange={(event) => {
+                    setCreateBuyer(event.target.value);
+                    setCreateErrors((prev) => ({ ...prev, buyer: undefined }));
+                  }}
+                >
+                  <option value="">選択してください</option>
+                  {createBuyer && !hasBuyerOption && (
+                    <option value={createBuyer}>現在値（未解決）: {createBuyer}</option>
+                  )}
+                  {buyerOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                {createErrors.buyer && <span className="field-error">{createErrors.buyer}</span>}
+              </label>
+            )}
             <label>
               メモ（任意）
               <textarea value={createMemo} onChange={(event) => setCreateMemo(event.target.value)} />
