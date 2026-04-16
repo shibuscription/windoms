@@ -1,0 +1,1626 @@
+{
+  "generatedAt": "2026-04-16T07:07:11.440Z",
+  "sourceCsvPath": "C:\\Users\\shibu\\Desktop\\windoms_schedule_import_guess_until_2026-02.csv",
+  "targetRange": {
+    "endDateInclusive": "2026-02-28"
+  },
+  "counts": {
+    "sourceRows": 129,
+    "targetRows": 129,
+    "excludedRowsAfterRange": 0,
+    "invalidRows": 0,
+    "scheduleDayCount": 86,
+    "sessionCount": 129
+  },
+  "collisionsPolicy": {
+    "onExistingSessions": "abort",
+    "requiresApplyFlag": true
+  },
+  "scheduleDays": {
+    "2025-09-02": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "加藤",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-09-04": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "今井",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-09-06": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "水野",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-09-07": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "熊澤",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-09-09": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "中村",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-09-11": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "今井",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-09-13": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "大滝",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-09-14": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "青木",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-09-16": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "青木",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-09-18": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "水野",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-09-20": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "瀬古",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-09-21": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "event",
+          "eventName": "ママブラスぽっぽ公開練習",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "加藤",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-09-25": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "瀬古",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-09-27": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "熊澤",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "渋谷",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-09-30": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "中村",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-10-02": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "今井",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-10-04": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "大滝",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-10-05": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "瀬古",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-10-07": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "青木",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-10-09": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "瀬古",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-10-11": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "16:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "渋谷",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-10-12": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "青木",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "16:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-10-13": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "11:00",
+          "endTime": "12:00",
+          "type": "event",
+          "eventName": "たじみ陶器まつり",
+          "location": "多治見美濃焼卸センター協同組合\n〒507-0071, 岐阜県多治見市, 旭ケ丘10丁目6-33",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-10-14": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "中村",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-10-16": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "水野",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-10-18": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "水野",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-10-19": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "大滝",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-10-23": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "加藤",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-10-25": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "今井",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "other",
+          "eventName": "休み",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 3,
+          "startTime": "13:00",
+          "endTime": "16:00",
+          "type": "event",
+          "eventName": "東濃ウインド合同練習会",
+          "location": "多治見市消防本部 多治見笠原消防署, 日本、〒507-0901 岐阜県多治見市笠原町２０８１−１",
+          "note": "笠原消防署3階大ホール",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-10-28": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "中村",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-10-30": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "加藤",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-11-01": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "青木",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-11-02": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "大滝",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-11-04": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "中村",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-11-09": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "14:00",
+          "endTime": "17:00",
+          "type": "event",
+          "eventName": "東濃ウインド定期演奏会",
+          "location": "バロー文化ホール\n〒507-0039, 岐阜県多治見市, 十九田町2丁目8 バロー文化ホール(多治見市文化会館)",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-11-13": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "水野",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-11-15": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "熊澤",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-11-16": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "加藤",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-11-18": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "渋谷",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-11-20": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "今井",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-11-22": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "熊澤",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-11-23": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "青木",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-11-25": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "中村",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-11-27": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "加藤",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-11-29": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "event",
+          "eventName": "多治見高校合同練習",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "今井",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-12-02": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "中村",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-12-04": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "瀬古",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-12-06": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "大滝",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-12-07": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "event",
+          "eventName": "ママブラスぽっぽ公開練習",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-12-09": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "青木",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-12-11": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "水野",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-12-13": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "加藤",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-12-14": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "event",
+          "eventName": "アンコン録画",
+          "location": "可児市文化創造センターala, 日本、〒509-0203 岐阜県可児市下恵土３４３３−１３９",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-12-16": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "中村",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-12-18": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "今井",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-12-20": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "今井",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-12-21": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "青木",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-12-23": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "渋谷",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-12-25": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "加藤",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2025-12-28": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "大滝",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "熊澤",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-01-10": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "加藤",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-01-11": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "熊澤",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 3,
+          "startTime": "15:00",
+          "endTime": "18:00",
+          "type": "event",
+          "eventName": "ソロコン録画",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-01-13": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "青木",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-01-15": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "今井",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-01-17": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "14:00",
+          "endTime": "16:00",
+          "type": "other",
+          "eventName": "土岐商吹奏楽団定期演奏会",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-01-18": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "水野",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-01-20": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "中村",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-01-22": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "中村",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-01-24": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "大滝",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-01-25": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "event",
+          "eventName": "ママブラスぽっぽ公開練習",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-01-27": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "瀬古",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-02-05": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "今井",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-02-07": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "熊澤",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-02-08": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "event",
+          "eventName": "ファミリーコンサート",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-02-10": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "中村",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-02-12": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "水野",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-02-14": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "加藤",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-02-15": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "瀬古",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-02-17": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "中村",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-02-19": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "加藤",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-02-21": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "normal",
+          "assigneeNameSnapshot": "大滝",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-02-22": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "event",
+          "eventName": "ママブラスぽっぽ公開練習",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "12:00",
+          "endTime": "15:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-02-24": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "水野",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-02-26": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "17:00",
+          "endTime": "18:30",
+          "type": "normal",
+          "assigneeNameSnapshot": "今井",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-02-27": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "13:05",
+          "endTime": "13:25",
+          "type": "other",
+          "eventName": "校内演奏会予定（音楽室）",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    },
+    "2026-02-28": {
+      "sessions": [
+        {
+          "order": 1,
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "type": "self",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        },
+        {
+          "order": 2,
+          "startTime": "13:00",
+          "endTime": "15:00",
+          "type": "event",
+          "eventName": "平和中合同練習",
+          "dutyRequirement": "duty",
+          "assignees": [],
+          "requiresShift": true
+        }
+      ]
+    }
+  },
+  "excludedRowsAfterRange": [],
+  "invalidRows": []
+}

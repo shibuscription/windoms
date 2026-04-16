@@ -8,6 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 5174",
     "seed:links": "node --env-file=.env ./scripts/seed-links.mjs",
+    "preview:legacy-schedule-import": "node ./scripts/preview-legacy-schedule-import.mjs",
+    "import:legacy-schedule-firestore": "node --env-file=.env ./scripts/import-legacy-schedule-to-firestore.mjs",
     "migrate:accounting-csv": "powershell -ExecutionPolicy Bypass -File ./scripts/normalize-accounting-csv.ps1",
     "cleanup:accounting-migration": "node --env-file=.env ./scripts/cleanup-accounting-period.mjs",
     "import:accounting-migration": "node --env-file=.env ./scripts/import-accounting-migration.mjs",
