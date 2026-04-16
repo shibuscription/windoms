@@ -68,3 +68,35 @@ export const resolveFamilyNameFromIdentifier = ({
 
   return resolveNaturalFallback(identifier) || fallback;
 };
+
+const isLikelyLoginId = (value: string): boolean => /^[a-z0-9_-]{4,20}$/i.test(value);
+
+export const resolveMemberDisplayNameFromIdentifier = ({
+  identifier,
+  memberIndexes,
+  familiesById,
+  fallback = "未設定",
+}: {
+  identifier?: string;
+  memberIndexes: MemberIndexes;
+  familiesById: Map<string, FamilyRecord>;
+  fallback?: string;
+}): string => {
+  if (!identifier) return fallback;
+
+  const member = resolveMemberByIdentifier(identifier, memberIndexes);
+  if (member) {
+    const displayName = (member.displayName || member.name || "").trim();
+    if (displayName) return displayName;
+    const loginId = (member.loginId || "").trim();
+    if (loginId) return loginId;
+  }
+
+  const family = familiesById.get(identifier);
+  if (family?.name?.trim()) return trimFamilySuffix(family.name) || fallback;
+
+  const normalizedIdentifier = identifier.trim();
+  if (isLikelyLoginId(normalizedIdentifier)) return normalizedIdentifier;
+
+  return resolveNaturalFallback(normalizedIdentifier) || normalizedIdentifier || fallback;
+};

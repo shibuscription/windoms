@@ -1629,6 +1629,7 @@ export function App() {
               <ReimbursementsPage
                 data={data}
                 currentUid={currentUid}
+                currentLoginId={authUser?.loginId ?? ""}
                 demoRole={currentOperatorRole}
                 canManageAccounting={uiCanManageAccounting}
                 isLoading={isReimbursementsLoading}

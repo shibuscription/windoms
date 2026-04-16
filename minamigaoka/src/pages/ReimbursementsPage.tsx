@@ -15,13 +15,14 @@ import type { FamilyRecord, MemberRecord } from "../members/types";
 import {
   buildFamilyMap,
   buildMemberIndexes,
-  resolveFamilyNameFromIdentifier,
+  resolveMemberDisplayNameFromIdentifier,
   resolveMemberByIdentifier,
 } from "../members/familyNameResolver";
 
 type ReimbursementsPageProps = {
   data: DemoData;
   currentUid: string;
+  currentLoginId: string;
   demoRole: "admin" | "parent";
   canManageAccounting: boolean;
   isLoading: boolean;
@@ -130,6 +131,7 @@ const normalizeReimbursementMemo = (value?: string): string | undefined => {
 export function ReimbursementsPage({
   data,
   currentUid,
+  currentLoginId,
   demoRole,
   canManageAccounting,
   isLoading,
@@ -194,8 +196,10 @@ export function ReimbursementsPage({
   const memberIndexes = useMemo(() => buildMemberIndexes(members), [members]);
   const familiesById = useMemo(() => buildFamilyMap(families), [families]);
   const currentUserMember = useMemo(
-    () => resolveMemberByIdentifier(currentUid, memberIndexes),
-    [currentUid, memberIndexes],
+    () =>
+      resolveMemberByIdentifier(currentUid, memberIndexes) ??
+      resolveMemberByIdentifier(currentLoginId, memberIndexes),
+    [currentUid, currentLoginId, memberIndexes],
   );
   useEffect(() => {
     const unsubscribeMembers = subscribeMembers(setMembers);
@@ -206,8 +210,8 @@ export function ReimbursementsPage({
     };
   }, []);
 
-  const resolveBuyerFamilyName = (buyer?: string): string =>
-    resolveFamilyNameFromIdentifier({
+  const resolveBuyerDisplayName = (buyer?: string): string =>
+    resolveMemberDisplayNameFromIdentifier({
       identifier: buyer,
       memberIndexes,
       familiesById,
@@ -217,6 +221,7 @@ export function ReimbursementsPage({
   const matchesCurrentUser = (identifier?: string): boolean => {
     if (!identifier) return false;
     if (identifier === currentUid) return true;
+    if (currentLoginId && identifier === currentLoginId) return true;
     const resolved = resolveMemberByIdentifier(identifier, memberIndexes);
     if (!resolved || !currentUserMember) return false;
     return (
@@ -258,7 +263,7 @@ export function ReimbursementsPage({
         }
         buckets.set(buyerKey, {
           buyerKey,
-          buyerName: resolveBuyerFamilyName(item.buyer),
+          buyerName: resolveBuyerDisplayName(item.buyer),
           count: 1,
           totalAmount: item.amount,
         });
@@ -568,7 +573,12 @@ export function ReimbursementsPage({
             title: createTitle.trim(),
             amount: amountNumber,
             purchasedAt: purchasedAtIso,
-            buyer: currentUid,
+            buyer:
+              currentUserMember?.id ||
+              currentUserMember?.authUid ||
+              currentUserMember?.loginId ||
+              currentLoginId ||
+              currentUid,
             memo: createMemo.trim() || undefined,
             accountingSourceType: "reimbursement",
             accountingSourceId: "",
@@ -740,7 +750,7 @@ export function ReimbursementsPage({
                 </span>
               </div>
               <p className="reimbursement-meta">
-                <span>購入者: {resolveBuyerFamilyName(item.buyer)}</span>
+                <span>購入者: {resolveBuyerDisplayName(item.buyer)}</span>
                 <span>購入日: {toDateLabel(item.purchasedAt)}</span>
                 <span>金額: {item.amount.toLocaleString()}円</span>
               </p>
@@ -1043,7 +1053,7 @@ export function ReimbursementsPage({
               ×
             </button>
             <h3>{detailTarget.source === "lunch" ? "🍱 " : ""}{detailTarget.title}</h3>
-            <p className="muted">購入者: {resolveBuyerFamilyName(detailTarget.buyer)}</p>
+            <p className="muted">購入者: {resolveBuyerDisplayName(detailTarget.buyer)}</p>
             <p className="muted">購入日: {toDateLabel(detailTarget.purchasedAt)}</p>
             <p className="muted">金額: {detailTarget.amount.toLocaleString()}円</p>
             <p className="muted">会計連携状態: {detailTarget.accountingLinked || detailTarget.accountingEntryId ? "会計連携済み" : "会計連携なし"}</p>
@@ -1115,7 +1125,7 @@ export function ReimbursementsPage({
             <h3>支払済にしますか？</h3>
             <p className="modal-summary">{paidModalTarget.title}</p>
             <p className="muted">金額: {paidModalTarget.amount.toLocaleString()}円</p>
-            <p className="muted">購入者: {resolveBuyerFamilyName(paidModalTarget.buyer)}</p>
+            <p className="muted">購入者: {resolveBuyerDisplayName(paidModalTarget.buyer)}</p>
             <p className="muted">購入日: {toDateLabel(paidModalTarget.purchasedAt)}</p>
             {normalizeReimbursementMemo(paidModalTarget.memo) && <p className="muted">メモ: {normalizeReimbursementMemo(paidModalTarget.memo)}</p>}
             <label className="purchase-option-check">
@@ -1204,7 +1214,7 @@ export function ReimbursementsPage({
             <h3>{confirmDialogTitle}</h3>
             <p className="modal-summary">{confirmDialog.reimbursement.title}</p>
             <p className="muted">金額: {confirmDialog.reimbursement.amount.toLocaleString()}円</p>
-            <p className="muted">購入者: {resolveBuyerFamilyName(confirmDialog.reimbursement.buyer)}</p>
+            <p className="muted">購入者: {resolveBuyerDisplayName(confirmDialog.reimbursement.buyer)}</p>
             <p className="muted">購入日: {toDateLabel(confirmDialog.reimbursement.purchasedAt)}</p>
             {normalizeReimbursementMemo(confirmDialog.reimbursement.memo) && <p className="muted">メモ: {normalizeReimbursementMemo(confirmDialog.reimbursement.memo)}</p>}
             <p className="muted">会計連携状態: {confirmDialog.reimbursement.accountingLinked || confirmDialog.reimbursement.accountingEntryId ? "会計連携済み" : "会計連携なし"}</p>
