@@ -4,7 +4,7 @@ import { sortMembersForDisplay } from "../members/permissions";
 import { subscribeMembers } from "../members/service";
 import type { MemberRecord } from "../members/types";
 import {
-  cancelManualNotificationHistory,
+  deleteNotificationHistory,
   sendSystemNotification,
   subscribeNotificationHistory,
 } from "../notifications/service";
@@ -122,11 +122,11 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
   const [audienceScope, setAudienceScope] = useState<NotificationAudienceScope>("all");
   const [audienceUserUids, setAudienceUserUids] = useState<string[]>([]);
   const [isSending, setIsSending] = useState(false);
-  const [isCanceling, setIsCanceling] = useState(false);
+  const [isDeletingHistory, setIsDeletingHistory] = useState(false);
   const [isLoadingMembers, setIsLoadingMembers] = useState(true);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
-  const [pendingCancelHistoryId, setPendingCancelHistoryId] = useState<string | null>(null);
+  const [pendingDeleteHistoryId, setPendingDeleteHistoryId] = useState<string | null>(null);
   const [historyMonth, setHistoryMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [historyKindFilter, setHistoryKindFilter] = useState<"all" | NotificationHistoryKind>("all");
 
@@ -252,21 +252,26 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
     }
   };
 
-  const handleCancelHistory = async () => {
-    if (!pendingCancelHistoryId) return;
-    setIsCanceling(true);
+  const handleDeleteHistory = async () => {
+    if (!pendingDeleteHistoryId) return;
+    const targetHistory = history.find((item) => item.id === pendingDeleteHistoryId) ?? null;
+    if (!targetHistory) {
+      setPendingDeleteHistoryId(null);
+      return;
+    }
+    setIsDeletingHistory(true);
     setPageError("");
     try {
-      await cancelManualNotificationHistory(pendingCancelHistoryId);
-      if (selectedHistoryId === pendingCancelHistoryId) {
+      await deleteNotificationHistory(targetHistory);
+      if (selectedHistoryId === pendingDeleteHistoryId) {
         setSelectedHistoryId(null);
       }
-      setPendingCancelHistoryId(null);
-      setSuccessMessage(TEXT.canceled);
+      setPendingDeleteHistoryId(null);
+      setSuccessMessage(targetHistory.kind === "manual" ? TEXT.canceled : "通知を削除しました。");
     } catch (error) {
-      setPageError(error instanceof Error ? error.message : "通知取消に失敗しました。");
+      setPageError(error instanceof Error ? error.message : "通知の削除に失敗しました。");
     } finally {
-      setIsCanceling(false);
+      setIsDeletingHistory(false);
     }
   };
 
@@ -471,13 +476,14 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
               >
                 閉じる
               </button>
-              {selectedHistory.kind === "manual" && selectedHistory.isCancelable && (
+              {((selectedHistory.kind === "manual" && selectedHistory.isCancelable) ||
+                selectedHistory.kind === "auto") && (
                 <button
                   type="button"
                   className="button events-danger-button"
-                  onClick={() => setPendingCancelHistoryId(selectedHistory.id)}
+                  onClick={() => setPendingDeleteHistoryId(selectedHistory.id)}
                 >
-                  {TEXT.cancelHistory}
+                  {selectedHistory.kind === "manual" ? TEXT.cancelHistory : "削除"}
                 </button>
               )}
             </div>
@@ -485,16 +491,32 @@ export function SystemNotificationsPage({ currentMember, currentLoginId }: Props
         </div>
       )}
 
-      {pendingCancelHistoryId && (
+      {pendingDeleteHistoryId && (
         <ConfirmationDialog
-          title="通知を取り消しますか？"
-          message="この通知を取り消すと、配布済みの全ユーザー通知も削除されます。"
-          summary="手動通知のみ取り消せます。すでに対応済の通知も対象です。"
-          confirmLabel={isCanceling ? TEXT.canceling : TEXT.cancelHistory}
+          title={selectedHistory?.kind === "manual" ? "通知を取り消しますか？" : "通知を削除しますか？"}
+          message={
+            selectedHistory?.kind === "manual"
+              ? "この通知を取り消すと、配布済みの全ユーザー通知も削除されます。"
+              : "この自動通知を削除しますか？ 配布済みの全ユーザー通知と履歴から削除します。"
+          }
+          summary={
+            selectedHistory?.kind === "manual"
+              ? "手動通知のみ取り消せます。すでに対応済の通知も対象です。"
+              : "元の購入依頼や立替などの元レコードは削除しません。通知データだけを削除します。"
+          }
+          confirmLabel={
+            isDeletingHistory
+              ? selectedHistory?.kind === "manual"
+                ? TEXT.canceling
+                : "削除中..."
+              : selectedHistory?.kind === "manual"
+                ? TEXT.cancelHistory
+                : "削除"
+          }
           danger
-          busy={isCanceling}
-          onClose={() => setPendingCancelHistoryId(null)}
-          onConfirm={handleCancelHistory}
+          busy={isDeletingHistory}
+          onClose={() => setPendingDeleteHistoryId(null)}
+          onConfirm={handleDeleteHistory}
         />
       )}
     </section>

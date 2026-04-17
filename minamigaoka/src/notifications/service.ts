@@ -344,22 +344,24 @@ export const subscribeNotificationHistory = (
   );
 };
 
-export const cancelManualNotificationHistory = async (
-  historyId: string,
+export const deleteNotificationHistory = async (
+  history: NotificationHistoryRecord,
 ): Promise<void> => {
   ensureDb();
 
   const relatedNotifications = await getDocs(
     query(
       collectionGroup(db!, "notifications"),
-      where("sourceModule", "==", "system-notifications"),
-      where("sourceRecordId", "==", historyId),
+      where("sourceModule", "==", history.sourceModule),
+      where("sourceRecordId", "==", history.sourceRecordId),
     ),
   );
 
   const batch = writeBatch(db!);
-  batch.delete(doc(notificationHistoryCollection(), historyId));
-  batch.delete(doc(systemNotificationsCollection(), historyId));
+  batch.delete(doc(notificationHistoryCollection(), history.id));
+  if (history.kind === "manual") {
+    batch.delete(doc(systemNotificationsCollection(), history.id));
+  }
   relatedNotifications.docs.forEach((item) => {
     batch.delete(item.ref);
   });
