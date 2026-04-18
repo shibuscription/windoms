@@ -398,14 +398,10 @@ export function EventsPage({
       return;
     }
     const selectedMemberExists = selectableOutboundMembers.some((member) => member.id === selectedOutboundMemberId);
-    const shouldResetSelection =
-      !selectedOutboundMemberId || !selectedMemberExists || outboundAssignedIds.has(selectedOutboundMemberId);
+    const shouldResetSelection = Boolean(selectedOutboundMemberId) &&
+      (!selectedMemberExists || outboundAssignedIds.has(selectedOutboundMemberId));
     if (shouldResetSelection) {
-      const nextSelectedId =
-        selectableOutboundMembers.find((member) => !outboundAssignedIds.has(member.id))?.id ??
-        selectableOutboundMembers[0].id;
-      if (nextSelectedId === selectedOutboundMemberId) return;
-      setSelectedOutboundMemberId(nextSelectedId);
+      setSelectedOutboundMemberId("");
     }
   }, [editingCarpoolVehicleKey, outboundAssignedIds, selectableOutboundMembers, selectedOutboundMemberId]);
 
@@ -416,14 +412,10 @@ export function EventsPage({
       return;
     }
     const selectedMemberExists = selectableReturnMembers.some((member) => member.id === selectedReturnMemberId);
-    const shouldResetSelection =
-      !selectedReturnMemberId || !selectedMemberExists || returnAssignedIds.has(selectedReturnMemberId);
+    const shouldResetSelection = Boolean(selectedReturnMemberId) &&
+      (!selectedMemberExists || returnAssignedIds.has(selectedReturnMemberId));
     if (shouldResetSelection) {
-      const nextSelectedId =
-        selectableReturnMembers.find((member) => !returnAssignedIds.has(member.id))?.id ??
-        selectableReturnMembers[0].id;
-      if (nextSelectedId === selectedReturnMemberId) return;
-      setSelectedReturnMemberId(nextSelectedId);
+      setSelectedReturnMemberId("");
     }
   }, [editingCarpoolVehicleKey, returnAssignedIds, selectableReturnMembers, selectedReturnMemberId]);
 
@@ -775,6 +767,11 @@ export function EventsPage({
       ...current,
       [direction]: [...current[direction], memberId],
     }));
+    if (direction === "outboundMemberIds") {
+      setSelectedOutboundMemberId("");
+      return;
+    }
+    setSelectedReturnMemberId("");
   };
 
   const removeCarpoolAssignmentMember = (
@@ -1783,8 +1780,11 @@ export function EventsPage({
                     value={selectedOutboundMemberId}
                     onChange={(event) => setSelectedOutboundMemberId(event.target.value)}
                   >
+                    <option value="">選択してください</option>
                     {selectableOutboundMembers.length === 0 ? (
-                      <option value="">候補メンバーがありません</option>
+                      <option value="" disabled>
+                        候補メンバーがありません
+                      </option>
                     ) : (
                       selectableOutboundMembers.map((member) => (
                         <option
@@ -1850,8 +1850,11 @@ export function EventsPage({
                     value={selectedReturnMemberId}
                     onChange={(event) => setSelectedReturnMemberId(event.target.value)}
                   >
+                    <option value="">選択してください</option>
                     {selectableReturnMembers.length === 0 ? (
-                      <option value="">候補メンバーがありません</option>
+                      <option value="" disabled>
+                        候補メンバーがありません
+                      </option>
                     ) : (
                       selectableReturnMembers.map((member) => (
                         <option
