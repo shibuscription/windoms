@@ -1567,6 +1567,44 @@ body {
   font-weight: 700;
 }
 
+.events-timetable-row {
+  align-items: center;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.events-timetable-line {
+  display: grid;
+  grid-template-columns: 4.5em 1.2em 4.5em minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 8px;
+}
+
+.events-timetable-start,
+.events-timetable-end,
+.events-timetable-separator {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.events-timetable-separator {
+  text-align: center;
+  color: #64748b;
+}
+
+.events-timetable-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.events-timetable-detail-trigger {
+  text-decoration: none;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
 .events-inline-actions {
   display: flex;
   flex-wrap: wrap;
@@ -1707,6 +1745,16 @@ body {
   .events-checklist-row,
   .events-carpool-row {
     flex-direction: column;
+  }
+
+  .events-timetable-row {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .events-timetable-line {
+    grid-template-columns: 4.2em 1.1em 4.2em minmax(0, 1fr) auto;
+    column-gap: 6px;
   }
 
   .events-inline-actions {

@@ -1124,25 +1124,25 @@ export function EventsPage({
               </div>
               <div className="events-simple-list">
                 {selectedEventTimetableItems.map((item) => (
-                  <article key={item.id} className="events-simple-list-row">
+                  <article key={item.id} className="events-simple-list-row events-timetable-row">
                     <div className="events-simple-list-main">
-                      <p className="events-simple-list-title">
-                        <span className="events-time-chip">{formatTimelineRange(item)}</span>
-                        <span>{item.title}</span>
-                      </p>
-                      <p className="events-simple-list-meta">
+                      <div className="events-timetable-line">
+                        <span className="events-timetable-start">{item.startTime}</span>
+                        <span className="events-timetable-separator">{item.endTime?.trim() ? "-" : ""}</span>
+                        <span className="events-timetable-end">{item.endTime?.trim() ?? ""}</span>
+                        <span className="events-timetable-title">{item.title}</span>
                         {item.details?.trim() ? (
                           <button
                             type="button"
-                            className="events-inline-link"
+                            className="events-inline-link events-timetable-detail-trigger"
                             onClick={() => setDetailTimetableItemId(item.id)}
+                            aria-label={`${item.title} の詳細を表示`}
+                            title="詳細を表示"
                           >
-                            詳細あり
+                            📝
                           </button>
-                        ) : (
-                          <span className="muted">詳細なし</span>
-                        )}
-                      </p>
+                        ) : null}
+                      </div>
                     </div>
                     {isManager && (
                       <div className="events-inline-actions">
