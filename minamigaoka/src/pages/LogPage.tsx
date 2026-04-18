@@ -685,7 +685,7 @@ export function LogPage({
   const [pendingRemoveArrayItem, setPendingRemoveArrayItem] = useState<PendingRemoveArrayItemState | null>(null);
   const [pendingStampSession, setPendingStampSession] = useState<{
     sessionOrder: number;
-    mode: "undo" | "overwrite";
+    mode: "undo" | "overwrite" | "claim";
     fromName: string;
   } | null>(null);
   const [notesDraft, setNotesDraft] = useState(log.notes ?? "");
@@ -1144,8 +1144,13 @@ export function LogPage({
   const onStampDuty = (sessionOrder: number, plannedName: string) => {
     const key = String(sessionOrder);
     const current = log.dutyStamps?.[key];
+    const plannedFamilyName = toFamilyName(plannedName ?? "");
 
     if (!current) {
+      if (plannedFamilyName && plannedFamilyName !== currentStampFamilyName) {
+        setPendingStampSession({ sessionOrder, mode: "claim", fromName: plannedFamilyName });
+        return;
+      }
       applyDutyStamp(sessionOrder);
       return;
     }
@@ -1567,11 +1572,13 @@ export function LogPage({
             <button type="button" className="modal-close" onClick={() => setPendingStampSession(null)} aria-label="閉じる" title="閉じる">
               ×
             </button>
-            <p className="modal-context">
-              {pendingStampSession.mode === "undo"
-                ? `「${pendingStampSession.fromName}」の捺印を取り消して未押下に戻しますか？`
-                : `当番者を「${pendingStampSession.fromName}」から「${currentStampFamilyName}」に書き換えます。よろしいですか？`}
-            </p>
+              <p className="modal-context">
+                {pendingStampSession.mode === "undo"
+                  ? `「${pendingStampSession.fromName}」の捺印を取り消して未押下に戻しますか？`
+                  : pendingStampSession.mode === "claim"
+                    ? `予定当番「${pendingStampSession.fromName}」の枠へ「${currentStampFamilyName}」として捺印します。よろしいですか？`
+                    : `当番者を「${pendingStampSession.fromName}」から「${currentStampFamilyName}」に書き換えます。よろしいですか？`}
+              </p>
             <div className="modal-actions">
               <button type="button" className="button button-secondary" onClick={() => setPendingStampSession(null)}>
                 やめる
