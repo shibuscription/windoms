@@ -1,0 +1,11 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      // Temporary authenticated-only rule for the trial operation phase.
+      // Tighten this after role- and data-based access control is stabilized.
+      allow read, write: if request.auth != null;
+    }
+  }
+}
