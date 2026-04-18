@@ -1272,7 +1272,9 @@ export function EventsPage({
                     return (
                       <article
                         key={item.id}
-                        className={`events-checklist-row events-checklist-item-row ${isManager ? "events-checklist-item-row-manageable" : ""}`}
+                        className={`events-checklist-row events-checklist-item-row ${isManager ? "events-checklist-item-row-manageable" : ""} ${
+                          item.checked ? "completed" : ""
+                        }`}
                         onDragOver={
                           isManager && draggingChecklistItem?.scope === "common"
                             ? (event) => event.preventDefault()
@@ -1358,7 +1360,9 @@ export function EventsPage({
                     return (
                       <article
                         key={item.id}
-                        className={`events-checklist-row events-checklist-item-row ${isManager ? "events-checklist-item-row-manageable" : ""}`}
+                        className={`events-checklist-row events-checklist-item-row ${isManager ? "events-checklist-item-row-manageable" : ""} ${
+                          personalCheckedItemIds.includes(item.id) ? "completed" : ""
+                        }`}
                         onDragOver={
                           isManager && draggingChecklistItem?.scope === "personal"
                             ? (event) => event.preventDefault()

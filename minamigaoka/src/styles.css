@@ -1699,6 +1699,14 @@ body {
   overflow-wrap: break-word;
 }
 
+.events-checklist-item-row.completed {
+  opacity: 0.62;
+}
+
+.events-checklist-item-row.completed .events-checklist-label {
+  text-decoration: line-through;
+}
+
 .events-checklist-memo {
   color: #475569;
   font-size: 0.88rem;
