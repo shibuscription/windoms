@@ -5953,6 +5953,14 @@ body {
   box-shadow: 0 8px 20px rgba(15, 23, 42, 0.14);
 }
 
+.suggestion-dropdown-portal {
+  top: auto;
+  left: auto;
+  right: auto;
+  z-index: 2400;
+  max-height: min(320px, calc(100vh - 32px));
+}
+
 .suggestion-option {
   border: 0;
   border-bottom: 1px solid #e5e7eb;

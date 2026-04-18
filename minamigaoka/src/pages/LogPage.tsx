@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useParams } from "react-router-dom";
 import type { Activity, DayLog, DemoData, DemoRsvp, RsvpStatus, SessionDoc } from "../types";
 import { isChildMember, sortMembersForDisplay } from "../members/permissions";
@@ -303,6 +304,7 @@ function SongInlineSuggestAdd({
   const [isOpen, setIsOpen] = useState(false);
   const [pinnedClose, setPinnedClose] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
+  const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left: number; width: number } | null>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
   const toastTimerRef = useRef<number | null>(null);
 
@@ -329,6 +331,32 @@ function SongInlineSuggestAdd({
       window.clearTimeout(toastTimerRef.current);
     }
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setDropdownStyle(null);
+      return;
+    }
+    const updateDropdownStyle = () => {
+      if (!anchorRef.current) {
+        setDropdownStyle(null);
+        return;
+      }
+      const rect = anchorRef.current.getBoundingClientRect();
+      setDropdownStyle({
+        top: rect.bottom,
+        left: rect.left,
+        width: rect.width,
+      });
+    };
+    updateDropdownStyle();
+    window.addEventListener("resize", updateDropdownStyle);
+    window.addEventListener("scroll", updateDropdownStyle, true);
+    return () => {
+      window.removeEventListener("resize", updateDropdownStyle);
+      window.removeEventListener("scroll", updateDropdownStyle, true);
+    };
+  }, [isOpen]);
 
   const selectedLabels = useMemo(
     () => selectedSongIds.map((id) => songMaster.find((song) => song.id === id)?.name ?? id),
@@ -451,34 +479,47 @@ function SongInlineSuggestAdd({
               </button>
             </div>
             {toastMessage && <div className="inline-toast">{toastMessage}</div>}
-            {isOpen && (
-              <div className="suggestion-dropdown" role="listbox">
-                {isLoading ? (
-                  <div className="suggestion-empty">候補を読み込み中です</div>
-                ) : loadError ? (
-                  <div className="suggestion-empty">{loadError}</div>
-                ) : suggestions.length > 0 ? (
-                  suggestions.map((song) => (
-                    <button
-                      key={song.id}
-                      type="button"
-                      className="suggestion-option"
-                      onPointerDown={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                      }}
-                      onClick={() => {
-                        if (addSelectedSong(song.id)) closeEditor();
-                      }}
-                    >
-                      {song.name}
-                    </button>
-                  ))
-                ) : (
-                  <div className="suggestion-empty">候補がありません</div>
-                )}
-              </div>
-            )}
+            {isOpen &&
+              dropdownStyle &&
+              typeof document !== "undefined" &&
+              createPortal(
+                <div
+                  className="suggestion-dropdown suggestion-dropdown-portal"
+                  role="listbox"
+                  style={{
+                    position: "fixed",
+                    top: `${dropdownStyle.top}px`,
+                    left: `${dropdownStyle.left}px`,
+                    width: `${dropdownStyle.width}px`,
+                  }}
+                >
+                  {isLoading ? (
+                    <div className="suggestion-empty">候補を読み込み中です</div>
+                  ) : loadError ? (
+                    <div className="suggestion-empty">{loadError}</div>
+                  ) : suggestions.length > 0 ? (
+                    suggestions.map((song) => (
+                      <button
+                        key={song.id}
+                        type="button"
+                        className="suggestion-option"
+                        onPointerDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        onClick={() => {
+                          if (addSelectedSong(song.id)) closeEditor();
+                        }}
+                      >
+                        {song.name}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="suggestion-empty">候補がありません</div>
+                  )}
+                </div>,
+                document.body,
+              )}
           </div>
           <div className="inline-add-actions">
             <button type="button" className="button button-small ghost-button" onClick={closeEditor}>

@@ -1612,6 +1612,7 @@ export function App() {
               <PurchasesPage
                 data={data}
                 currentUid={currentUid}
+                linkedMember={linkedMember}
                 demoRole={currentOperatorRole}
                 canManageAccounting={uiCanManageAccounting}
                 isLoading={isPurchaseRequestsLoading}

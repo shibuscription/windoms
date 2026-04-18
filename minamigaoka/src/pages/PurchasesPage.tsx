@@ -41,6 +41,7 @@ type PurchaseConfirmDialogState = { mode: "delete"; purchase: PurchaseRequest } 
 type PurchasesPageProps = {
   data: DemoData;
   currentUid: string;
+  linkedMember: MemberRecord | null;
   demoRole: DemoRole;
   canManageAccounting: boolean;
   isLoading: boolean;
@@ -124,6 +125,7 @@ const createCompleteDraft = (
 export function PurchasesPage({
   data,
   currentUid,
+  linkedMember,
   demoRole,
   canManageAccounting,
   isLoading,
@@ -220,15 +222,28 @@ export function PurchasesPage({
     [data.purchaseRequests, titleQuery],
   );
 
-  const userName = (identifier?: string): string =>
-    identifier
-      ? resolveFamilyNameFromIdentifier({
-          identifier,
-          memberIndexes,
-          familiesById,
-          fallback: identifier,
-        }) || identifier
-      : "未設定";
+  const userName = (identifier?: string): string => {
+    if (!identifier) return "未設定";
+    const resolved =
+      resolveFamilyNameFromIdentifier({
+        identifier,
+        memberIndexes,
+        familiesById,
+        fallback: "",
+      }) || "";
+    if (resolved) return resolved;
+
+    const legacyUser = data.users[identifier];
+    if (legacyUser?.householdId) {
+      const legacyHousehold = data.households[legacyUser.householdId];
+      const householdLabel = legacyHousehold?.label?.trim() ?? "";
+      if (householdLabel) {
+        return householdLabel.endsWith("家") ? householdLabel.slice(0, -1) : householdLabel;
+      }
+    }
+
+    return identifier;
+  };
   const canEditPurchase = (purchase: PurchaseRequest): boolean => isAdmin || (purchase.status === "OPEN" && purchase.createdBy === currentUid);
   const canDeletePurchase = (purchase: PurchaseRequest): boolean => isAdmin || (purchase.status === "OPEN" && purchase.createdBy === currentUid);
 
@@ -361,7 +376,7 @@ export function PurchasesPage({
             reimbursementId: modalTarget.purchaseResult?.reimbursementId,
           },
         },
-        completedBy: currentUid,
+        completedBy: linkedMember?.id || currentUid,
         itemName: completeDraft.itemName.trim(),
         quantity: completeDraft.quantity.trim(),
         amount: amountNumber,
