@@ -1181,13 +1181,13 @@ export function EventsPage({
                   )}
                 </div>
                 <div className="events-checklist-list">
-                  {selectedEventCommonChecklistItems.map((item) => (
-                    <article key={item.id} className="events-checklist-row">
-                      <label className="events-checklist-toggle">
-                        <input type="checkbox" checked={item.checked} onChange={() => void toggleCommonChecklistItem(item.id)} />
-                        <span>
-                          <strong>{item.label}</strong>
-                          {item.memo?.trim() && <span className="events-checklist-memo">{item.memo}</span>}
+                    {selectedEventCommonChecklistItems.map((item) => (
+                      <article key={item.id} className="events-checklist-row events-checklist-item-row">
+                        <label className="events-checklist-toggle">
+                          <input type="checkbox" checked={item.checked} onChange={() => void toggleCommonChecklistItem(item.id)} />
+                          <span>
+                            <strong>{item.label}</strong>
+                            {item.memo?.trim() && <span className="events-checklist-memo">{item.memo}</span>}
                         </span>
                       </label>
                       {isManager && (
@@ -1230,14 +1230,13 @@ export function EventsPage({
                     </button>
                   )}
                 </div>
-                <p className="muted">自分の持ち物確認だけを切り替えます。</p>
-                <div className="events-checklist-list">
-                  {selectedEventPersonalChecklistItems.map((item) => (
-                    <article key={item.id} className="events-checklist-row">
-                      <label className="events-checklist-toggle">
-                        <input
-                          type="checkbox"
-                          checked={personalCheckedItemIds.includes(item.id)}
+                  <div className="events-checklist-list">
+                    {selectedEventPersonalChecklistItems.map((item) => (
+                      <article key={item.id} className="events-checklist-row events-checklist-item-row">
+                        <label className="events-checklist-toggle">
+                          <input
+                            type="checkbox"
+                            checked={personalCheckedItemIds.includes(item.id)}
                           onChange={() => void togglePersonalChecklistItem(item.id)}
                         />
                         <span>
