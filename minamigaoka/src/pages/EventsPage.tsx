@@ -1181,38 +1181,46 @@ export function EventsPage({
                   )}
                 </div>
                 <div className="events-checklist-list">
-                    {selectedEventCommonChecklistItems.map((item) => (
+                  {selectedEventCommonChecklistItems.map((item) => {
+                    const inputId = `common-checklist-${item.id}`;
+                    return (
                       <article key={item.id} className="events-checklist-row events-checklist-item-row">
-                        <label className="events-checklist-toggle">
-                          <input type="checkbox" checked={item.checked} onChange={() => void toggleCommonChecklistItem(item.id)} />
-                          <span>
-                            <strong>{item.label}</strong>
-                            {item.memo?.trim() && <span className="events-checklist-memo">{item.memo}</span>}
-                        </span>
-                      </label>
-                      {isManager && (
-                        <div className="events-inline-actions">
-                          <button
-                            type="button"
-                            className="button button-small button-secondary"
-                            onClick={() => openChecklistEditor("common", item)}
-                          >
-                            編集
-                          </button>
-                          <button
-                            type="button"
-                            className="button button-small events-danger-button"
-                            onClick={() => {
-                              setDeleteChecklistScope("common");
-                              setDeleteChecklistItemId(item.id);
-                            }}
-                          >
-                            削除
-                          </button>
+                        <div className="events-checklist-box">
+                          <input
+                            id={inputId}
+                            type="checkbox"
+                            checked={item.checked}
+                            onChange={() => void toggleCommonChecklistItem(item.id)}
+                          />
                         </div>
-                      )}
-                    </article>
-                  ))}
+                        <label className="events-checklist-content" htmlFor={inputId}>
+                          <strong className="events-checklist-label">{item.label}</strong>
+                          {item.memo?.trim() && <span className="events-checklist-memo">{item.memo}</span>}
+                        </label>
+                        {isManager && (
+                          <div className="events-inline-actions">
+                            <button
+                              type="button"
+                              className="button button-small button-secondary"
+                              onClick={() => openChecklistEditor("common", item)}
+                            >
+                              編集
+                            </button>
+                            <button
+                              type="button"
+                              className="button button-small events-danger-button"
+                              onClick={() => {
+                                setDeleteChecklistScope("common");
+                                setDeleteChecklistItemId(item.id);
+                              }}
+                            >
+                              削除
+                            </button>
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })}
                   {selectedEventCommonChecklistItems.length === 0 && <p className="muted">共通持ち物はありません。</p>}
                 </div>
               </div>
@@ -1230,43 +1238,47 @@ export function EventsPage({
                     </button>
                   )}
                 </div>
-                  <div className="events-checklist-list">
-                    {selectedEventPersonalChecklistItems.map((item) => (
+                <div className="events-checklist-list">
+                  {selectedEventPersonalChecklistItems.map((item) => {
+                    const inputId = `personal-checklist-${item.id}`;
+                    return (
                       <article key={item.id} className="events-checklist-row events-checklist-item-row">
-                        <label className="events-checklist-toggle">
+                        <div className="events-checklist-box">
                           <input
+                            id={inputId}
                             type="checkbox"
                             checked={personalCheckedItemIds.includes(item.id)}
-                          onChange={() => void togglePersonalChecklistItem(item.id)}
-                        />
-                        <span>
-                          <strong>{item.label}</strong>
-                          {item.memo?.trim() && <span className="events-checklist-memo">{item.memo}</span>}
-                        </span>
-                      </label>
-                      {isManager && (
-                        <div className="events-inline-actions">
-                          <button
-                            type="button"
-                            className="button button-small button-secondary"
-                            onClick={() => openChecklistEditor("personal", item)}
-                          >
-                            編集
-                          </button>
-                          <button
-                            type="button"
-                            className="button button-small events-danger-button"
-                            onClick={() => {
-                              setDeleteChecklistScope("personal");
-                              setDeleteChecklistItemId(item.id);
-                            }}
-                          >
-                            削除
-                          </button>
+                            onChange={() => void togglePersonalChecklistItem(item.id)}
+                          />
                         </div>
-                      )}
-                    </article>
-                  ))}
+                        <label className="events-checklist-content" htmlFor={inputId}>
+                          <strong className="events-checklist-label">{item.label}</strong>
+                          {item.memo?.trim() && <span className="events-checklist-memo">{item.memo}</span>}
+                        </label>
+                        {isManager && (
+                          <div className="events-inline-actions">
+                            <button
+                              type="button"
+                              className="button button-small button-secondary"
+                              onClick={() => openChecklistEditor("personal", item)}
+                            >
+                              編集
+                            </button>
+                            <button
+                              type="button"
+                              className="button button-small events-danger-button"
+                              onClick={() => {
+                                setDeleteChecklistScope("personal");
+                                setDeleteChecklistItemId(item.id);
+                              }}
+                            >
+                              削除
+                            </button>
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })}
                   {selectedEventPersonalChecklistItems.length === 0 && <p className="muted">個人持ち物はありません。</p>}
                 </div>
               </div>
