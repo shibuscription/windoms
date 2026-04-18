@@ -1,6 +1,5 @@
 import {
   collection,
-  deleteField,
   doc,
   getDoc,
   getDocs,
@@ -128,23 +127,7 @@ export const subscribeDayLogs = (
 export const saveDayLog = async (date: string, dayLog: DayLog): Promise<void> => {
   ensureDb();
   const dayLogRef = doc(dayLogsCollection!, date);
-  const existingSnapshot = await getDoc(dayLogRef);
-  const existingValue = existingSnapshot.exists()
-    ? (existingSnapshot.data() as Record<string, unknown>)
-    : undefined;
-  const existingDutyStamps =
-    existingValue?.dutyStamps && typeof existingValue.dutyStamps === "object"
-      ? (existingValue.dutyStamps as Record<string, unknown>)
-      : {};
-  const nextDutyStamps = dayLog.dutyStamps ?? {};
-  const removedDutyStampKeys = Object.keys(existingDutyStamps).filter((key) => !(key in nextDutyStamps));
-
-  const payload: Record<string, unknown> = toDayLogPayload(dayLog) as Record<string, unknown>;
-  removedDutyStampKeys.forEach((key) => {
-    payload[`dutyStamps.${key}`] = deleteField();
-  });
-
-  await setDoc(dayLogRef, payload, { merge: true });
+  await setDoc(dayLogRef, toDayLogPayload(dayLog));
 };
 
 export const ensureDayLog = async (date: string): Promise<void> => {
