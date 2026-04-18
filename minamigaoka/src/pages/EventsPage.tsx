@@ -4,7 +4,7 @@ import { LinkifiedText } from "../components/LinkifiedText";
 import { saveEventPersonalChecklistState, subscribeEventPersonalChecklistState } from "../events/service";
 import { buildFamilyMap, buildMemberIndexes, resolveFamilyNameFromIdentifier } from "../members/familyNameResolver";
 import { sortMembersForDisplay } from "../members/permissions";
-import { subscribeFamilies, subscribeMembers } from "../members/service";
+import { listFamilies, listMembers, subscribeFamilies, subscribeMembers } from "../members/service";
 import type { FamilyRecord, MemberRecord } from "../members/types";
 import { getSessionAssigneeRoleLabel, sessionTypeLabel } from "../schedule/sessionMeta";
 import type {
@@ -219,6 +219,8 @@ export function EventsPage({
     returnMemberIds: [],
     isEquipmentVehicle: false,
   });
+  const [selectedOutboundMemberId, setSelectedOutboundMemberId] = useState("");
+  const [selectedReturnMemberId, setSelectedReturnMemberId] = useState("");
   const { eventId } = useParams<{ eventId?: string }>();
   const navigate = useNavigate();
   const today = todayDateKey();
@@ -226,8 +228,16 @@ export function EventsPage({
   const [selectedDoneYear, setSelectedDoneYear] = useState<number>(defaultClubYear);
 
   const isManager = canManageEvents(menuRole);
-  useEffect(() => subscribeFamilies(setFamilies), []);
-  useEffect(() => subscribeMembers(setMembers), []);
+  useEffect(() => {
+    const unsubscribe = subscribeFamilies(setFamilies);
+    void listFamilies().then(setFamilies).catch(() => undefined);
+    return unsubscribe;
+  }, []);
+  useEffect(() => {
+    const unsubscribe = subscribeMembers(setMembers);
+    void listMembers().then(setMembers).catch(() => undefined);
+    return unsubscribe;
+  }, []);
   const selectedEvent = eventId ? data.events.find((item) => item.id === eventId) ?? null : null;
   const editingEvent =
     editingEventId && editingEventId !== "__new__"
@@ -299,10 +309,36 @@ export function EventsPage({
       ),
     [families],
   );
+  const availableCarpoolOptions = useMemo(
+    () =>
+      carpoolOptions.filter(
+        (option) =>
+          !formDraft.carpoolVehicles.some(
+            (vehicle) =>
+              vehicle.familyId === option.vehicle.familyId && vehicle.vehicleIndex === option.vehicle.vehicleIndex,
+          ),
+      ),
+    [carpoolOptions, formDraft.carpoolVehicles],
+  );
   const memberIndexes = useMemo(() => buildMemberIndexes(members), [members]);
   const familiesById = useMemo(() => buildFamilyMap(families), [families]);
+  const membersById = useMemo(() => new Map(members.map((member) => [member.id, member])), [members]);
   const currentChecklistMemberId = linkedMember?.id || currentUid;
   const sortedAssignableMembers = useMemo(() => sortMembersForDisplay(members, "all"), [members]);
+  const availableOutboundMembers = useMemo(
+    () =>
+      sortedAssignableMembers.filter(
+        (member) => !carpoolAssignmentDraft.outboundMemberIds.includes(member.id),
+      ),
+    [carpoolAssignmentDraft.outboundMemberIds, sortedAssignableMembers],
+  );
+  const availableReturnMembers = useMemo(
+    () =>
+      sortedAssignableMembers.filter(
+        (member) => !carpoolAssignmentDraft.returnMemberIds.includes(member.id),
+      ),
+    [carpoolAssignmentDraft.returnMemberIds, sortedAssignableMembers],
+  );
 
   const activeEvents = useMemo(
     () =>
@@ -346,6 +382,39 @@ export function EventsPage({
     setIsLinkedSessionsOpen(false);
     setIsCarpoolOpen(false);
   }, [selectedEvent?.id]);
+
+  useEffect(() => {
+    if (!editingEventId) return;
+    if (availableCarpoolOptions.length === 0) {
+      if (selectedVehicleKey) setSelectedVehicleKey("");
+      return;
+    }
+    if (!availableCarpoolOptions.some((option) => option.key === selectedVehicleKey)) {
+      setSelectedVehicleKey(availableCarpoolOptions[0].key);
+    }
+  }, [availableCarpoolOptions, editingEventId, selectedVehicleKey]);
+
+  useEffect(() => {
+    if (!editingCarpoolVehicleKey) return;
+    if (availableOutboundMembers.length === 0) {
+      if (selectedOutboundMemberId) setSelectedOutboundMemberId("");
+      return;
+    }
+    if (!availableOutboundMembers.some((member) => member.id === selectedOutboundMemberId)) {
+      setSelectedOutboundMemberId(availableOutboundMembers[0].id);
+    }
+  }, [availableOutboundMembers, editingCarpoolVehicleKey, selectedOutboundMemberId]);
+
+  useEffect(() => {
+    if (!editingCarpoolVehicleKey) return;
+    if (availableReturnMembers.length === 0) {
+      if (selectedReturnMemberId) setSelectedReturnMemberId("");
+      return;
+    }
+    if (!availableReturnMembers.some((member) => member.id === selectedReturnMemberId)) {
+      setSelectedReturnMemberId(availableReturnMembers[0].id);
+    }
+  }, [availableReturnMembers, editingCarpoolVehicleKey, selectedReturnMemberId]);
 
   useEffect(() => {
     if (!selectedEvent) {
@@ -444,12 +513,23 @@ export function EventsPage({
   };
 
   const memberDisplayName = (memberId: string): string => {
-    const member = members.find((item) => item.id === memberId) ?? null;
+    const member = membersById.get(memberId) ?? null;
     return member?.displayName || member?.name || memberId;
   };
 
-  const memberListLabel = (memberIds: string[] | undefined): string => {
+  const sortAssignedMemberIds = (memberIds: string[] | undefined): string[] => {
     const ids = memberIds ?? [];
+    const knownMembers = ids
+      .map((memberId) => membersById.get(memberId) ?? null)
+      .filter((member): member is MemberRecord => member !== null);
+    const knownIds = new Set(knownMembers.map((member) => member.id));
+    const sortedKnownIds = sortMembersForDisplay(knownMembers, "all").map((member) => member.id);
+    const unknownIds = ids.filter((memberId) => !knownIds.has(memberId));
+    return [...sortedKnownIds, ...unknownIds];
+  };
+
+  const memberListLabel = (memberIds: string[] | undefined): string => {
+    const ids = sortAssignedMemberIds(memberIds);
     if (ids.length === 0) return "未設定";
     return ids.map((memberId) => memberDisplayName(memberId)).join(" / ");
   };
@@ -659,6 +739,8 @@ export function EventsPage({
       returnMemberIds: vehicle.returnMemberIds ?? [],
       isEquipmentVehicle: vehicle.isEquipmentVehicle === true,
     });
+    setSelectedOutboundMemberId("");
+    setSelectedReturnMemberId("");
   };
 
   const closeCarpoolAssignmentEditor = () => {
@@ -668,14 +750,25 @@ export function EventsPage({
       returnMemberIds: [],
       isEquipmentVehicle: false,
     });
+    setSelectedOutboundMemberId("");
+    setSelectedReturnMemberId("");
   };
 
-  const toggleCarpoolAssignmentMember = (direction: "outboundMemberIds" | "returnMemberIds", memberId: string) => {
+  const addCarpoolAssignmentMember = (direction: "outboundMemberIds" | "returnMemberIds", memberId: string) => {
+    if (!memberId) return;
     setCarpoolAssignmentDraft((current) => ({
       ...current,
-      [direction]: current[direction].includes(memberId)
-        ? current[direction].filter((currentMemberId) => currentMemberId !== memberId)
-        : [...current[direction], memberId],
+      [direction]: current[direction].includes(memberId) ? current[direction] : [...current[direction], memberId],
+    }));
+  };
+
+  const removeCarpoolAssignmentMember = (
+    direction: "outboundMemberIds" | "returnMemberIds",
+    memberId: string,
+  ) => {
+    setCarpoolAssignmentDraft((current) => ({
+      ...current,
+      [direction]: current[direction].filter((currentMemberId) => currentMemberId !== memberId),
     }));
   };
 
@@ -745,7 +838,7 @@ export function EventsPage({
 
   const addCarpoolVehicle = () => {
     if (!selectedVehicleKey) return;
-    const option = carpoolOptions.find((item) => item.key === selectedVehicleKey);
+    const option = availableCarpoolOptions.find((item) => item.key === selectedVehicleKey);
     if (!option) return;
 
     setFormDraft((current) => {
@@ -757,8 +850,8 @@ export function EventsPage({
       return {
         ...current,
         carpoolVehicles: [...current.carpoolVehicles, option.vehicle],
-      };
-    });
+        };
+      });
     setSelectedVehicleKey("");
   };
 
@@ -1666,6 +1759,56 @@ export function EventsPage({
               <section className="events-checklist-block">
                 <div className="events-section-header">
                   <h4>行き</h4>
+                </div>
+                <div className="events-carpool-assignment-picker">
+                  <select
+                    value={selectedOutboundMemberId}
+                    onChange={(event) => setSelectedOutboundMemberId(event.target.value)}
+                  >
+                    {availableOutboundMembers.length === 0 ? (
+                      <option value="">追加できるメンバーはいません</option>
+                    ) : (
+                      availableOutboundMembers.map((member) => (
+                        <option key={`outbound-option-${member.id}`} value={member.id}>
+                          {memberDisplayName(member.id)}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  <button
+                    type="button"
+                    className="button button-small button-secondary"
+                    onClick={() => addCarpoolAssignmentMember("outboundMemberIds", selectedOutboundMemberId)}
+                    disabled={!selectedOutboundMemberId}
+                  >
+                    追加
+                  </button>
+                </div>
+                <div className="events-checklist-list">
+                  {sortAssignedMemberIds(carpoolAssignmentDraft.outboundMemberIds).map((memberId) => (
+                    <div key={`outbound-${memberId}`} className="events-checklist-row">
+                      <div className="events-simple-list-main">
+                        <p className="events-simple-list-title">{memberDisplayName(memberId)}</p>
+                      </div>
+                      <div className="events-inline-actions">
+                        <button
+                          type="button"
+                          className="button button-small button-secondary"
+                          onClick={() => removeCarpoolAssignmentMember("outboundMemberIds", memberId)}
+                        >
+                          削除
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {carpoolAssignmentDraft.outboundMemberIds.length === 0 && (
+                    <p className="muted">行きの乗車メンバーは未設定です。</p>
+                  )}
+                </div>
+              </section>
+              <section className="events-checklist-block">
+                <div className="events-section-header">
+                  <h4>帰り</h4>
                   <button
                     type="button"
                     className="button button-small button-secondary"
@@ -1676,37 +1819,53 @@ export function EventsPage({
                       }))
                     }
                   >
-                    帰りへコピー
+                    行きの割り振りをコピー
+                  </button>
+                </div>
+                <div className="events-carpool-assignment-picker">
+                  <select
+                    value={selectedReturnMemberId}
+                    onChange={(event) => setSelectedReturnMemberId(event.target.value)}
+                  >
+                    {availableReturnMembers.length === 0 ? (
+                      <option value="">追加できるメンバーはいません</option>
+                    ) : (
+                      availableReturnMembers.map((member) => (
+                        <option key={`return-option-${member.id}`} value={member.id}>
+                          {memberDisplayName(member.id)}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                  <button
+                    type="button"
+                    className="button button-small button-secondary"
+                    onClick={() => addCarpoolAssignmentMember("returnMemberIds", selectedReturnMemberId)}
+                    disabled={!selectedReturnMemberId}
+                  >
+                    追加
                   </button>
                 </div>
                 <div className="events-checklist-list">
-                  {sortedAssignableMembers.map((member) => (
-                    <label key={`outbound-${member.id}`} className="events-checklist-toggle">
-                      <input
-                        type="checkbox"
-                        checked={carpoolAssignmentDraft.outboundMemberIds.includes(member.id)}
-                        onChange={() => toggleCarpoolAssignmentMember("outboundMemberIds", member.id)}
-                      />
-                      <span>{memberDisplayName(member.id)}</span>
-                    </label>
+                  {sortAssignedMemberIds(carpoolAssignmentDraft.returnMemberIds).map((memberId) => (
+                    <div key={`return-${memberId}`} className="events-checklist-row">
+                      <div className="events-simple-list-main">
+                        <p className="events-simple-list-title">{memberDisplayName(memberId)}</p>
+                      </div>
+                      <div className="events-inline-actions">
+                        <button
+                          type="button"
+                          className="button button-small button-secondary"
+                          onClick={() => removeCarpoolAssignmentMember("returnMemberIds", memberId)}
+                        >
+                          削除
+                        </button>
+                      </div>
+                    </div>
                   ))}
-                </div>
-              </section>
-              <section className="events-checklist-block">
-                <div className="events-section-header">
-                  <h4>帰り</h4>
-                </div>
-                <div className="events-checklist-list">
-                  {sortedAssignableMembers.map((member) => (
-                    <label key={`return-${member.id}`} className="events-checklist-toggle">
-                      <input
-                        type="checkbox"
-                        checked={carpoolAssignmentDraft.returnMemberIds.includes(member.id)}
-                        onChange={() => toggleCarpoolAssignmentMember("returnMemberIds", member.id)}
-                      />
-                      <span>{memberDisplayName(member.id)}</span>
-                    </label>
-                  ))}
+                  {carpoolAssignmentDraft.returnMemberIds.length === 0 && (
+                    <p className="muted">帰りの乗車メンバーは未設定です。</p>
+                  )}
                 </div>
               </section>
             </div>
@@ -1839,14 +1998,22 @@ export function EventsPage({
               </div>
               <div className="events-carpool-picker">
                 <select value={selectedVehicleKey} onChange={(event) => setSelectedVehicleKey(event.target.value)}>
-                  <option value="">車両を選択</option>
-                  {carpoolOptions.map((option) => (
+                  {availableCarpoolOptions.length === 0 ? (
+                    <option value="">追加できる車両はありません</option>
+                  ) : (
+                    availableCarpoolOptions.map((option) => (
                     <option key={option.key} value={option.key}>
                       {option.label}
                     </option>
-                  ))}
+                    ))
+                  )}
                 </select>
-                <button type="button" className="button button-small button-secondary" onClick={addCarpoolVehicle}>
+                <button
+                  type="button"
+                  className="button button-small button-secondary"
+                  onClick={addCarpoolVehicle}
+                  disabled={!selectedVehicleKey}
+                >
                   追加
                 </button>
               </div>

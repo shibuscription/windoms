@@ -1668,6 +1668,12 @@ body {
   gap: 8px;
 }
 
+.events-carpool-assignment-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
 .events-carpool-list {
   display: grid;
   gap: 8px;

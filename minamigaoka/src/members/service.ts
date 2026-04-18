@@ -269,6 +269,14 @@ export const subscribeFamilies = (callback: (rows: FamilyRecord[]) => void): (()
   });
 };
 
+export const listFamilies = async (): Promise<FamilyRecord[]> => {
+  ensureDb();
+  const snapshot = await getDocs(query(familiesCollection!, orderBy("name", "asc")));
+  return sortFamiliesByDisplayOrder(
+    snapshot.docs.map((item) => toFamilyRecord(item.id, item.data() as Record<string, unknown>)),
+  );
+};
+
 export const subscribeMembers = (callback: (rows: MemberRecord[]) => void): (() => void) => {
   ensureDb();
   return onSnapshot(membersCollection!, (snapshot) => {
@@ -279,6 +287,15 @@ export const subscribeMembers = (callback: (rows: MemberRecord[]) => void): (() 
     callback(rows);
     void backfillLegacyMemberNameFields(rows);
   });
+};
+
+export const listMembers = async (): Promise<MemberRecord[]> => {
+  ensureDb();
+  const snapshot = await getDocs(membersCollection!);
+  return sortMembersForDisplay(
+    snapshot.docs.map((item) => toMemberRecord(item.id, item.data() as Record<string, unknown>)),
+    "all",
+  );
 };
 
 export const subscribeMemberRelations = (
