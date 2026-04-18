@@ -8,9 +8,18 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { db, hasFirebaseAppConfig } from "../config/firebase";
-import type { EventCarpoolVehicle, EventKind, EventRecord, EventState } from "../types";
+import type {
+  EventCarpoolVehicle,
+  EventCommonChecklistItem,
+  EventKind,
+  EventPersonalChecklistItem,
+  EventRecord,
+  EventState,
+  EventTimelineItem,
+} from "../types";
 
 const eventsCollection = db ? collection(db, "events") : null;
+const eventPersonalChecklistStatesCollection = db ? collection(db, "eventPersonalChecklistStates") : null;
 
 const ensureDb = () => {
   if (!db || !hasFirebaseAppConfig || !eventsCollection) {
@@ -46,6 +55,11 @@ const toOptionalCapacity = (value: unknown): number | null => {
 const toBooleanWithDefault = (value: unknown, defaultValue: boolean): boolean =>
   typeof value === "boolean" ? value : defaultValue;
 
+const toStringIdArray = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
+
 const toCarpoolVehicle = (value: unknown): EventCarpoolVehicle | null => {
   if (!value || typeof value !== "object") return null;
   const source = value as Record<string, unknown>;
@@ -65,6 +79,55 @@ const toCarpoolVehicle = (value: unknown): EventCarpoolVehicle | null => {
     capacity: toOptionalCapacity(source.capacity),
     canOutbound: toBooleanWithDefault(source.canOutbound, true),
     canReturn: toBooleanWithDefault(source.canReturn, true),
+    outboundMemberIds: toStringIdArray(source.outboundMemberIds),
+    returnMemberIds: toStringIdArray(source.returnMemberIds),
+    isEquipmentVehicle: toBooleanWithDefault(source.isEquipmentVehicle, false),
+  };
+};
+
+const toTimelineItem = (value: unknown): EventTimelineItem | null => {
+  if (!value || typeof value !== "object") return null;
+  const source = value as Record<string, unknown>;
+  const id = typeof source.id === "string" ? source.id.trim() : "";
+  const startTime = typeof source.startTime === "string" ? source.startTime.trim() : "";
+  const title = typeof source.title === "string" ? source.title.trim() : "";
+  if (!id || !startTime || !title) return null;
+
+  return {
+    id,
+    startTime,
+    endTime: toOptionalString(source.endTime),
+    title,
+    details: toOptionalString(source.details),
+  };
+};
+
+const toCommonChecklistItem = (value: unknown): EventCommonChecklistItem | null => {
+  if (!value || typeof value !== "object") return null;
+  const source = value as Record<string, unknown>;
+  const id = typeof source.id === "string" ? source.id.trim() : "";
+  const label = typeof source.label === "string" ? source.label.trim() : "";
+  if (!id || !label) return null;
+
+  return {
+    id,
+    label,
+    memo: toOptionalString(source.memo),
+    checked: toBooleanWithDefault(source.checked, false),
+  };
+};
+
+const toPersonalChecklistItem = (value: unknown): EventPersonalChecklistItem | null => {
+  if (!value || typeof value !== "object") return null;
+  const source = value as Record<string, unknown>;
+  const id = typeof source.id === "string" ? source.id.trim() : "";
+  const label = typeof source.label === "string" ? source.label.trim() : "";
+  if (!id || !label) return null;
+
+  return {
+    id,
+    label,
+    memo: toOptionalString(source.memo),
   };
 };
 
@@ -77,6 +140,27 @@ const toEventRecord = (id: string, value: Record<string, unknown>): EventRecord 
   memo: toOptionalString(value.memo),
   sessionIds: Array.isArray(value.sessionIds)
     ? value.sessionIds.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [],
+  timetableItems: Array.isArray(value.timetableItems)
+    ? value.timetableItems.reduce<EventTimelineItem[]>((result, item) => {
+        const normalized = toTimelineItem(item);
+        if (normalized) result.push(normalized);
+        return result;
+      }, [])
+    : [],
+  commonChecklistItems: Array.isArray(value.commonChecklistItems)
+    ? value.commonChecklistItems.reduce<EventCommonChecklistItem[]>((result, item) => {
+        const normalized = toCommonChecklistItem(item);
+        if (normalized) result.push(normalized);
+        return result;
+      }, [])
+    : [],
+  personalChecklistItems: Array.isArray(value.personalChecklistItems)
+    ? value.personalChecklistItems.reduce<EventPersonalChecklistItem[]>((result, item) => {
+        const normalized = toPersonalChecklistItem(item);
+        if (normalized) result.push(normalized);
+        return result;
+      }, [])
     : [],
   carpoolVehicles: Array.isArray(value.carpoolVehicles)
     ? value.carpoolVehicles.reduce<EventCarpoolVehicle[]>((result, item) => {
@@ -94,6 +178,30 @@ const toPayload = (event: Omit<EventRecord, "id">) => ({
   eventSortDate: event.eventSortDate,
   memo: event.memo?.trim() || "",
   sessionIds: Array.isArray(event.sessionIds) ? event.sessionIds : [],
+  timetableItems: Array.isArray(event.timetableItems)
+    ? event.timetableItems.map((item) => ({
+        id: item.id,
+        startTime: item.startTime,
+        endTime: item.endTime?.trim() || "",
+        title: item.title.trim(),
+        details: item.details?.trim() || "",
+      }))
+    : [],
+  commonChecklistItems: Array.isArray(event.commonChecklistItems)
+    ? event.commonChecklistItems.map((item) => ({
+        id: item.id,
+        label: item.label.trim(),
+        memo: item.memo?.trim() || "",
+        checked: item.checked === true,
+      }))
+    : [],
+  personalChecklistItems: Array.isArray(event.personalChecklistItems)
+    ? event.personalChecklistItems.map((item) => ({
+        id: item.id,
+        label: item.label.trim(),
+        memo: item.memo?.trim() || "",
+      }))
+    : [],
   carpoolVehicles: Array.isArray(event.carpoolVehicles)
     ? event.carpoolVehicles.map((vehicle) => ({
         familyId: vehicle.familyId,
@@ -104,6 +212,9 @@ const toPayload = (event: Omit<EventRecord, "id">) => ({
         capacity: toOptionalCapacity(vehicle.capacity),
         canOutbound: vehicle.canOutbound !== false,
         canReturn: vehicle.canReturn !== false,
+        outboundMemberIds: Array.isArray(vehicle.outboundMemberIds) ? vehicle.outboundMemberIds : [],
+        returnMemberIds: Array.isArray(vehicle.returnMemberIds) ? vehicle.returnMemberIds : [],
+        isEquipmentVehicle: vehicle.isEquipmentVehicle === true,
       }))
     : [],
   updatedAt: serverTimestamp(),
@@ -148,4 +259,44 @@ export const saveEvent = async (event: EventRecord): Promise<void> => {
 export const deleteEvent = async (eventId: string): Promise<void> => {
   ensureDb();
   await deleteDoc(doc(eventsCollection!, eventId));
+};
+
+const buildEventPersonalChecklistStateId = (eventId: string, memberId: string): string => `${eventId}__${memberId}`;
+
+export const subscribeEventPersonalChecklistState = (
+  eventId: string,
+  memberId: string,
+  callback: (checkedItemIds: string[]) => void,
+  onError?: (error: Error) => void,
+): (() => void) => {
+  ensureDb();
+
+  return onSnapshot(
+    doc(eventPersonalChecklistStatesCollection!, buildEventPersonalChecklistStateId(eventId, memberId)),
+    (snapshot) => {
+      const value = snapshot.data() as Record<string, unknown> | undefined;
+      callback(toStringIdArray(value?.checkedItemIds));
+    },
+    (error) => {
+      onError?.(error instanceof Error ? error : new Error("event personal checklist subscription failed"));
+    },
+  );
+};
+
+export const saveEventPersonalChecklistState = async (
+  eventId: string,
+  memberId: string,
+  checkedItemIds: string[],
+): Promise<void> => {
+  ensureDb();
+  await setDoc(
+    doc(eventPersonalChecklistStatesCollection!, buildEventPersonalChecklistStateId(eventId, memberId)),
+    {
+      eventId,
+      memberId,
+      checkedItemIds,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
 };

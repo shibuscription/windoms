@@ -1,11 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { LinkifiedText } from "../components/LinkifiedText";
+import { saveEventPersonalChecklistState, subscribeEventPersonalChecklistState } from "../events/service";
 import { buildFamilyMap, buildMemberIndexes, resolveFamilyNameFromIdentifier } from "../members/familyNameResolver";
+import { sortMembersForDisplay } from "../members/permissions";
 import { subscribeFamilies, subscribeMembers } from "../members/service";
 import type { FamilyRecord, MemberRecord } from "../members/types";
 import { getSessionAssigneeRoleLabel, sessionTypeLabel } from "../schedule/sessionMeta";
-import type { DemoData, EventCarpoolVehicle, EventKind, EventRecord, SessionDoc, Todo } from "../types";
+import type {
+  DemoData,
+  EventCarpoolVehicle,
+  EventCommonChecklistItem,
+  EventKind,
+  EventPersonalChecklistItem,
+  EventRecord,
+  EventTimelineItem,
+  SessionDoc,
+  Todo,
+} from "../types";
 import { canViewTodoByScope, getTodoTakeoverLabel, sortTodosOpenFirst } from "../utils/todoUtils";
 import { todayDateKey } from "../utils/date";
 
@@ -43,6 +55,29 @@ type CarpoolVehicleOption = {
   vehicle: EventCarpoolVehicle;
 };
 
+type TimetableDraft = {
+  startTime: string;
+  endTime: string;
+  title: string;
+  details: string;
+};
+
+type ChecklistDraft = {
+  label: string;
+  memo: string;
+};
+
+type TimetableErrors = {
+  startTime?: string;
+  title?: string;
+};
+
+type ChecklistErrors = {
+  label?: string;
+};
+
+type ChecklistScope = "common" | "personal";
+
 const canManageEvents = (menuRole: DemoMenuRole): boolean => menuRole === "admin";
 
 const toDateLabel = (dateKey: string): string => dateKey.replace(/-/g, "/");
@@ -61,6 +96,21 @@ const createInitialDraft = (): EventFormDraft => ({
   state: "active",
   carpoolVehicles: [],
 });
+
+const createInitialTimetableDraft = (): TimetableDraft => ({
+  startTime: "",
+  endTime: "",
+  title: "",
+  details: "",
+});
+
+const createInitialChecklistDraft = (): ChecklistDraft => ({
+  label: "",
+  memo: "",
+});
+
+const createLocalItemId = (prefix: string): string =>
+  `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 const toVehicleLabel = (familyName: string, maker: string, model: string): string => {
   const familyLabel = familyName.trim() || "名称未設定";
@@ -90,6 +140,12 @@ const toCarpoolDirectionLabel = (vehicle: EventCarpoolVehicle): string => {
   if (isReturnAvailable(vehicle)) labels.push("帰り");
   return labels.length > 0 ? labels.join(" / ") : "対象なし";
 };
+
+const formatTimelineRange = (item: Pick<EventTimelineItem, "startTime" | "endTime">): string =>
+  item.endTime?.trim() ? `${item.startTime}-${item.endTime}` : item.startTime;
+
+const compareTimelineItems = (left: EventTimelineItem, right: EventTimelineItem): number =>
+  `${left.startTime}-${left.id}`.localeCompare(`${right.startTime}-${right.id}`, "ja");
 
 const toLinkedSession = (date: string, session: SessionDoc): LinkedSession => ({
   id: session.id ?? `session:${date}:${session.order}`,
@@ -141,6 +197,28 @@ export function EventsPage({
   const [selectedVehicleKey, setSelectedVehicleKey] = useState("");
   const [isLinkedSessionsOpen, setIsLinkedSessionsOpen] = useState(false);
   const [isCarpoolOpen, setIsCarpoolOpen] = useState(false);
+  const [personalCheckedItemIds, setPersonalCheckedItemIds] = useState<string[]>([]);
+  const [detailTimetableItemId, setDetailTimetableItemId] = useState<string | null>(null);
+  const [editingTimetableItemId, setEditingTimetableItemId] = useState<string | "__new__" | null>(null);
+  const [timetableDraft, setTimetableDraft] = useState<TimetableDraft>(createInitialTimetableDraft());
+  const [timetableErrors, setTimetableErrors] = useState<TimetableErrors>({});
+  const [deleteTimetableItemId, setDeleteTimetableItemId] = useState<string | null>(null);
+  const [editingChecklistScope, setEditingChecklistScope] = useState<ChecklistScope | null>(null);
+  const [editingChecklistItemId, setEditingChecklistItemId] = useState<string | "__new__" | null>(null);
+  const [checklistDraft, setChecklistDraft] = useState<ChecklistDraft>(createInitialChecklistDraft());
+  const [checklistErrors, setChecklistErrors] = useState<ChecklistErrors>({});
+  const [deleteChecklistScope, setDeleteChecklistScope] = useState<ChecklistScope | null>(null);
+  const [deleteChecklistItemId, setDeleteChecklistItemId] = useState<string | null>(null);
+  const [editingCarpoolVehicleKey, setEditingCarpoolVehicleKey] = useState<string | null>(null);
+  const [carpoolAssignmentDraft, setCarpoolAssignmentDraft] = useState<{
+    outboundMemberIds: string[];
+    returnMemberIds: string[];
+    isEquipmentVehicle: boolean;
+  }>({
+    outboundMemberIds: [],
+    returnMemberIds: [],
+    isEquipmentVehicle: false,
+  });
   const { eventId } = useParams<{ eventId?: string }>();
   const navigate = useNavigate();
   const today = todayDateKey();
@@ -223,6 +301,11 @@ export function EventsPage({
   );
   const memberIndexes = useMemo(() => buildMemberIndexes(members), [members]);
   const familiesById = useMemo(() => buildFamilyMap(families), [families]);
+  const currentChecklistMemberId = linkedMember?.id || currentUid;
+  const sortedAssignableMembers = useMemo(
+    () => sortMembersForDisplay(members.filter((member) => member.memberStatus !== "inactive"), "all"),
+    [members],
+  );
 
   const activeEvents = useMemo(
     () =>
@@ -267,6 +350,19 @@ export function EventsPage({
     setIsCarpoolOpen(false);
   }, [selectedEvent?.id]);
 
+  useEffect(() => {
+    if (!selectedEvent) {
+      setPersonalCheckedItemIds([]);
+      return;
+    }
+    return subscribeEventPersonalChecklistState(
+      selectedEvent.id,
+      currentChecklistMemberId,
+      setPersonalCheckedItemIds,
+      () => setPersonalCheckedItemIds([]),
+    );
+  }, [currentChecklistMemberId, selectedEvent?.id]);
+
   const filteredDoneEvents = useMemo(
     () => doneEvents.filter((item) => clubYearFromDateKey(item.eventSortDate) === selectedDoneYear),
     [doneEvents, selectedDoneYear],
@@ -286,9 +382,37 @@ export function EventsPage({
     );
   }, [authRole, data.todos, linkedMember, selectedEvent]);
 
+  const selectedEventTimetableItems = useMemo(
+    () => [...(selectedEvent?.timetableItems ?? [])].sort(compareTimelineItems),
+    [selectedEvent?.timetableItems],
+  );
+  const detailTimetableItem =
+    detailTimetableItemId && selectedEvent
+      ? selectedEventTimetableItems.find((item) => item.id === detailTimetableItemId) ?? null
+      : null;
+  const deleteTimetableItem =
+    deleteTimetableItemId && selectedEvent
+      ? (selectedEvent.timetableItems ?? []).find((item) => item.id === deleteTimetableItemId) ?? null
+      : null;
+  const selectedEventCommonChecklistItems = selectedEvent?.commonChecklistItems ?? [];
+  const selectedEventPersonalChecklistItems = selectedEvent?.personalChecklistItems ?? [];
+  const deleteChecklistItem =
+    deleteChecklistItemId && deleteChecklistScope && selectedEvent
+      ? (
+          deleteChecklistScope === "common"
+            ? selectedEvent.commonChecklistItems ?? []
+            : selectedEvent.personalChecklistItems ?? []
+        ).find((item) => item.id === deleteChecklistItemId) ?? null
+      : null;
   const selectedEventCarpoolVehicles = selectedEvent?.carpoolVehicles ?? [];
   const selectedEventCarpoolCapacitySummary = summarizeCarpoolCapacities(selectedEventCarpoolVehicles);
   const formDraftCarpoolCapacitySummary = summarizeCarpoolCapacities(formDraft.carpoolVehicles);
+  const editingCarpoolVehicle =
+    editingCarpoolVehicleKey && selectedEvent
+      ? selectedEventCarpoolVehicles.find(
+          (vehicle) => `${vehicle.familyId}:${vehicle.vehicleIndex}` === editingCarpoolVehicleKey,
+        ) ?? null
+      : null;
 
   const showFeedback = (message: string) => {
     setFeedback(message);
@@ -320,6 +444,266 @@ export function EventsPage({
 
   const takeoverLabel = (todo: Todo): string | null => {
     return getTodoTakeoverLabel(todo, currentUid);
+  };
+
+  const memberDisplayName = (memberId: string): string => {
+    const member = members.find((item) => item.id === memberId) ?? null;
+    return member?.displayName || member?.name || memberId;
+  };
+
+  const memberListLabel = (memberIds: string[] | undefined): string => {
+    const ids = memberIds ?? [];
+    if (ids.length === 0) return "未設定";
+    return ids.map((memberId) => memberDisplayName(memberId)).join(" / ");
+  };
+
+  const validateTimetableDraft = (): TimetableErrors => {
+    const errors: TimetableErrors = {};
+    if (!timetableDraft.startTime.trim()) errors.startTime = "開始時刻を入力してください";
+    if (!timetableDraft.title.trim()) errors.title = "タイトルを入力してください";
+    return errors;
+  };
+
+  const validateChecklistDraft = (): ChecklistErrors => {
+    const errors: ChecklistErrors = {};
+    if (!checklistDraft.label.trim()) errors.label = "項目名を入力してください";
+    return errors;
+  };
+
+  const closeTimetableEditor = () => {
+    setEditingTimetableItemId(null);
+    setTimetableDraft(createInitialTimetableDraft());
+    setTimetableErrors({});
+  };
+
+  const openTimetableEditor = (item?: EventTimelineItem) => {
+    if (!isManager) return;
+    setEditingTimetableItemId(item?.id ?? "__new__");
+    setTimetableDraft({
+      startTime: item?.startTime ?? "",
+      endTime: item?.endTime ?? "",
+      title: item?.title ?? "",
+      details: item?.details ?? "",
+    });
+    setTimetableErrors({});
+  };
+
+  const saveTimetableDraft = async () => {
+    if (!isManager || !selectedEvent) return;
+    const errors = validateTimetableDraft();
+    setTimetableErrors(errors);
+    if (errors.startTime || errors.title) return;
+
+    const nextItem: EventTimelineItem = {
+      id: editingTimetableItemId && editingTimetableItemId !== "__new__" ? editingTimetableItemId : createLocalItemId("timeline"),
+      startTime: timetableDraft.startTime,
+      endTime: timetableDraft.endTime.trim() || undefined,
+      title: timetableDraft.title.trim(),
+      details: timetableDraft.details.trim() || undefined,
+    };
+
+    const nextItems = [...(selectedEvent.timetableItems ?? [])];
+    const currentIndex = nextItems.findIndex((item) => item.id === nextItem.id);
+    if (currentIndex >= 0) {
+      nextItems[currentIndex] = nextItem;
+    } else {
+      nextItems.push(nextItem);
+    }
+
+    try {
+      await saveEvent({ ...selectedEvent, timetableItems: nextItems.sort(compareTimelineItems) });
+      closeTimetableEditor();
+      showFeedback("タイムテーブルを保存しました");
+    } catch {
+      showFailure("タイムテーブルの保存に失敗しました");
+    }
+  };
+
+  const confirmDeleteTimetableItem = async () => {
+    if (!isManager || !selectedEvent || !deleteTimetableItemId) return;
+    try {
+      await saveEvent({
+        ...selectedEvent,
+        timetableItems: (selectedEvent.timetableItems ?? []).filter((item) => item.id !== deleteTimetableItemId),
+      });
+      setDeleteTimetableItemId(null);
+      showFeedback("タイムテーブルを削除しました");
+    } catch {
+      showFailure("タイムテーブルの削除に失敗しました");
+    }
+  };
+
+  const closeChecklistEditor = () => {
+    setEditingChecklistScope(null);
+    setEditingChecklistItemId(null);
+    setChecklistDraft(createInitialChecklistDraft());
+    setChecklistErrors({});
+  };
+
+  const openChecklistEditor = (scope: ChecklistScope, item?: EventCommonChecklistItem | EventPersonalChecklistItem) => {
+    if (!isManager) return;
+    setEditingChecklistScope(scope);
+    setEditingChecklistItemId(item?.id ?? "__new__");
+    setChecklistDraft({
+      label: item?.label ?? "",
+      memo: item?.memo ?? "",
+    });
+    setChecklistErrors({});
+  };
+
+  const saveChecklistDraft = async () => {
+    if (!isManager || !selectedEvent || !editingChecklistScope) return;
+    const errors = validateChecklistDraft();
+    setChecklistErrors(errors);
+    if (errors.label) return;
+
+    const itemId =
+      editingChecklistItemId && editingChecklistItemId !== "__new__"
+        ? editingChecklistItemId
+        : createLocalItemId(editingChecklistScope === "common" ? "common" : "personal");
+
+    try {
+      if (editingChecklistScope === "common") {
+        const nextItem: EventCommonChecklistItem = {
+          id: itemId,
+          label: checklistDraft.label.trim(),
+          memo: checklistDraft.memo.trim() || undefined,
+          checked:
+            (selectedEvent.commonChecklistItems ?? []).find((item) => item.id === itemId)?.checked ?? false,
+        };
+        const nextItems = [...(selectedEvent.commonChecklistItems ?? [])];
+        const currentIndex = nextItems.findIndex((item) => item.id === itemId);
+        if (currentIndex >= 0) nextItems[currentIndex] = nextItem;
+        else nextItems.push(nextItem);
+        await saveEvent({ ...selectedEvent, commonChecklistItems: nextItems });
+      } else {
+        const nextItem: EventPersonalChecklistItem = {
+          id: itemId,
+          label: checklistDraft.label.trim(),
+          memo: checklistDraft.memo.trim() || undefined,
+        };
+        const nextItems = [...(selectedEvent.personalChecklistItems ?? [])];
+        const currentIndex = nextItems.findIndex((item) => item.id === itemId);
+        if (currentIndex >= 0) nextItems[currentIndex] = nextItem;
+        else nextItems.push(nextItem);
+        await saveEvent({ ...selectedEvent, personalChecklistItems: nextItems });
+      }
+      closeChecklistEditor();
+      showFeedback("持ち物項目を保存しました");
+    } catch {
+      showFailure("持ち物項目の保存に失敗しました");
+    }
+  };
+
+  const confirmDeleteChecklistItem = async () => {
+    if (!isManager || !selectedEvent || !deleteChecklistScope || !deleteChecklistItemId) return;
+    try {
+      if (deleteChecklistScope === "common") {
+        await saveEvent({
+          ...selectedEvent,
+          commonChecklistItems: (selectedEvent.commonChecklistItems ?? []).filter(
+            (item) => item.id !== deleteChecklistItemId,
+          ),
+        });
+      } else {
+        await saveEvent({
+          ...selectedEvent,
+          personalChecklistItems: (selectedEvent.personalChecklistItems ?? []).filter(
+            (item) => item.id !== deleteChecklistItemId,
+          ),
+        });
+        if (personalCheckedItemIds.includes(deleteChecklistItemId)) {
+          const nextCheckedItemIds = personalCheckedItemIds.filter((itemId) => itemId !== deleteChecklistItemId);
+          await saveEventPersonalChecklistState(selectedEvent.id, currentChecklistMemberId, nextCheckedItemIds);
+        }
+      }
+      setDeleteChecklistScope(null);
+      setDeleteChecklistItemId(null);
+      showFeedback("持ち物項目を削除しました");
+    } catch {
+      showFailure("持ち物項目の削除に失敗しました");
+    }
+  };
+
+  const toggleCommonChecklistItem = async (itemId: string) => {
+    if (!selectedEvent) return;
+    try {
+      await saveEvent({
+        ...selectedEvent,
+        commonChecklistItems: (selectedEvent.commonChecklistItems ?? []).map((item) =>
+          item.id === itemId ? { ...item, checked: !item.checked } : item,
+        ),
+      });
+    } catch {
+      showFailure("共通持ち物の更新に失敗しました");
+    }
+  };
+
+  const togglePersonalChecklistItem = async (itemId: string) => {
+    if (!selectedEvent) return;
+    const previousCheckedItemIds = personalCheckedItemIds;
+    const nextCheckedItemIds = previousCheckedItemIds.includes(itemId)
+      ? previousCheckedItemIds.filter((currentItemId) => currentItemId !== itemId)
+      : [...previousCheckedItemIds, itemId];
+    setPersonalCheckedItemIds(nextCheckedItemIds);
+    try {
+      await saveEventPersonalChecklistState(selectedEvent.id, currentChecklistMemberId, nextCheckedItemIds);
+    } catch {
+      setPersonalCheckedItemIds(previousCheckedItemIds);
+      showFailure("個人持ち物の更新に失敗しました");
+    }
+  };
+
+  const openCarpoolAssignmentEditor = (vehicle: EventCarpoolVehicle) => {
+    if (!isManager) return;
+    setEditingCarpoolVehicleKey(`${vehicle.familyId}:${vehicle.vehicleIndex}`);
+    setCarpoolAssignmentDraft({
+      outboundMemberIds: vehicle.outboundMemberIds ?? [],
+      returnMemberIds: vehicle.returnMemberIds ?? [],
+      isEquipmentVehicle: vehicle.isEquipmentVehicle === true,
+    });
+  };
+
+  const closeCarpoolAssignmentEditor = () => {
+    setEditingCarpoolVehicleKey(null);
+    setCarpoolAssignmentDraft({
+      outboundMemberIds: [],
+      returnMemberIds: [],
+      isEquipmentVehicle: false,
+    });
+  };
+
+  const toggleCarpoolAssignmentMember = (direction: "outboundMemberIds" | "returnMemberIds", memberId: string) => {
+    setCarpoolAssignmentDraft((current) => ({
+      ...current,
+      [direction]: current[direction].includes(memberId)
+        ? current[direction].filter((currentMemberId) => currentMemberId !== memberId)
+        : [...current[direction], memberId],
+    }));
+  };
+
+  const saveCarpoolAssignments = async () => {
+    if (!isManager || !selectedEvent || !editingCarpoolVehicle) return;
+    const vehicleKey = `${editingCarpoolVehicle.familyId}:${editingCarpoolVehicle.vehicleIndex}`;
+    try {
+      await saveEvent({
+        ...selectedEvent,
+        carpoolVehicles: (selectedEvent.carpoolVehicles ?? []).map((vehicle) =>
+          `${vehicle.familyId}:${vehicle.vehicleIndex}` === vehicleKey
+            ? {
+                ...vehicle,
+                outboundMemberIds: carpoolAssignmentDraft.outboundMemberIds,
+                returnMemberIds: carpoolAssignmentDraft.returnMemberIds,
+                isEquipmentVehicle: carpoolAssignmentDraft.isEquipmentVehicle,
+              }
+            : vehicle,
+        ),
+      });
+      closeCarpoolAssignmentEditor();
+      showFeedback("配車割り振りを保存しました");
+    } catch {
+      showFailure("配車割り振りの保存に失敗しました");
+    }
   };
 
   const openCreateModal = () => {
@@ -613,7 +997,7 @@ export function EventsPage({
               )}
             </div>
 
-            <section className="events-detail-section">
+            <section className="events-detail-section events-detail-linked-sessions-section">
               <h3>メモ / 説明</h3>
               {selectedEvent.memo?.trim() ? (
                 <p className="todo-memo-full">
@@ -622,6 +1006,166 @@ export function EventsPage({
               ) : (
                 <p className="muted">メモはありません。</p>
               )}
+            </section>
+
+            <section className="events-detail-section events-detail-carpool-section">
+              <div className="events-section-header">
+                <h3>タイムテーブル</h3>
+                {isManager && (
+                  <button type="button" className="button button-small button-secondary" onClick={() => openTimetableEditor()}>
+                    ＋ 追加
+                  </button>
+                )}
+              </div>
+              <div className="events-simple-list">
+                {selectedEventTimetableItems.map((item) => (
+                  <article key={item.id} className="events-simple-list-row">
+                    <div className="events-simple-list-main">
+                      <p className="events-simple-list-title">
+                        <span className="events-time-chip">{formatTimelineRange(item)}</span>
+                        <span>{item.title}</span>
+                      </p>
+                      <p className="events-simple-list-meta">
+                        {item.details?.trim() ? (
+                          <button
+                            type="button"
+                            className="events-inline-link"
+                            onClick={() => setDetailTimetableItemId(item.id)}
+                          >
+                            詳細あり
+                          </button>
+                        ) : (
+                          <span className="muted">詳細なし</span>
+                        )}
+                      </p>
+                    </div>
+                    {isManager && (
+                      <div className="events-inline-actions">
+                        <button type="button" className="button button-small button-secondary" onClick={() => openTimetableEditor(item)}>
+                          編集
+                        </button>
+                        <button
+                          type="button"
+                          className="button button-small events-danger-button"
+                          onClick={() => setDeleteTimetableItemId(item.id)}
+                        >
+                          削除
+                        </button>
+                      </div>
+                    )}
+                  </article>
+                ))}
+                {selectedEventTimetableItems.length === 0 && <p className="muted">タイムテーブルはありません。</p>}
+              </div>
+            </section>
+
+            <section className="events-detail-section">
+              <h3>持ち物</h3>
+
+              <div className="events-checklist-block">
+                <div className="events-section-header">
+                  <h4>共通チェックリスト</h4>
+                  {isManager && (
+                    <button
+                      type="button"
+                      className="button button-small button-secondary"
+                      onClick={() => openChecklistEditor("common")}
+                    >
+                      ＋ 追加
+                    </button>
+                  )}
+                </div>
+                <div className="events-checklist-list">
+                  {selectedEventCommonChecklistItems.map((item) => (
+                    <article key={item.id} className="events-checklist-row">
+                      <label className="events-checklist-toggle">
+                        <input type="checkbox" checked={item.checked} onChange={() => void toggleCommonChecklistItem(item.id)} />
+                        <span>
+                          <strong>{item.label}</strong>
+                          {item.memo?.trim() && <span className="events-checklist-memo">{item.memo}</span>}
+                        </span>
+                      </label>
+                      {isManager && (
+                        <div className="events-inline-actions">
+                          <button
+                            type="button"
+                            className="button button-small button-secondary"
+                            onClick={() => openChecklistEditor("common", item)}
+                          >
+                            編集
+                          </button>
+                          <button
+                            type="button"
+                            className="button button-small events-danger-button"
+                            onClick={() => {
+                              setDeleteChecklistScope("common");
+                              setDeleteChecklistItemId(item.id);
+                            }}
+                          >
+                            削除
+                          </button>
+                        </div>
+                      )}
+                    </article>
+                  ))}
+                  {selectedEventCommonChecklistItems.length === 0 && <p className="muted">共通持ち物はありません。</p>}
+                </div>
+              </div>
+
+              <div className="events-checklist-block">
+                <div className="events-section-header">
+                  <h4>個人チェックリスト</h4>
+                  {isManager && (
+                    <button
+                      type="button"
+                      className="button button-small button-secondary"
+                      onClick={() => openChecklistEditor("personal")}
+                    >
+                      ＋ 追加
+                    </button>
+                  )}
+                </div>
+                <p className="muted">自分の持ち物確認だけを切り替えます。</p>
+                <div className="events-checklist-list">
+                  {selectedEventPersonalChecklistItems.map((item) => (
+                    <article key={item.id} className="events-checklist-row">
+                      <label className="events-checklist-toggle">
+                        <input
+                          type="checkbox"
+                          checked={personalCheckedItemIds.includes(item.id)}
+                          onChange={() => void togglePersonalChecklistItem(item.id)}
+                        />
+                        <span>
+                          <strong>{item.label}</strong>
+                          {item.memo?.trim() && <span className="events-checklist-memo">{item.memo}</span>}
+                        </span>
+                      </label>
+                      {isManager && (
+                        <div className="events-inline-actions">
+                          <button
+                            type="button"
+                            className="button button-small button-secondary"
+                            onClick={() => openChecklistEditor("personal", item)}
+                          >
+                            編集
+                          </button>
+                          <button
+                            type="button"
+                            className="button button-small events-danger-button"
+                            onClick={() => {
+                              setDeleteChecklistScope("personal");
+                              setDeleteChecklistItemId(item.id);
+                            }}
+                          >
+                            削除
+                          </button>
+                        </div>
+                      )}
+                    </article>
+                  ))}
+                  {selectedEventPersonalChecklistItems.length === 0 && <p className="muted">個人持ち物はありません。</p>}
+                </div>
+              </div>
             </section>
 
             <section className="related-todos-block events-detail-section">
@@ -783,7 +1327,21 @@ export function EventsPage({
                               乗車定員（運転手除く）: {toPassengerCapacity(vehicle.capacity)}人
                             </p>
                             <p className="events-carpool-direction">対応: {toCarpoolDirectionLabel(vehicle)}</p>
+                            {vehicle.isEquipmentVehicle === true && <p className="events-carpool-flag">機材車</p>}
+                            <p className="events-carpool-passengers">行き: {memberListLabel(vehicle.outboundMemberIds)}</p>
+                            <p className="events-carpool-passengers">帰り: {memberListLabel(vehicle.returnMemberIds)}</p>
                           </div>
+                          {isManager && (
+                            <div className="events-inline-actions">
+                              <button
+                                type="button"
+                                className="button button-small button-secondary"
+                                onClick={() => openCarpoolAssignmentEditor(vehicle)}
+                              >
+                                割り振り
+                              </button>
+                            </div>
+                          )}
                         </article>
                       ))}
                     </div>
@@ -797,6 +1355,299 @@ export function EventsPage({
                 ))}
             </section>
           </article>
+        </div>
+      )}
+
+      {detailTimetableItem && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close"
+              aria-label="閉じる"
+              title="閉じる"
+              onClick={() => setDetailTimetableItemId(null)}
+            >
+              ×
+            </button>
+            <h3>{detailTimetableItem.title}</h3>
+            <p className="modal-summary">{formatTimelineRange(detailTimetableItem)}</p>
+            <p className="todo-memo-full">
+              <LinkifiedText text={detailTimetableItem.details ?? ""} className="todo-linkified-text" />
+            </p>
+            <div className="modal-actions">
+              <button type="button" className="button button-secondary" onClick={() => setDetailTimetableItemId(null)}>
+                閉じる
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {selectedEvent && editingTimetableItemId && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <section className="modal-panel events-editor-modal" onClick={(event) => event.stopPropagation()}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeTimetableEditor}>
+              ×
+            </button>
+            <div className="events-editor-modal-body">
+              <h3>{editingTimetableItemId === "__new__" ? "タイムテーブル追加" : "タイムテーブル編集"}</h3>
+              <label>
+                開始時刻
+                <input
+                  type="time"
+                  value={timetableDraft.startTime}
+                  onChange={(event) =>
+                    setTimetableDraft((current) => ({ ...current, startTime: event.target.value }))
+                  }
+                />
+                {timetableErrors.startTime && <span className="field-error">{timetableErrors.startTime}</span>}
+              </label>
+              <label>
+                終了時刻
+                <input
+                  type="time"
+                  value={timetableDraft.endTime}
+                  onChange={(event) =>
+                    setTimetableDraft((current) => ({ ...current, endTime: event.target.value }))
+                  }
+                />
+              </label>
+              <label>
+                タイトル
+                <input
+                  value={timetableDraft.title}
+                  onChange={(event) =>
+                    setTimetableDraft((current) => ({ ...current, title: event.target.value }))
+                  }
+                />
+                {timetableErrors.title && <span className="field-error">{timetableErrors.title}</span>}
+              </label>
+              <label>
+                詳細
+                <textarea
+                  value={timetableDraft.details}
+                  onChange={(event) =>
+                    setTimetableDraft((current) => ({ ...current, details: event.target.value }))
+                  }
+                />
+              </label>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="button button-secondary" onClick={closeTimetableEditor}>
+                キャンセル
+              </button>
+              <button type="button" className="button" onClick={() => void saveTimetableDraft()}>
+                保存
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {deleteTimetableItem && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close"
+              aria-label="閉じる"
+              title="閉じる"
+              onClick={() => setDeleteTimetableItemId(null)}
+            >
+              ×
+            </button>
+            <h3>タイムテーブルを削除しますか？</h3>
+            <p className="modal-summary">
+              {formatTimelineRange(deleteTimetableItem)} {deleteTimetableItem.title}
+            </p>
+            <div className="modal-actions">
+              <button type="button" className="button button-secondary" onClick={() => setDeleteTimetableItemId(null)}>
+                キャンセル
+              </button>
+              <button type="button" className="button events-danger-button" onClick={() => void confirmDeleteTimetableItem()}>
+                削除
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {selectedEvent && editingChecklistScope && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <section className="modal-panel events-editor-modal" onClick={(event) => event.stopPropagation()}>
+            <button type="button" className="modal-close" aria-label="閉じる" title="閉じる" onClick={closeChecklistEditor}>
+              ×
+            </button>
+            <div className="events-editor-modal-body">
+              <h3>
+                {editingChecklistScope === "common" ? "共通持ち物" : "個人持ち物"}
+                {editingChecklistItemId === "__new__" ? "追加" : "編集"}
+              </h3>
+              <label>
+                項目名
+                <input
+                  value={checklistDraft.label}
+                  onChange={(event) =>
+                    setChecklistDraft((current) => ({ ...current, label: event.target.value }))
+                  }
+                />
+                {checklistErrors.label && <span className="field-error">{checklistErrors.label}</span>}
+              </label>
+              <label>
+                メモ
+                <textarea
+                  value={checklistDraft.memo}
+                  onChange={(event) =>
+                    setChecklistDraft((current) => ({ ...current, memo: event.target.value }))
+                  }
+                />
+              </label>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="button button-secondary" onClick={closeChecklistEditor}>
+                キャンセル
+              </button>
+              <button type="button" className="button" onClick={() => void saveChecklistDraft()}>
+                保存
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {deleteChecklistItem && deleteChecklistScope && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <section className="modal-panel events-delete-modal" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close"
+              aria-label="閉じる"
+              title="閉じる"
+              onClick={() => {
+                setDeleteChecklistScope(null);
+                setDeleteChecklistItemId(null);
+              }}
+            >
+              ×
+            </button>
+            <h3>持ち物項目を削除しますか？</h3>
+            <p className="modal-summary">{deleteChecklistItem.label}</p>
+            <p className="muted">{deleteChecklistScope === "common" ? "共通チェックリスト" : "個人チェックリスト"} から削除します。</p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="button button-secondary"
+                onClick={() => {
+                  setDeleteChecklistScope(null);
+                  setDeleteChecklistItemId(null);
+                }}
+              >
+                キャンセル
+              </button>
+              <button type="button" className="button events-danger-button" onClick={() => void confirmDeleteChecklistItem()}>
+                削除
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {editingCarpoolVehicle && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <section className="modal-panel events-editor-modal" onClick={(event) => event.stopPropagation()}>
+            <button
+              type="button"
+              className="modal-close"
+              aria-label="閉じる"
+              title="閉じる"
+              onClick={closeCarpoolAssignmentEditor}
+            >
+              ×
+            </button>
+            <div className="events-editor-modal-body">
+              <h3>配車割り振り</h3>
+              <p className="modal-context">
+                {toVehicleLabel(
+                  resolveFamilyNameFromIdentifier({
+                    identifier: editingCarpoolVehicle.familyId,
+                    memberIndexes,
+                    familiesById,
+                    fallback: editingCarpoolVehicle.familyNameSnapshot || "車両",
+                  }) || editingCarpoolVehicle.familyNameSnapshot || "車両",
+                  editingCarpoolVehicle.maker,
+                  editingCarpoolVehicle.model,
+                )}
+              </p>
+              <label className="events-carpool-toggle">
+                <input
+                  type="checkbox"
+                  checked={carpoolAssignmentDraft.isEquipmentVehicle}
+                  onChange={(event) =>
+                    setCarpoolAssignmentDraft((current) => ({
+                      ...current,
+                      isEquipmentVehicle: event.target.checked,
+                    }))
+                  }
+                />
+                <span>機材車として表示する</span>
+              </label>
+              <section className="events-checklist-block">
+                <div className="events-section-header">
+                  <h4>行き</h4>
+                  <button
+                    type="button"
+                    className="button button-small button-secondary"
+                    onClick={() =>
+                      setCarpoolAssignmentDraft((current) => ({
+                        ...current,
+                        returnMemberIds: [...current.outboundMemberIds],
+                      }))
+                    }
+                  >
+                    帰りへコピー
+                  </button>
+                </div>
+                <div className="events-checklist-list">
+                  {sortedAssignableMembers.map((member) => (
+                    <label key={`outbound-${member.id}`} className="events-checklist-toggle">
+                      <input
+                        type="checkbox"
+                        checked={carpoolAssignmentDraft.outboundMemberIds.includes(member.id)}
+                        onChange={() => toggleCarpoolAssignmentMember("outboundMemberIds", member.id)}
+                      />
+                      <span>{memberDisplayName(member.id)}</span>
+                    </label>
+                  ))}
+                </div>
+              </section>
+              <section className="events-checklist-block">
+                <div className="events-section-header">
+                  <h4>帰り</h4>
+                </div>
+                <div className="events-checklist-list">
+                  {sortedAssignableMembers.map((member) => (
+                    <label key={`return-${member.id}`} className="events-checklist-toggle">
+                      <input
+                        type="checkbox"
+                        checked={carpoolAssignmentDraft.returnMemberIds.includes(member.id)}
+                        onChange={() => toggleCarpoolAssignmentMember("returnMemberIds", member.id)}
+                      />
+                      <span>{memberDisplayName(member.id)}</span>
+                    </label>
+                  ))}
+                </div>
+              </section>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="button button-secondary" onClick={closeCarpoolAssignmentEditor}>
+                キャンセル
+              </button>
+              <button type="button" className="button" onClick={() => void saveCarpoolAssignments()}>
+                保存
+              </button>
+            </div>
+          </section>
         </div>
       )}
 

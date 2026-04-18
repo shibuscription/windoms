@@ -121,6 +121,36 @@ export type EventCarpoolVehicle = {
   capacity: number | null;
   canOutbound?: boolean;
   canReturn?: boolean;
+  outboundMemberIds?: string[];
+  returnMemberIds?: string[];
+  isEquipmentVehicle?: boolean;
+};
+
+export type EventTimelineItem = {
+  id: string;
+  startTime: string;
+  endTime?: string;
+  title: string;
+  details?: string;
+};
+
+export type EventCommonChecklistItem = {
+  id: string;
+  label: string;
+  memo?: string;
+  checked: boolean;
+};
+
+export type EventPersonalChecklistItem = {
+  id: string;
+  label: string;
+  memo?: string;
+};
+
+export type EventPersonalChecklistState = {
+  eventId: string;
+  memberId: string;
+  checkedItemIds: string[];
 };
 
 export type EventRecord = {
@@ -131,6 +161,9 @@ export type EventRecord = {
   eventSortDate: string;
   memo?: string;
   sessionIds?: string[];
+  timetableItems?: EventTimelineItem[];
+  commonChecklistItems?: EventCommonChecklistItem[];
+  personalChecklistItems?: EventPersonalChecklistItem[];
   carpoolVehicles?: EventCarpoolVehicle[];
 };
 

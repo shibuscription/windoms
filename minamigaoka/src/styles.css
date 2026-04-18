@@ -1391,6 +1391,14 @@ body {
   color: #0f172a;
 }
 
+.events-detail-carpool-section {
+  order: 1;
+}
+
+.events-detail-linked-sessions-section {
+  order: 2;
+}
+
 .events-section-header {
   display: flex;
   align-items: center;
@@ -1522,6 +1530,123 @@ body {
   gap: 6px;
 }
 
+.events-simple-list,
+.events-checklist-list {
+  display: grid;
+  gap: 10px;
+}
+
+.events-simple-list-row,
+.events-checklist-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #d6dde8;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px 12px;
+}
+
+.events-simple-list-main {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.events-simple-list-title,
+.events-simple-list-meta,
+.events-carpool-flag,
+.events-carpool-passengers {
+  margin: 0;
+}
+
+.events-time-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 88px;
+  padding: 2px 8px;
+  margin-right: 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #0f172a;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.events-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.events-inline-link {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #1d4ed8;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.events-inline-link:hover {
+  color: #1e40af;
+}
+
+.events-checklist-block {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #d6dde8;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.events-checklist-block h4 {
+  margin: 0;
+  font-size: 0.96rem;
+  color: #0f172a;
+}
+
+.events-checklist-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.events-checklist-toggle span {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.events-checklist-toggle strong {
+  font-size: 0.95rem;
+  color: #0f172a;
+}
+
+.events-checklist-memo {
+  color: #475569;
+  font-size: 0.88rem;
+  white-space: pre-wrap;
+}
+
+.events-carpool-flag {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #0f766e;
+}
+
+.events-carpool-passengers {
+  color: #475569;
+  font-size: 0.88rem;
+  white-space: pre-wrap;
+}
+
 .events-carpool-editor {
   display: grid;
   gap: 10px;
@@ -1577,6 +1702,24 @@ body {
 .events-carpool-capacity,
 .events-carpool-total {
   margin: 0;
+}
+
+@media (max-width: 767px) {
+  .events-simple-list-row,
+  .events-checklist-row,
+  .events-carpool-row {
+    flex-direction: column;
+  }
+
+  .events-inline-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .events-time-chip {
+    margin-right: 0;
+    margin-bottom: 6px;
+  }
 }
 
 .events-carpool-name {
