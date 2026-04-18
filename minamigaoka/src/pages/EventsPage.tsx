@@ -379,12 +379,14 @@ export function EventsPage({
       if (selectedVehicleKey) setSelectedVehicleKey("");
       return;
     }
-    const nextAvailableOption = selectableCarpoolOptions.find((option) => !addedCarpoolVehicleKeys.has(option.key));
-    const nextSelectedKey =
-      nextAvailableOption?.key ??
-      selectableCarpoolOptions.find((option) => option.key === selectedVehicleKey)?.key ??
-      selectableCarpoolOptions[0].key;
-    if (nextSelectedKey !== selectedVehicleKey) {
+    const selectedOptionExists = selectableCarpoolOptions.some((option) => option.key === selectedVehicleKey);
+    const shouldResetSelection =
+      !selectedVehicleKey || !selectedOptionExists || addedCarpoolVehicleKeys.has(selectedVehicleKey);
+    if (shouldResetSelection) {
+      const nextSelectedKey =
+        selectableCarpoolOptions.find((option) => !addedCarpoolVehicleKeys.has(option.key))?.key ??
+        selectableCarpoolOptions[0].key;
+      if (nextSelectedKey === selectedVehicleKey) return;
       setSelectedVehicleKey(nextSelectedKey);
     }
   }, [addedCarpoolVehicleKeys, editingEventId, selectableCarpoolOptions, selectedVehicleKey]);
@@ -395,12 +397,14 @@ export function EventsPage({
       if (selectedOutboundMemberId) setSelectedOutboundMemberId("");
       return;
     }
-    const nextAvailableMember = selectableOutboundMembers.find((member) => !outboundAssignedIds.has(member.id));
-    const nextSelectedId =
-      nextAvailableMember?.id ??
-      selectableOutboundMembers.find((member) => member.id === selectedOutboundMemberId)?.id ??
-      selectableOutboundMembers[0].id;
-    if (nextSelectedId !== selectedOutboundMemberId) {
+    const selectedMemberExists = selectableOutboundMembers.some((member) => member.id === selectedOutboundMemberId);
+    const shouldResetSelection =
+      !selectedOutboundMemberId || !selectedMemberExists || outboundAssignedIds.has(selectedOutboundMemberId);
+    if (shouldResetSelection) {
+      const nextSelectedId =
+        selectableOutboundMembers.find((member) => !outboundAssignedIds.has(member.id))?.id ??
+        selectableOutboundMembers[0].id;
+      if (nextSelectedId === selectedOutboundMemberId) return;
       setSelectedOutboundMemberId(nextSelectedId);
     }
   }, [editingCarpoolVehicleKey, outboundAssignedIds, selectableOutboundMembers, selectedOutboundMemberId]);
@@ -411,12 +415,14 @@ export function EventsPage({
       if (selectedReturnMemberId) setSelectedReturnMemberId("");
       return;
     }
-    const nextAvailableMember = selectableReturnMembers.find((member) => !returnAssignedIds.has(member.id));
-    const nextSelectedId =
-      nextAvailableMember?.id ??
-      selectableReturnMembers.find((member) => member.id === selectedReturnMemberId)?.id ??
-      selectableReturnMembers[0].id;
-    if (nextSelectedId !== selectedReturnMemberId) {
+    const selectedMemberExists = selectableReturnMembers.some((member) => member.id === selectedReturnMemberId);
+    const shouldResetSelection =
+      !selectedReturnMemberId || !selectedMemberExists || returnAssignedIds.has(selectedReturnMemberId);
+    if (shouldResetSelection) {
+      const nextSelectedId =
+        selectableReturnMembers.find((member) => !returnAssignedIds.has(member.id))?.id ??
+        selectableReturnMembers[0].id;
+      if (nextSelectedId === selectedReturnMemberId) return;
       setSelectedReturnMemberId(nextSelectedId);
     }
   }, [editingCarpoolVehicleKey, returnAssignedIds, selectableReturnMembers, selectedReturnMemberId]);
