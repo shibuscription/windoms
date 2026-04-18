@@ -139,12 +139,14 @@ export type EventCommonChecklistItem = {
   label: string;
   memo?: string;
   checked: boolean;
+  sortOrder?: number;
 };
 
 export type EventPersonalChecklistItem = {
   id: string;
   label: string;
   memo?: string;
+  sortOrder?: number;
 };
 
 export type EventPersonalChecklistState = {

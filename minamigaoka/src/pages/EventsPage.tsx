@@ -1,3 +1,4 @@
+import type { DragEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { LinkifiedText } from "../components/LinkifiedText";
@@ -112,6 +113,17 @@ const createInitialChecklistDraft = (): ChecklistDraft => ({
 const createLocalItemId = (prefix: string): string =>
   `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
+const sortChecklistItems = <T extends { sortOrder?: number; id: string }>(items: T[]): T[] =>
+  [...items].sort((a, b) => {
+    const left = typeof a.sortOrder === "number" ? a.sortOrder : Number.MAX_SAFE_INTEGER;
+    const right = typeof b.sortOrder === "number" ? b.sortOrder : Number.MAX_SAFE_INTEGER;
+    if (left !== right) return left - right;
+    return a.id.localeCompare(b.id, "ja");
+  });
+
+const normalizeChecklistSortOrder = <T extends { sortOrder?: number }>(items: T[]): T[] =>
+  items.map((item, index) => ({ ...item, sortOrder: index }));
+
 const toVehicleLabel = (familyName: string, maker: string, model: string): string => {
   const familyLabel = familyName.trim() || "名称未設定";
   const vehicleLabel = [maker.trim(), model.trim()].filter(Boolean).join("/");
@@ -209,6 +221,9 @@ export function EventsPage({
   const [checklistErrors, setChecklistErrors] = useState<ChecklistErrors>({});
   const [deleteChecklistScope, setDeleteChecklistScope] = useState<ChecklistScope | null>(null);
   const [deleteChecklistItemId, setDeleteChecklistItemId] = useState<string | null>(null);
+  const [draggingChecklistItem, setDraggingChecklistItem] = useState<{ scope: ChecklistScope; itemId: string } | null>(
+    null,
+  );
   const [editingCarpoolVehicleKey, setEditingCarpoolVehicleKey] = useState<string | null>(null);
   const [carpoolAssignmentDraft, setCarpoolAssignmentDraft] = useState<{
     outboundMemberIds: string[];
@@ -463,8 +478,14 @@ export function EventsPage({
     deleteTimetableItemId && selectedEvent
       ? (selectedEvent.timetableItems ?? []).find((item) => item.id === deleteTimetableItemId) ?? null
       : null;
-  const selectedEventCommonChecklistItems = selectedEvent?.commonChecklistItems ?? [];
-  const selectedEventPersonalChecklistItems = selectedEvent?.personalChecklistItems ?? [];
+  const selectedEventCommonChecklistItems = useMemo(
+    () => sortChecklistItems(selectedEvent?.commonChecklistItems ?? []),
+    [selectedEvent?.commonChecklistItems],
+  );
+  const selectedEventPersonalChecklistItems = useMemo(
+    () => sortChecklistItems(selectedEvent?.personalChecklistItems ?? []),
+    [selectedEvent?.personalChecklistItems],
+  );
   const deleteChecklistItem =
     deleteChecklistItemId && deleteChecklistScope && selectedEvent
       ? (
@@ -650,23 +671,29 @@ export function EventsPage({
           memo: checklistDraft.memo.trim() || undefined,
           checked:
             (selectedEvent.commonChecklistItems ?? []).find((item) => item.id === itemId)?.checked ?? false,
+          sortOrder:
+            (selectedEvent.commonChecklistItems ?? []).find((item) => item.id === itemId)?.sortOrder ??
+            (selectedEvent.commonChecklistItems ?? []).length,
         };
         const nextItems = [...(selectedEvent.commonChecklistItems ?? [])];
         const currentIndex = nextItems.findIndex((item) => item.id === itemId);
         if (currentIndex >= 0) nextItems[currentIndex] = nextItem;
         else nextItems.push(nextItem);
-        await saveEvent({ ...selectedEvent, commonChecklistItems: nextItems });
+        await saveEvent({ ...selectedEvent, commonChecklistItems: normalizeChecklistSortOrder(nextItems) });
       } else {
         const nextItem: EventPersonalChecklistItem = {
           id: itemId,
           label: checklistDraft.label.trim(),
           memo: checklistDraft.memo.trim() || undefined,
+          sortOrder:
+            (selectedEvent.personalChecklistItems ?? []).find((item) => item.id === itemId)?.sortOrder ??
+            (selectedEvent.personalChecklistItems ?? []).length,
         };
         const nextItems = [...(selectedEvent.personalChecklistItems ?? [])];
         const currentIndex = nextItems.findIndex((item) => item.id === itemId);
         if (currentIndex >= 0) nextItems[currentIndex] = nextItem;
         else nextItems.push(nextItem);
-        await saveEvent({ ...selectedEvent, personalChecklistItems: nextItems });
+        await saveEvent({ ...selectedEvent, personalChecklistItems: normalizeChecklistSortOrder(nextItems) });
       }
       closeChecklistEditor();
       showFeedback("持ち物項目を保存しました");
@@ -681,15 +708,15 @@ export function EventsPage({
       if (deleteChecklistScope === "common") {
         await saveEvent({
           ...selectedEvent,
-          commonChecklistItems: (selectedEvent.commonChecklistItems ?? []).filter(
-            (item) => item.id !== deleteChecklistItemId,
+          commonChecklistItems: normalizeChecklistSortOrder(
+            (selectedEvent.commonChecklistItems ?? []).filter((item) => item.id !== deleteChecklistItemId),
           ),
         });
       } else {
         await saveEvent({
           ...selectedEvent,
-          personalChecklistItems: (selectedEvent.personalChecklistItems ?? []).filter(
-            (item) => item.id !== deleteChecklistItemId,
+          personalChecklistItems: normalizeChecklistSortOrder(
+            (selectedEvent.personalChecklistItems ?? []).filter((item) => item.id !== deleteChecklistItemId),
           ),
         });
         if (personalCheckedItemIds.includes(deleteChecklistItemId)) {
@@ -732,6 +759,65 @@ export function EventsPage({
       setPersonalCheckedItemIds(previousCheckedItemIds);
       showFailure("個人持ち物の更新に失敗しました");
     }
+  };
+
+  const reorderChecklistItems = async (scope: ChecklistScope, sourceItemId: string, targetItemId: string) => {
+    if (!isManager || !selectedEvent || sourceItemId === targetItemId) return;
+    try {
+      if (scope === "common") {
+        const currentItems = [...selectedEventCommonChecklistItems];
+        const sourceIndex = currentItems.findIndex((item) => item.id === sourceItemId);
+        const targetIndex = currentItems.findIndex((item) => item.id === targetItemId);
+        if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return;
+        const [movedItem] = currentItems.splice(sourceIndex, 1);
+        currentItems.splice(targetIndex, 0, movedItem);
+        await saveEvent({
+          ...selectedEvent,
+          commonChecklistItems: normalizeChecklistSortOrder(currentItems),
+        });
+      } else {
+        const currentItems = [...selectedEventPersonalChecklistItems];
+        const sourceIndex = currentItems.findIndex((item) => item.id === sourceItemId);
+        const targetIndex = currentItems.findIndex((item) => item.id === targetItemId);
+        if (sourceIndex < 0 || targetIndex < 0 || sourceIndex === targetIndex) return;
+        const [movedItem] = currentItems.splice(sourceIndex, 1);
+        currentItems.splice(targetIndex, 0, movedItem);
+        await saveEvent({
+          ...selectedEvent,
+          personalChecklistItems: normalizeChecklistSortOrder(currentItems),
+        });
+      }
+    } catch {
+      showFailure("持ち物項目の並べ替えに失敗しました");
+    }
+  };
+
+  const handleChecklistDragStart = (
+    event: DragEvent<HTMLButtonElement>,
+    scope: ChecklistScope,
+    itemId: string,
+  ) => {
+    if (!isManager) return;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", itemId);
+    setDraggingChecklistItem({ scope, itemId });
+  };
+
+  const handleChecklistDrop = async (
+    event: DragEvent<HTMLElement>,
+    scope: ChecklistScope,
+    targetItemId: string,
+  ) => {
+    event.preventDefault();
+    const draggedItemId =
+      draggingChecklistItem?.scope === scope ? draggingChecklistItem.itemId : event.dataTransfer.getData("text/plain");
+    setDraggingChecklistItem(null);
+    if (!draggedItemId || draggedItemId === targetItemId) return;
+    await reorderChecklistItems(scope, draggedItemId, targetItemId);
+  };
+
+  const handleChecklistDragEnd = () => {
+    setDraggingChecklistItem(null);
   };
 
   const openCarpoolAssignmentEditor = (vehicle: EventCarpoolVehicle) => {
@@ -1184,7 +1270,35 @@ export function EventsPage({
                   {selectedEventCommonChecklistItems.map((item) => {
                     const inputId = `common-checklist-${item.id}`;
                     return (
-                      <article key={item.id} className="events-checklist-row events-checklist-item-row">
+                      <article
+                        key={item.id}
+                        className={`events-checklist-row events-checklist-item-row ${isManager ? "events-checklist-item-row-manageable" : ""}`}
+                        onDragOver={
+                          isManager && draggingChecklistItem?.scope === "common"
+                            ? (event) => event.preventDefault()
+                            : undefined
+                        }
+                        onDrop={
+                          isManager
+                            ? (event) => {
+                                void handleChecklistDrop(event, "common", item.id);
+                              }
+                            : undefined
+                        }
+                      >
+                        {isManager && (
+                          <button
+                            type="button"
+                            className="events-drag-handle"
+                            draggable
+                            onDragStart={(event) => handleChecklistDragStart(event, "common", item.id)}
+                            onDragEnd={handleChecklistDragEnd}
+                            aria-label="共通持ち物を並べ替える"
+                            title="ドラッグして並べ替え"
+                          >
+                            ⋮⋮
+                          </button>
+                        )}
                         <div className="events-checklist-box">
                           <input
                             id={inputId}
@@ -1242,7 +1356,35 @@ export function EventsPage({
                   {selectedEventPersonalChecklistItems.map((item) => {
                     const inputId = `personal-checklist-${item.id}`;
                     return (
-                      <article key={item.id} className="events-checklist-row events-checklist-item-row">
+                      <article
+                        key={item.id}
+                        className={`events-checklist-row events-checklist-item-row ${isManager ? "events-checklist-item-row-manageable" : ""}`}
+                        onDragOver={
+                          isManager && draggingChecklistItem?.scope === "personal"
+                            ? (event) => event.preventDefault()
+                            : undefined
+                        }
+                        onDrop={
+                          isManager
+                            ? (event) => {
+                                void handleChecklistDrop(event, "personal", item.id);
+                              }
+                            : undefined
+                        }
+                      >
+                        {isManager && (
+                          <button
+                            type="button"
+                            className="events-drag-handle"
+                            draggable
+                            onDragStart={(event) => handleChecklistDragStart(event, "personal", item.id)}
+                            onDragEnd={handleChecklistDragEnd}
+                            aria-label="個人持ち物を並べ替える"
+                            title="ドラッグして並べ替え"
+                          >
+                            ⋮⋮
+                          </button>
+                        )}
                         <div className="events-checklist-box">
                           <input
                             id={inputId}

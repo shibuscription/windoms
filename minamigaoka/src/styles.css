@@ -1643,9 +1643,29 @@ body {
 
 .events-checklist-item-row {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
+  grid-template-columns: 28px minmax(0, 1fr);
   align-items: start;
   gap: 12px;
+}
+
+.events-checklist-item-row-manageable {
+  grid-template-columns: 20px 28px minmax(0, 1fr) auto;
+}
+
+.events-drag-handle {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  color: #64748b;
+  cursor: grab;
+  font-size: 1rem;
+  line-height: 1;
+  align-self: start;
+}
+
+.events-drag-handle:active {
+  cursor: grabbing;
 }
 
 .events-checklist-box {
@@ -1775,19 +1795,54 @@ body {
     row-gap: 8px;
   }
 
+  .events-checklist-item-row-manageable {
+    grid-template-columns: 20px 28px minmax(0, 1fr);
+  }
+
   .events-checklist-item-row .events-inline-actions {
-    grid-column: 2;
+    grid-column: 2 / -1;
     justify-content: flex-start;
   }
 
   .events-timetable-row {
-    flex-direction: row;
-    align-items: center;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 8px;
+    align-items: start;
   }
 
   .events-timetable-line {
     grid-template-columns: 4.2em 1.1em 4.2em minmax(0, 1fr) auto;
+    grid-template-areas:
+      "start separator end . ."
+      "title title title title detail";
     column-gap: 6px;
+    row-gap: 4px;
+    align-items: start;
+  }
+
+  .events-timetable-start {
+    grid-area: start;
+  }
+
+  .events-timetable-separator {
+    grid-area: separator;
+  }
+
+  .events-timetable-end {
+    grid-area: end;
+  }
+
+  .events-timetable-title {
+    grid-area: title;
+    word-break: normal;
+    overflow-wrap: break-word;
+  }
+
+  .events-timetable-detail-trigger {
+    grid-area: detail;
+    justify-self: end;
+    align-self: start;
   }
 
   .events-inline-actions {

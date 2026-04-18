@@ -114,6 +114,7 @@ const toCommonChecklistItem = (value: unknown): EventCommonChecklistItem | null 
     label,
     memo: toOptionalString(source.memo),
     checked: toBooleanWithDefault(source.checked, false),
+    sortOrder: typeof source.sortOrder === "number" && Number.isFinite(source.sortOrder) ? source.sortOrder : undefined,
   };
 };
 
@@ -128,6 +129,7 @@ const toPersonalChecklistItem = (value: unknown): EventPersonalChecklistItem | n
     id,
     label,
     memo: toOptionalString(source.memo),
+    sortOrder: typeof source.sortOrder === "number" && Number.isFinite(source.sortOrder) ? source.sortOrder : undefined,
   };
 };
 
@@ -193,6 +195,7 @@ const toPayload = (event: Omit<EventRecord, "id">) => ({
         label: item.label.trim(),
         memo: item.memo?.trim() || "",
         checked: item.checked === true,
+        sortOrder: typeof item.sortOrder === "number" && Number.isFinite(item.sortOrder) ? item.sortOrder : null,
       }))
     : [],
   personalChecklistItems: Array.isArray(event.personalChecklistItems)
@@ -200,6 +203,7 @@ const toPayload = (event: Omit<EventRecord, "id">) => ({
         id: item.id,
         label: item.label.trim(),
         memo: item.memo?.trim() || "",
+        sortOrder: typeof item.sortOrder === "number" && Number.isFinite(item.sortOrder) ? item.sortOrder : null,
       }))
     : [],
   carpoolVehicles: Array.isArray(event.carpoolVehicles)
