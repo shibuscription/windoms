@@ -3531,6 +3531,20 @@ cd d:\projects\windoms\minamigaoka
 firebase deploy --only storage
 ```
 
+#### 30.9.11.6 minamigaoka Firestore Rules
+- minamigaoka の Firestore Rules は、当面の仮運用では「未ログインは拒否、認証済みユーザーは read / write 可」のシンプルなルールを採用する。
+- Firestore Rules は `firestore.rules` を正とし、リポジトリルートの `firebase.json` から deploy できる状態を保つ。
+- 当面の Firestore Rules は `allow read, write: if request.auth != null;` とする。
+- つまり、未ログインユーザーは Firestore へアクセスできず、認証済みユーザーは現在の主要画面や編集操作が止まらないことを優先する。
+- role / family / accounting などの厳密な権限制御は、仮運用を止めないことを優先して後続フェーズで段階的に強化する。
+
+Rules の反映手順:
+
+```powershell
+cd d:\projects\windoms
+firebase deploy --only firestore:rules
+```
+
 - Hosting / Firestore / Functions とまとめて反映する場合を除き、Storage Rules だけの反映では `firebase deploy --only storage` を優先する。
 
 #### 30.9.12 不整合チェック
