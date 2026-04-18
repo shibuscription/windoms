@@ -302,10 +302,7 @@ export function EventsPage({
   const memberIndexes = useMemo(() => buildMemberIndexes(members), [members]);
   const familiesById = useMemo(() => buildFamilyMap(families), [families]);
   const currentChecklistMemberId = linkedMember?.id || currentUid;
-  const sortedAssignableMembers = useMemo(
-    () => sortMembersForDisplay(members.filter((member) => member.memberStatus !== "inactive"), "all"),
-    [members],
-  );
+  const sortedAssignableMembers = useMemo(() => sortMembersForDisplay(members, "all"), [members]);
 
   const activeEvents = useMemo(
     () =>
@@ -997,7 +994,7 @@ export function EventsPage({
               )}
             </div>
 
-            <section className="events-detail-section events-detail-linked-sessions-section">
+            <section className="events-detail-section">
               <h3>メモ / 説明</h3>
               {selectedEvent.memo?.trim() ? (
                 <p className="todo-memo-full">
@@ -1008,7 +1005,7 @@ export function EventsPage({
               )}
             </section>
 
-            <section className="events-detail-section events-detail-carpool-section">
+            <section className="events-detail-section">
               <div className="events-section-header">
                 <h3>タイムテーブル</h3>
                 {isManager && (
@@ -1219,6 +1216,7 @@ export function EventsPage({
               </div>
             </section>
 
+            {false && (
             <section className="events-detail-section">
               <button
                 type="button"
@@ -1290,6 +1288,7 @@ export function EventsPage({
                 </>
               )}
             </section>
+            )}
 
             <section className="events-detail-section">
               <button
@@ -1353,6 +1352,78 @@ export function EventsPage({
                 ) : (
                   <p className="muted">配車はありません。</p>
                 ))}
+            </section>
+
+            <section className="events-detail-section">
+              <button
+                type="button"
+                className="events-collapsible-toggle"
+                aria-expanded={isLinkedSessionsOpen}
+                onClick={() => setIsLinkedSessionsOpen((current) => !current)}
+              >
+                <span className="events-collapsible-heading">紐付け予定</span>
+                <span className="events-collapsible-meta">{linkedSessions.length}件</span>
+                <span className={`events-collapsible-icon ${isLinkedSessionsOpen ? "open" : ""}`} aria-hidden="true">
+                  ▾
+                </span>
+              </button>
+              {isLinkedSessionsOpen && (
+                <>
+                  {isManager && (
+                    <div className="events-section-header">
+                      <span className="muted">紐付け予定を追加・解除できます。</span>
+                      <button
+                        type="button"
+                        className="button button-small"
+                        aria-label="追加"
+                        title="追加"
+                        onClick={() => setIsSessionBindModalOpen(true)}
+                      >
+                        ＋追加
+                      </button>
+                    </div>
+                  )}
+                  <div className="calendar-day-sheet-list">
+                    {linkedSessions.map((session) => (
+                      <article key={session.id} className={`session-card ${session.type}`}>
+                        <span className={`session-type-badge ${session.type}`}>{sessionTypeLabel[session.type]}</span>
+                        <div className="calendar-day-sheet-main session-card-body">
+                          <p className="calendar-day-sheet-time session-time">
+                            {toDateLabel(session.date)} {session.startTime}-{session.endTime}
+                          </p>
+                          {(session.type === "event" || session.type === "other") && session.eventName && (
+                            <p className="calendar-day-sheet-meta">{session.eventName}</p>
+                          )}
+                          {getSessionAssigneeRoleLabel(session) && (
+                            <p className="calendar-day-sheet-label kv-row">
+                              <span className="kv-key">{getSessionAssigneeRoleLabel(session)}：</span>
+                              <span className="kv-val shift-role">{session.dutyName ?? "-"}</span>
+                            </p>
+                          )}
+                          {session.location && (
+                            <p className="calendar-day-sheet-meta kv-row">
+                              <span className="kv-key">場所：</span>
+                              <span className="kv-val">{session.location}</span>
+                            </p>
+                          )}
+                          {isManager && (
+                            <div className="events-linked-session-actions">
+                              <button
+                                type="button"
+                                className="events-unlink-button"
+                                onClick={() => setUnlinkTargetSessionId(session.id)}
+                              >
+                                解除
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </article>
+                    ))}
+                    {linkedSessions.length === 0 && <p className="muted">紐付け予定はありません。</p>}
+                  </div>
+                </>
+              )}
             </section>
           </article>
         </div>

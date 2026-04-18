@@ -1391,14 +1391,6 @@ body {
   color: #0f172a;
 }
 
-.events-detail-carpool-section {
-  order: 1;
-}
-
-.events-detail-linked-sessions-section {
-  order: 2;
-}
-
 .events-section-header {
   display: flex;
   align-items: center;
